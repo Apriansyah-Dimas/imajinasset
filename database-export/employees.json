@@ -1,0 +1,50 @@
+[
+  {
+    "id": "cmh7umzmo0000x5s4ko8bvw6g",
+    "employeeId": "IMJ0068",
+    "name": "Herfian Pradityo",
+    "email": "pradityoherfian@gmail.com",
+    "department": "Engineering",
+    "position": "Operator",
+    "joinDate": "2024-05-20T00:00:00.000Z",
+    "isActive": true,
+    "createdAt": "2025-10-26T15:13:54.143Z",
+    "updatedAt": "2025-10-26T15:13:54.143Z"
+  },
+  {
+    "id": "cmh7umznp0001x5s4ok0irghg",
+    "employeeId": "IMJ0070",
+    "name": "Yogie Alfath",
+    "email": "yogiealfath48@gmail.com",
+    "department": "BDD",
+    "position": "Videograph",
+    "joinDate": "2024-05-27T00:00:00.000Z",
+    "isActive": true,
+    "createdAt": "2025-10-26T15:13:54.182Z",
+    "updatedAt": "2025-10-26T15:13:54.182Z"
+  },
+  {
+    "id": "cmh7umzp90002x5s4618c2juj",
+    "employeeId": "IMJ0071",
+    "name": "Devi Erliani",
+    "email": "devierliani98@gmail.com",
+    "department": "Supply Chain",
+    "position": "Purchasing",
+    "joinDate": "2024-05-27T00:00:00.000Z",
+    "isActive": true,
+    "createdAt": "2025-10-26T15:13:54.237Z",
+    "updatedAt": "2025-10-26T15:13:54.237Z"
+  },
+  {
+    "id": "cmh7umzqk0003x5s4ilxt58y0",
+    "employeeId": "IMJ0072",
+    "name": "Muhamad Apriansyah Dimas Saputra",
+    "email": "muhmmddimas13@gmail.com",
+    "department": "HRGA & Legal",
+    "position": "Office Staff",
+    "joinDate": "2024-05-27T00:00:00.000Z",
+    "isActive": true,
+    "createdAt": "2025-10-26T15:13:54.284Z",
+    "updatedAt": "2025-10-26T15:13:54.284Z"
+  }
+]

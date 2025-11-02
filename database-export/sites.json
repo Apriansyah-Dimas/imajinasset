@@ -1,0 +1,41 @@
+[
+  {
+    "id": "cmh7urlqm0004x5s43hf36gs2",
+    "name": "BSD",
+    "address": null,
+    "city": null,
+    "province": null,
+    "postalCode": null,
+    "country": null,
+    "phone": null,
+    "email": null,
+    "createdAt": "2025-10-26T15:17:29.423Z",
+    "updatedAt": "2025-10-26T15:17:29.423Z"
+  },
+  {
+    "id": "cmh7urq9e0005x5s4wn9pof7v",
+    "name": "Deltamas 1",
+    "address": null,
+    "city": null,
+    "province": null,
+    "postalCode": null,
+    "country": null,
+    "phone": null,
+    "email": null,
+    "createdAt": "2025-10-26T15:17:35.282Z",
+    "updatedAt": "2025-10-26T15:17:35.282Z"
+  },
+  {
+    "id": "cmh7uru8n0006x5s4bjqx13vr",
+    "name": "Deltamas 2",
+    "address": null,
+    "city": null,
+    "province": null,
+    "postalCode": null,
+    "country": null,
+    "phone": null,
+    "email": null,
+    "createdAt": "2025-10-26T15:17:40.439Z",
+    "updatedAt": "2025-10-26T15:17:40.439Z"
+  }
+]

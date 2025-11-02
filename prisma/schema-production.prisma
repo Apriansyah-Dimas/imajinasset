@@ -1,0 +1,112 @@
+// Production Schema for PostgreSQL Deployment
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Asset {
+  id           String   @id @default(cuid())
+  name         String
+  noAsset      String   @unique
+  status       String   @default("Unidentified") // Unidentified, Active, Broken, Lost/Missing, Sell
+  serialNo     String?
+  purchaseDate DateTime?
+  cost         Float?
+  brand        String?
+  model        String?
+  siteId       String?
+  categoryId   String?
+  departmentId String?
+  pic          String?
+  imageUrl     String?
+  dateCreated  DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  site       Site?       @relation(fields: [siteId], references: [id])
+  category   Category?   @relation(fields: [categoryId], references: [id])
+  department Department? @relation(fields: [departmentId], references: [id])
+  soAssetEntries SOAssetEntry[]
+}
+
+model Site {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  assets      Asset[]
+}
+
+model Category {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  assets      Asset[]
+}
+
+model Department {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  assets      Asset[]
+}
+
+model SOSession {
+  id          String    @id @default(cuid())
+  name        String
+  year        Int
+  description String?
+  status      String    @default("Active") // Active, Completed, Cancelled
+  totalAssets Int       @default(0)
+  scannedAssets Int     @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  startedAt   DateTime?
+  completedAt DateTime?
+
+  soAssetEntries SOAssetEntry[]
+}
+
+model SOAssetEntry {
+  id            String    @id @default(cuid())
+  soSessionId   String
+  assetId       String
+  scannedAt     DateTime  @default(now())
+  status        String    @default("Scanned") // Scanned, Updated, Not Found
+  isIdentified  Boolean   @default(false) // Whether asset has been identified/updated
+
+  // Temporary data that can be edited during SO without affecting main asset
+  tempName      String?
+  tempStatus    String?
+  tempSerialNo  String?
+  tempPic       String?
+  tempNotes     String?
+  tempBrand     String?
+  tempModel     String?
+  tempCost      Float?
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  soSession     SOSession @relation(fields: [soSessionId], references: [id])
+  asset         Asset     @relation(fields: [assetId], references: [id])
+}
+
+model Employee {
+  id          String   @id @default(cuid())
+  employeeId  String   @unique
+  name        String
+  email       String?  @unique
+  department  String?
+  position    String?
+  joinDate    DateTime?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}

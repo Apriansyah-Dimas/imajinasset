@@ -1,0 +1,188 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:dev.db"
+}
+
+model Asset {
+  id           String   @id @default(cuid())
+  name         String
+  noAsset      String   @unique
+  status       String   @default("Unidentified") // Unidentified, Active, Broken, Lost/Missing, Sell
+  serialNo     String?
+  purchaseDate DateTime?
+  cost         Float?
+  brand        String?
+  model        String?
+  siteId       String?
+  categoryId   String?
+  departmentId String?
+  picId        String?  // Foreign key to Employee
+  pic          String?  // Keep for backward compatibility
+  imageUrl     String?
+  notes        String?  // For additional information (JSON string)
+  dateCreated  DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  site       Site?       @relation(fields: [siteId], references: [id])
+  category   Category?   @relation(fields: [categoryId], references: [id])
+  department Department? @relation(fields: [departmentId], references: [id])
+  employee   Employee?   @relation(fields: [picId], references: [id])
+  soAssetEntries SOAssetEntry[]
+  customValues AssetCustomValue[]
+}
+
+model Site {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  address     String?
+  city        String?
+  province    String?
+  postalCode  String?
+  country     String?   @default("Indonesia")
+  phone       String?
+  email       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  assets      Asset[]
+}
+
+model Category {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  assets      Asset[]
+}
+
+model Department {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  assets      Asset[]
+}
+
+model Employee {
+  id          String    @id @default(cuid())
+  employeeId  String    @unique
+  name        String
+  email       String?   @unique
+  department  String?
+  position    String?
+  joinDate    DateTime?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations - employees can be PIC for assets
+  assets      Asset[]
+  
+}
+
+model SOSession {
+  id          String    @id @default(cuid())
+  name        String
+  year        Int
+  description String?
+  status      String    @default("Active") // Active, Completed, Cancelled
+  totalAssets Int       @default(0)
+  scannedAssets Int     @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  startedAt   DateTime?
+  completedAt DateTime?
+
+  soAssetEntries SOAssetEntry[]
+}
+
+model SOAssetEntry {
+  id            String    @id @default(cuid())
+  soSessionId   String
+  assetId       String
+  scannedAt     DateTime  @default(now())
+  status        String    @default("Scanned") // Scanned, Updated, Not Found
+  isIdentified  Boolean   @default(false) // Whether asset has been identified/updated
+
+  // Temporary data that can be edited during SO without affecting main asset
+  tempName      String?
+  tempStatus    String?
+  tempSerialNo  String?
+  tempPic       String?
+  tempNotes     String?
+  tempBrand     String?
+  tempModel     String?
+  tempCost      Float?
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  soSession     SOSession @relation(fields: [soSessionId], references: [id])
+  asset         Asset     @relation(fields: [assetId], references: [id])
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  password  String
+  role      String   @default("VIEWER")
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdBy String?
+
+  // Relations
+  createdUsers User[] @relation("UserCreator")
+  creator      User?   @relation("UserCreator", fields: [createdBy], references: [id])
+}
+
+model AssetCustomField {
+  id           String    @id @default(cuid())
+  name         String    @unique
+  label        String    // Display label (e.g., "Price", "Warranty Expiry")
+  fieldType    String // text, number, date, select, textarea
+  required     Boolean   @default(false)
+  isActive     Boolean   @default(true)
+  showCondition String?  // Conditional display logic (e.g., "status=Sell")
+  options      String?   // JSON string for select options
+  defaultValue  String?
+  description  String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  customValues AssetCustomValue[]
+}
+
+model AssetCustomValue {
+  id           String   @id @default(cuid())
+  assetId      String
+  customFieldId String
+  stringValue  String?
+  numberValue  Float?
+  dateValue    DateTime?
+  booleanValue Boolean?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  asset       Asset            @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  customField AssetCustomField @relation(fields: [customFieldId], references: [id], onDelete: Cascade)
+
+  @@unique([assetId, customFieldId])
+}
+
+// SQLite doesn't support enums, using String instead
+// FieldType: TEXT, NUMBER, DATE, BOOLEAN, SELECT, TEXTAREA
+// Role: ADMIN, SO_ASSET_USER, VIEWER

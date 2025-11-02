@@ -1,0 +1,131 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { PrismaClient } from '@prisma/client'
+import { z } from 'zod'
+
+const prisma = new PrismaClient()
+
+// Schema untuk validasi custom value
+const customValueSchema = z.object({
+  customFieldId: z.string().min(1, 'Custom field ID is required'),
+  stringValue: z.string().optional(),
+  numberValue: z.number().optional(),
+  dateValue: z.string().datetime().optional(),
+  booleanValue: z.boolean().optional(),
+})
+
+// GET - Mendapatkan custom values untuk asset tertentu
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const customValues = await prisma.assetCustomValue.findMany({
+      where: { assetId: params.id },
+      include: {
+        customField: {
+          where: { isactive: true }
+        }
+      },
+      orderBy: {
+        customField: {
+          createdat: 'asc'
+        }
+      }
+    })
+
+    return NextResponse.json(customValues)
+  } catch (error) {
+    console.error('Error fetching custom values:', error)
+    return NextResponse.json(
+      { error: 'Failed to fetch custom values' },
+      { status: 500 }
+    )
+  }
+}
+
+// POST - Menambah/mengupdate custom values untuk asset
+export async function POST(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const body = await request.json()
+    const { customValues } = body
+
+    if (!Array.isArray(customValues)) {
+      return NextResponse.json(
+        { error: 'Custom values must be an array' },
+        { status: 400 }
+      )
+    }
+
+    const results = []
+
+    for (const valueData of customValues) {
+      const validatedData = customValueSchema.parse(valueData)
+
+      // Check if custom field exists and is active
+      const customField = await prisma.assetCustomField.findFirst({
+        where: {
+          id: validatedData.customFieldId,
+          isactive: true
+        }
+      })
+
+      if (!customField) {
+        return NextResponse.json(
+          { error: `Custom field ${validatedData.customFieldId} not found or inactive` },
+          { status: 400 }
+        )
+      }
+
+      // Check if required field is empty
+      if (customField.required) {
+        const hasValue = validatedData.stringValue ||
+                         validatedData.numberValue !== undefined ||
+                         validatedData.dateValue ||
+                         validatedData.booleanValue !== undefined
+
+        if (!hasValue) {
+          return NextResponse.json(
+            { error: `${customField.label} is required` },
+            { status: 400 }
+          )
+        }
+      }
+
+      // Upsert custom value
+      const result = await prisma.assetCustomValue.upsert({
+        where: {
+          assetId_customFieldId: {
+            assetId: params.id,
+            customFieldId: validatedData.customFieldId
+          }
+        },
+        update: validatedData,
+        create: {
+          assetId: params.id,
+          ...validatedData
+        }
+      })
+
+      results.push(result)
+    }
+
+    return NextResponse.json(results, { status: 201 })
+  } catch (error) {
+    console.error('Error updating custom values:', error)
+
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: 'Validation failed', details: error.errors },
+        { status: 400 }
+      )
+    }
+
+    return NextResponse.json(
+      { error: 'Failed to update custom values' },
+      { status: 500 }
+    )
+  }
+}

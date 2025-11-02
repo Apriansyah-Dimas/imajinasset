@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Auth Test</title>
+</head>
+<body>
+    <h1>Authentication Test</h1>
+
+    <div>
+        <h2>Login Test</h2>
+        <input type="email" id="email" placeholder="Email" value="admin@assetso.com"><br><br>
+        <input type="password" id="password" placeholder="Password" value="admin123"><br><br>
+        <button onclick="testLogin()">Login</button>
+        <div id="loginResult"></div>
+    </div>
+
+    <div>
+        <h2>Register Test</h2>
+        <input type="text" id="regName" placeholder="Name" value="Test User"><br><br>
+        <input type="email" id="regEmail" placeholder="Email" value="test2@test.com"><br><br>
+        <input type="password" id="regPassword" placeholder="Password" value="test123"><br><br>
+        <button onclick="testRegister()">Register</button>
+        <div id="registerResult"></div>
+    </div>
+
+    <script>
+        async function testLogin() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const resultDiv = document.getElementById('loginResult');
+
+            try {
+                console.log('Testing login...');
+
+                const response = await fetch('http://localhost:3000/api/auth/login/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ email, password }),
+                    mode: 'cors'
+                });
+
+                console.log('Login response status:', response.status);
+
+                const data = await response.json();
+                console.log('Login response data:', data);
+
+                if (response.ok && data.success) {
+                    resultDiv.innerHTML = `<div style="color: green;">✅ Login successful!<br>User: ${data.user.name}<br>Role: ${data.user.role}<br>Token: ${data.token.substring(0, 20)}...</div>`;
+
+                    // Store token
+                    localStorage.setItem('auth_token', data.token);
+
+                    // Test auth/me
+                    testAuthMe();
+                } else {
+                    resultDiv.innerHTML = `<div style="color: red;">❌ Login failed: ${data.error || 'Unknown error'}</div>`;
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                resultDiv.innerHTML = `<div style="color: red;">❌ Network error: ${error.message}</div>`;
+            }
+        }
+
+        async function testAuthMe() {
+            const resultDiv = document.getElementById('loginResult');
+
+            try {
+                const token = localStorage.getItem('auth_token');
+                console.log('Testing auth/me with token:', token?.substring(0, 20) + '...');
+
+                const response = await fetch('http://localhost:3000/api/auth/me/', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    mode: 'cors'
+                });
+
+                console.log('Auth/me response status:', response.status);
+
+                const data = await response.json();
+                console.log('Auth/me response data:', data);
+
+                if (response.ok && data.success) {
+                    resultDiv.innerHTML += `<br><div style="color: blue;">✅ Auth/me successful!<br>User: ${data.user.name}</div>`;
+                } else {
+                    resultDiv.innerHTML += `<br><div style="color: red;">❌ Auth/me failed: ${data.error || 'Unknown error'}</div>`;
+                }
+            } catch (error) {
+                console.error('Auth/me error:', error);
+                resultDiv.innerHTML += `<br><div style="color: red;">❌ Auth/me network error: ${error.message}</div>`;
+            }
+        }
+
+        async function testRegister() {
+            const name = document.getElementById('regName').value;
+            const email = document.getElementById('regEmail').value;
+            const password = document.getElementById('regPassword').value;
+            const resultDiv = document.getElementById('registerResult');
+
+            try {
+                console.log('Testing register...');
+
+                const response = await fetch('http://localhost:3000/api/auth/register/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ name, email, password }),
+                    mode: 'cors'
+                });
+
+                console.log('Register response status:', response.status);
+
+                const data = await response.json();
+                console.log('Register response data:', data);
+
+                if (response.ok && data.success) {
+                    resultDiv.innerHTML = `<div style="color: green;">✅ Registration successful!<br>User: ${data.user.name}<br>Email: ${data.user.email}<br>Role: ${data.user.role}</div>`;
+                } else {
+                    resultDiv.innerHTML = `<div style="color: red;">❌ Registration failed: ${data.error || data.message || 'Unknown error'}</div>`;
+                }
+            } catch (error) {
+                console.error('Register error:', error);
+                resultDiv.innerHTML = `<div style="color: red;">❌ Network error: ${error.message}</div>`;
+            }
+        }
+    </script>
+</body>
+</html>

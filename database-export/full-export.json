@@ -1,0 +1,143 @@
+{
+  "users": [
+    {
+      "id": "cmh8y4cbk0000x5lgt87jfc36",
+      "email": "admin@assetso.com",
+      "name": "Administrator",
+      "password": "$2b$10$7AzwlcpnymnRigYG82zZs.jPlyS66yudUKr0oYh69EjEoHrVjMZHC",
+      "role": "ADMIN",
+      "isActive": true,
+      "createdAt": "2025-10-27T09:39:08.768Z",
+      "updatedAt": "2025-10-27T09:39:08.768Z",
+      "createdBy": null
+    },
+    {
+      "id": "cmh8y4cej0001x5lg3osrwtg8",
+      "email": "soasset@assetso.com",
+      "name": "SO Asset User",
+      "password": "$2b$10$uL1M5.yRMomoiNxFpQ0KT.mb2gkaIBe5.hmkXyRVv4QKg5yFX3uOy",
+      "role": "SO_ASSET_USER",
+      "isActive": true,
+      "createdAt": "2025-10-27T09:39:08.875Z",
+      "updatedAt": "2025-10-27T09:39:08.875Z",
+      "createdBy": null
+    },
+    {
+      "id": "cmh8y4ch00002x5lg1w4hlaij",
+      "email": "viewer@assetso.com",
+      "name": "Viewer User",
+      "password": "$2b$10$E1lCofmXV5kG.is8KkhYO.POzvA8Pl81Kul4JnPZ6GNTHFoC3rbDW",
+      "role": "VIEWER",
+      "isActive": true,
+      "createdAt": "2025-10-27T09:39:08.964Z",
+      "updatedAt": "2025-10-27T09:39:08.964Z",
+      "createdBy": null
+    }
+  ],
+  "employees": [
+    {
+      "id": "cmh7umzmo0000x5s4ko8bvw6g",
+      "employeeId": "IMJ0068",
+      "name": "Herfian Pradityo",
+      "email": "pradityoherfian@gmail.com",
+      "department": "Engineering",
+      "position": "Operator",
+      "joinDate": "2024-05-20T00:00:00.000Z",
+      "isActive": true,
+      "createdAt": "2025-10-26T15:13:54.143Z",
+      "updatedAt": "2025-10-26T15:13:54.143Z"
+    },
+    {
+      "id": "cmh7umznp0001x5s4ok0irghg",
+      "employeeId": "IMJ0070",
+      "name": "Yogie Alfath",
+      "email": "yogiealfath48@gmail.com",
+      "department": "BDD",
+      "position": "Videograph",
+      "joinDate": "2024-05-27T00:00:00.000Z",
+      "isActive": true,
+      "createdAt": "2025-10-26T15:13:54.182Z",
+      "updatedAt": "2025-10-26T15:13:54.182Z"
+    },
+    {
+      "id": "cmh7umzp90002x5s4618c2juj",
+      "employeeId": "IMJ0071",
+      "name": "Devi Erliani",
+      "email": "devierliani98@gmail.com",
+      "department": "Supply Chain",
+      "position": "Purchasing",
+      "joinDate": "2024-05-27T00:00:00.000Z",
+      "isActive": true,
+      "createdAt": "2025-10-26T15:13:54.237Z",
+      "updatedAt": "2025-10-26T15:13:54.237Z"
+    },
+    {
+      "id": "cmh7umzqk0003x5s4ilxt58y0",
+      "employeeId": "IMJ0072",
+      "name": "Muhamad Apriansyah Dimas Saputra",
+      "email": "muhmmddimas13@gmail.com",
+      "department": "HRGA & Legal",
+      "position": "Office Staff",
+      "joinDate": "2024-05-27T00:00:00.000Z",
+      "isActive": true,
+      "createdAt": "2025-10-26T15:13:54.284Z",
+      "updatedAt": "2025-10-26T15:13:54.284Z"
+    }
+  ],
+  "assets": [],
+  "sites": [
+    {
+      "id": "cmh7urlqm0004x5s43hf36gs2",
+      "name": "BSD",
+      "address": null,
+      "city": null,
+      "province": null,
+      "postalCode": null,
+      "country": null,
+      "phone": null,
+      "email": null,
+      "createdAt": "2025-10-26T15:17:29.423Z",
+      "updatedAt": "2025-10-26T15:17:29.423Z"
+    },
+    {
+      "id": "cmh7urq9e0005x5s4wn9pof7v",
+      "name": "Deltamas 1",
+      "address": null,
+      "city": null,
+      "province": null,
+      "postalCode": null,
+      "country": null,
+      "phone": null,
+      "email": null,
+      "createdAt": "2025-10-26T15:17:35.282Z",
+      "updatedAt": "2025-10-26T15:17:35.282Z"
+    },
+    {
+      "id": "cmh7uru8n0006x5s4bjqx13vr",
+      "name": "Deltamas 2",
+      "address": null,
+      "city": null,
+      "province": null,
+      "postalCode": null,
+      "country": null,
+      "phone": null,
+      "email": null,
+      "createdAt": "2025-10-26T15:17:40.439Z",
+      "updatedAt": "2025-10-26T15:17:40.439Z"
+    }
+  ],
+  "categories": [],
+  "departments": [
+    {
+      "id": "cmh7vieec0000x5vsl2ujas5m",
+      "name": "HRGA & Legal",
+      "description": null,
+      "createdAt": "2025-10-26T15:38:19.620Z",
+      "updatedAt": "2025-10-26T15:38:19.620Z"
+    }
+  ],
+  "soSessions": [],
+  "soAssetEntries": [],
+  "assetCustomFields": [],
+  "assetCustomValues": []
+}

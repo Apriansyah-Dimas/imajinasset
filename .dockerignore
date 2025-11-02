@@ -1,0 +1,17 @@
+Dockerfile
+.dockerignore
+node_modules
+npm-debug.log
+README.md
+.next
+.git
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+test
+*.log
+local-*
+dev.db
+dev.log
+server.log
+.DS_Store
