@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase";
+import { db } from "@/lib/db";
 
 interface ImportEmployeePayload {
   employeeId: string;
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
         rowIssues.push(`Invalid email format "${email}"`);
       }
 
-      let normalizedJoinDate: string | null = null;
+      let normalizedJoinDate: Date | null = null;
       if (joinDateValue) {
         const parsed = new Date(joinDateValue);
         if (Number.isNaN(parsed.getTime())) {
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
             `Invalid JoinDate "${joinDateValue}" (expected YYYY-MM-DD)`
           );
         } else {
-          normalizedJoinDate = parsed.toISOString();
+          normalizedJoinDate = parsed;
         }
       }
 
@@ -99,20 +99,10 @@ export async function POST(request: NextRequest) {
       processedIds.set(employeeId!, rowNumber);
 
       try {
-        const { data: existing, error: fetchError } = await supabaseAdmin
-          .from("employees")
-          .select("id, name")
-          .eq("employee_id", employeeId)
-          .maybeSingle();
-
-        if (fetchError && fetchError.code !== "PGRST116") {
-          results.skipped++;
-          results.issues.push({
-            row: rowNumber,
-            reason: `Failed to verify existing employee: ${fetchError.message}`,
-          });
-          continue;
-        }
+        const existing = await db.employee.findUnique({
+          where: { employeeId: employeeId! },
+          select: { id: true, name: true }
+        });
 
         if (existing) {
           results.skipped++;
@@ -125,30 +115,18 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
-        const nowIso = new Date().toISOString();
-        const { error: insertError } = await supabaseAdmin
-          .from("employees")
-          .insert({
+        await db.employee.create({
+          data: {
             id: randomUUID(),
-            employee_id: employeeId,
-            name,
+            employeeId: employeeId!,
+            name: name!,
             email: email || null,
             department: department || null,
             position: position || null,
-            join_date: normalizedJoinDate,
-            isactive: true,
-            createdat: nowIso,
-            updatedat: nowIso,
-          });
-
-        if (insertError) {
-          results.skipped++;
-          results.issues.push({
-            row: rowNumber,
-            reason: `Failed to create employee: ${insertError.message}`,
-          });
-          continue;
-        }
+            joinDate: normalizedJoinDate,
+            isActive: true
+          }
+        });
 
         results.imported++;
       } catch (error: any) {

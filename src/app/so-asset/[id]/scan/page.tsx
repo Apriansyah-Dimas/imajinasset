@@ -50,6 +50,7 @@ interface SOAssetEntry {
   tempStatus?: string
   tempSerialNo?: string
   tempPic?: string
+  tempPicId?: string
   tempNotes?: string
   tempBrand?: string
   tempModel?: string
@@ -64,9 +65,19 @@ interface SOAssetEntry {
     brand?: string
     model?: string
     cost?: number
-    site?: { name: string }
-    category?: { name: string }
-    department?: { name: string }
+    dateCreated?: string
+    site?: { id: string; name: string }
+    category?: { id: string; name: string }
+    department?: { id: string; name: string }
+    employee?: {
+      id: string
+      employeeId: string | null
+      name: string | null
+      email?: string | null
+      department?: string | null
+      position?: string | null
+      isActive?: boolean | null
+    }
   }
 }
 
@@ -79,7 +90,15 @@ interface SOSession {
   scannedAssets: number
 }
 
-export default function ScanPage() {
+const formatEmployeeLabel = (employee?: {
+  name?: string | null
+  employeeId?: string | null
+}) => {
+  if (!employee?.name) return ''
+  return employee.employeeId ? `${employee.name} (${employee.employeeId})` : employee.name
+}
+
+function ScanPageContent() {
   const params = useParams()
   const router = useRouter()
   const [session, setSession] = useState<SOSession | null>(null)
@@ -94,6 +113,7 @@ export default function ScanPage() {
     tempStatus: '',
     tempSerialNo: '',
     tempPic: '',
+    tempPicId: '',
     tempNotes: '',
     tempBrand: '',
     tempModel: '',
@@ -102,13 +122,14 @@ export default function ScanPage() {
     tempSiteId: '',
     tempCategoryId: '',
     tempDepartmentId: '',
-    isIdentified: false
+    isIdentified: false,
+    assetNumber: ''
   })
   const [searchQuery, setSearchQuery] = useState('')
   const [sites, setSites] = useState([])
   const [categories, setCategories] = useState([])
   const [departments, setDepartments] = useState([])
-  const [pics, setPics] = useState([])
+  const [pics, setPics] = useState<any[]>([])
   const [scanError, setScanError] = useState('')
   const [showCompleteDialog, setShowCompleteDialog] = useState(false)
   const [completing, setCompleting] = useState(false)
@@ -117,11 +138,25 @@ export default function ScanPage() {
   
   // QR Scanner states
   const [isQRScanning, setIsQRScanning] = useState(false)
-  const [devices, setDevices] = useState<MediaDeviceInfo[]>([])
+  const [devices, setDevices] = useState<any[]>([])
   const [selectedDevice, setSelectedDevice] = useState<string>('')
   const scannerRef = useRef<Html5Qrcode | null>(null)
   const scanRegionId = 'qr-reader-so'
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const totalAssets = session?.totalAssets ?? 0
+  const scannedCount = session?.scannedAssets ?? 0
+  const remainingAssets = Math.max(totalAssets - scannedCount, 0)
+
+  const formatEmployeeLabel = (employee?: {
+    name?: string | null
+    employeeId?: string | null
+  }) => {
+    if (!employee?.name) return ''
+    return employee.employeeId
+      ? `${employee.name} (${employee.employeeId})`
+      : employee.name
+  }
 
   useEffect(() => {
     if (params.id) {
@@ -138,10 +173,25 @@ export default function ScanPage() {
 
   const fetchSession = async () => {
     try {
-      const response = await fetch(`/api/so-sessions/${params.id}`)
+      // Get token from localStorage
+      const token = localStorage.getItem('auth_token')
+      if (!token) {
+        console.error('No auth token found')
+        return
+      }
+
+      const response = await fetch(`/api/so-sessions/${params.id}/`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
       if (response.ok) {
         const data = await response.json()
-        setSession(data)
+        setSession(data?.session ?? data)
+      } else {
+        const errorData = await response.json()
+        console.error('Failed to fetch session:', errorData)
       }
     } catch (error) {
       console.error('Error fetching session:', error)
@@ -150,13 +200,49 @@ export default function ScanPage() {
 
   const fetchScannedAssets = async () => {
     try {
-      const response = await fetch(`/api/so-sessions/${params.id}/entries`)
-      if (response.ok) {
-        const data = await response.json()
+      console.log('DEBUG: fetchScannedAssets - Starting fetch for session:', params.id)
+      
+      // Get token from localStorage
+      const token = localStorage.getItem('auth_token')
+      if (!token) {
+        console.error('No auth token found')
+        setScannedAssets([])
+        setLoading(false)
+        return
+      }
+
+      const response = await fetch(`/api/so-sessions/${params.id}/entries/`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      if (!response.ok) {
+        const errorData = await response.json()
+        console.error('Failed to fetch scanned assets:', errorData)
+        throw new Error('Failed to fetch scanned assets')
+      }
+
+      const data = await response.json()
+      console.log('DEBUG: fetchScannedAssets - API response entries:', data.entries?.length || 0)
+
+      if (Array.isArray(data)) {
+        console.log('DEBUG: fetchScannedAssets - Setting array directly, count:', data.length)
+        console.log('DEBUG: fetchScannedAssets - First entry tempStatus:', data[0]?.tempStatus)
         setScannedAssets(data)
+      } else if (Array.isArray(data.entries)) {
+        console.log('DEBUG: fetchScannedAssets - Setting entries array, count:', data.entries.length)
+        console.log('DEBUG: fetchScannedAssets - First entry tempStatus:', data.entries[0]?.tempStatus)
+        console.log('DEBUG: fetchScannedAssets - First entry tempName:', data.entries[0]?.tempName)
+        console.log('DEBUG: fetchScannedAssets - First entry full data:', JSON.stringify(data.entries[0], null, 2))
+        setScannedAssets(data.entries)
+      } else {
+        console.log('DEBUG: fetchScannedAssets - No array found, setting empty array')
+        setScannedAssets([])
       }
     } catch (error) {
-      console.error('Error fetching scanned assets:', error)
+      console.error('DEBUG: fetchScannedAssets - Error fetching scanned assets:', error)
+      setScannedAssets([])
     } finally {
       setLoading(false)
     }
@@ -164,11 +250,23 @@ export default function ScanPage() {
 
   const fetchMasterData = async () => {
     try {
+      // Get token from localStorage
+      const token = localStorage.getItem('auth_token')
+      if (!token) {
+        console.error('No auth token found')
+        return
+      }
+
+      const headers = {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+
       const [sitesRes, categoriesRes, departmentsRes, picsRes] = await Promise.all([
-        fetch('/api/sites'),
-        fetch('/api/categories'),
-        fetch('/api/departments'),
-        fetch('/api/pics')
+        fetch('/api/sites', { headers }),
+        fetch('/api/categories', { headers }),
+        fetch('/api/departments', { headers }),
+        fetch('/api/pics', { headers })
       ])
 
       if (sitesRes.ok) setSites(await sitesRes.json())
@@ -187,9 +285,21 @@ export default function ScanPage() {
     setScanError('')
 
     try {
-      const response = await fetch(`/api/so-sessions/${params.id}/scan`, {
+      // Get token from localStorage
+      const token = localStorage.getItem('auth_token')
+      if (!token) {
+        console.error('No auth token found')
+        setScanError('Authentication required')
+        setScanning(false)
+        return
+      }
+
+      const response = await fetch(`/api/so-sessions/${params.id}/scan/`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify({ assetNumber: manualAssetNumber.trim() })
       })
 
@@ -202,7 +312,7 @@ export default function ScanPage() {
         // Auto-open edit dialog with API response data
         await handleScanSuccessAndEdit({
           assetNumber,
-          assetData: data // Pass the full API response
+          entry: data.entry
         })
 
         fetchScannedAssets()
@@ -216,17 +326,18 @@ export default function ScanPage() {
       setScanning(false)
     }
   }
-
-  // Asset number generation functions removed - asset numbers should not be modified during SO scanning
-  // The original asset number is preserved and displayed as read-only
-
   const handleEditAsset = (asset: SOAssetEntry) => {
     setSelectedAsset(asset)
+    const employeeLabel = asset.tempPic || formatEmployeeLabel(asset.asset?.employee)
+    const employeeId = asset.asset?.employee?.id ?? ''
+    const resolvedPicId = employeeId || employeeLabel || ''
+
     setEditForm({
       tempName: asset.tempName || asset.asset.name || '',
       tempStatus: asset.tempStatus || asset.asset.status || 'Unidentified',
       tempSerialNo: asset.tempSerialNo || asset.asset.serialNo || '',
-      tempPic: asset.tempPic || asset.asset.pic || '',
+      tempPic: employeeLabel || asset.asset.pic || '',
+      tempPicId: resolvedPicId,
       tempNotes: asset.tempNotes || '',
       tempBrand: asset.tempBrand || asset.asset.brand || '',
       tempModel: asset.tempModel || asset.asset.model || '',
@@ -234,9 +345,10 @@ export default function ScanPage() {
       tempPurchaseDate: asset.asset.dateCreated ? new Date(asset.asset.dateCreated).toISOString().split('T')[0] : '',
       tempSiteId: asset.asset.site?.id || '',
       tempCategoryId: asset.asset.category?.id || '',
-      tempDepartmentId: asset.asset.department?.id || '',
-      isIdentified: asset.isIdentified
-    })
+    tempDepartmentId: asset.asset.department?.id || '',
+    isIdentified: asset.isIdentified,
+    assetNumber: asset.asset.noAsset || ''
+  })
     setShowEditDialog(true)
   }
 
@@ -244,17 +356,17 @@ export default function ScanPage() {
     // Show success message
     toast.success(`Asset scanned: ${assetData.assetNumber}`)
 
-    // If we have the API response data, use it immediately
-    if (assetData.assetData) {
-      console.log('Using API response data:', assetData.assetData)
-      handleEditAsset(assetData.assetData)
+    // If we have API response data, use it immediately
+    if (assetData.entry) {
+      console.log('Using API response entry:', assetData.entry)
+      handleEditAsset(assetData.entry)
       return
     }
 
-    // Wait a moment for the state to update and user to see success message
+    // Wait a moment for state to update and user to see success message
     setTimeout(async () => {
       try {
-        // Find the newly scanned asset - this should now be in the scannedAssets
+        // Find newly scanned asset - this should now be in scannedAssets
         const newAsset = scannedAssets.find(entry =>
           entry.asset.noAsset === assetData.assetNumber
         )
@@ -263,15 +375,29 @@ export default function ScanPage() {
           console.log('Found new asset:', newAsset)
           handleEditAsset(newAsset)
         } else {
-          // If not found in scannedAssets, try to get it directly from the API
+          // If not found in scannedAssets, try to get it directly from API
           console.log('Asset not found in scannedAssets, fetching from API...')
-          const response = await fetch(`/api/so-sessions/${params.id}/entries?search=${encodeURIComponent(assetData.assetNumber)}`)
-          if (response.ok) {
-            const entries = await response.json()
-            const latestEntry = entries.find((entry: any) => entry.asset.noAsset === assetData.assetNumber)
-            if (latestEntry) {
-              console.log('Found asset from API:', latestEntry)
-              handleEditAsset(latestEntry)
+          // Get token from localStorage
+          const token = localStorage.getItem('auth_token')
+          if (token) {
+            const response = await fetch(`/api/so-sessions/${params.id}/entries/?search=${encodeURIComponent(assetData.assetNumber)}`, {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              }
+            })
+            if (response.ok) {
+              const responseData = await response.json()
+              const entries = Array.isArray(responseData)
+                ? responseData
+                : Array.isArray(responseData.entries)
+                  ? responseData.entries
+                  : []
+              const latestEntry = entries.find((entry: any) => entry.asset?.noAsset === assetData.assetNumber)
+              if (latestEntry) {
+                console.log('Found asset from API:', latestEntry)
+                handleEditAsset(latestEntry)
+              }
             }
           }
         }
@@ -286,35 +412,173 @@ export default function ScanPage() {
     if (!selectedAsset) return
 
     try {
-      const response = await fetch(`/api/so-sessions/${params.id}/entries/${selectedAsset.id}`, {
+      console.log('DEBUG: Frontend - editForm before sending:', editForm)
+      console.log('DEBUG: Frontend - tempStatus value:', editForm.tempStatus)
+      console.log('DEBUG: Frontend - tempPic value:', editForm.tempPic)
+
+      // Get token from localStorage
+      const token = localStorage.getItem('auth_token')
+      if (!token) {
+        console.error('No auth token found')
+        toast.error('Authentication required')
+        return
+      }
+
+      const response = await fetch(`/api/so-sessions/${params.id}/entries/${selectedAsset.id}/`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify(editForm)
       })
 
+      const data = await response.json()
+
       if (response.ok) {
+        console.log('DEBUG: Frontend - API response successful:', data)
+        console.log('DEBUG: Frontend - Updated entry tempStatus:', data.entry?.tempStatus)
+        toast.success('Asset updated successfully!')
         setShowEditDialog(false)
         setSelectedAsset(null)
-        fetchScannedAssets()
+        
+        // Force refresh with a small delay to ensure database is updated
+        setTimeout(() => {
+          fetchScannedAssets()
+        }, 500)
+      } else {
+        console.error('DEBUG: Frontend - Save failed:', data)
+        toast.error(data.error || 'Failed to update asset')
       }
     } catch (error) {
       console.error('Error updating asset:', error)
+      toast.error('Network error. Please try again.')
+    }
+  }
+
+  const generateAssetNumber = async (siteId: string, categoryId: string) => {
+    if (!siteId || !categoryId) return ''
+
+    try {
+      // Get token from localStorage
+      const token = localStorage.getItem('auth_token')
+      if (!token) {
+        console.error('No auth token found')
+        return ''
+      }
+
+      const params = new URLSearchParams({ siteId, categoryId })
+      console.log('DEBUG: Generating asset number with params:', params.toString())
+      
+      const response = await fetch(`/api/assets/generate-number?${params}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        console.log('DEBUG: API response for asset number generation:', data)
+        console.log('DEBUG: data.assetNumber:', data.assetNumber)
+        console.log('DEBUG: data.number:', data.number)
+        
+        // Fix: Use the correct field name from API response
+        const assetNumber = data.number || data.assetNumber || ''
+        console.log('DEBUG: Final asset number to return:', assetNumber)
+        return assetNumber
+      }
+    } catch (error) {
+      console.error('Error generating asset number:', error)
+    }
+
+    return ''
+  }
+
+  const handleSiteChange = async (siteId: string) => {
+    console.log('DEBUG: handleSiteChange called with siteId:', siteId)
+    console.log('DEBUG: Current categoryId:', editForm.tempCategoryId)
+
+    setEditForm(prev => ({
+      ...prev,
+      tempSiteId: siteId
+    }))
+
+    // Auto-generate asset number if both site and category are selected
+    const categoryId = editForm.tempCategoryId
+    if (siteId && categoryId) {
+      console.log('DEBUG: Both site and category selected, generating asset number...')
+      const newAssetNumber = await generateAssetNumber(siteId, categoryId)
+      console.log('DEBUG: Generated asset number:', newAssetNumber)
+      if (newAssetNumber) {
+        setEditForm(prev => ({
+          ...prev,
+          assetNumber: newAssetNumber
+        }))
+      }
+    }
+  }
+
+  const handleCategoryChange = async (categoryId: string) => {
+    console.log('DEBUG: handleCategoryChange called with categoryId:', categoryId)
+    console.log('DEBUG: Current siteId:', editForm.tempSiteId)
+
+    setEditForm(prev => ({
+      ...prev,
+      tempCategoryId: categoryId
+    }))
+
+    // Auto-generate asset number if both site and category are selected
+    const siteId = editForm.tempSiteId
+    if (categoryId && siteId) {
+      console.log('DEBUG: Both category and site selected, generating asset number...')
+      const newAssetNumber = await generateAssetNumber(siteId, categoryId)
+      console.log('DEBUG: Generated asset number:', newAssetNumber)
+      if (newAssetNumber) {
+        setEditForm(prev => ({
+          ...prev,
+          assetNumber: newAssetNumber
+        }))
+      }
     }
   }
 
   const handleCompleteSO = async () => {
     setCompleting(true)
     try {
-      const response = await fetch(`/api/so-sessions/${params.id}/complete`, {
-        method: 'POST'
+      console.log('DEBUG: Starting SO completion for session:', params.id)
+      
+      // Get token from localStorage
+      const token = localStorage.getItem('auth_token')
+      if (!token) {
+        console.error('No auth token found')
+        toast.error('Authentication required')
+        setCompleting(false)
+        return
+      }
+
+      const response = await fetch(`/api/so-sessions/${params.id}/complete/`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
       })
 
+      const data = await response.json()
+      console.log('DEBUG: SO completion response:', data)
+
       if (response.ok) {
+        console.log('DEBUG: SO completed successfully, assets updated:', data.assetsUpdated)
         setShowCompleteDialog(false)
         router.push('/so-asset')
+      } else {
+        console.error('DEBUG: SO completion failed:', data)
+        toast.error(data.error || 'Failed to complete session')
       }
     } catch (error) {
-      console.error('Error completing SO:', error)
+      console.error('DEBUG: Error completing SO:', error)
+      toast.error('Network error. Please try again.')
     } finally {
       setCompleting(false)
     }
@@ -323,16 +587,33 @@ export default function ScanPage() {
   const handleCancelSO = async () => {
     setCancelling(true)
     try {
-      const response = await fetch(`/api/so-sessions/${params.id}/cancel`, {
-        method: 'POST'
+      // Get token from localStorage
+      const token = localStorage.getItem('auth_token')
+      if (!token) {
+        console.error('No auth token found')
+        toast.error('Authentication required')
+        setCancelling(false)
+        return
+      }
+
+      const response = await fetch(`/api/so-sessions/${params.id}/cancel/`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
       })
 
       if (response.ok) {
         setShowCancelDialog(false)
         router.push('/so-asset')
+      } else {
+        const errorData = await response.json()
+        toast.error(errorData.error || 'Failed to cancel session')
       }
     } catch (error) {
       console.error('Error cancelling SO:', error)
+      toast.error('Network error. Please try again.')
     } finally {
       setCancelling(false)
     }
@@ -340,9 +621,9 @@ export default function ScanPage() {
 
   
   const getProgressPercentage = () => {
-    if (!session || session.totalAssets === undefined || session.totalAssets === null || session.totalAssets === 0) return 0
-    const scanned = session.scannedAssets || 0
-    return Math.round((scanned / session.totalAssets) * 100)
+    if (!session || totalAssets === undefined || totalAssets === null || totalAssets === 0) return 0
+    const scanned = scannedCount || 0
+    return Math.round((scanned / totalAssets) * 100)
   }
 
   const getIdentifiedCount = () => {
@@ -449,9 +730,21 @@ export default function ScanPage() {
     setScanError('')
 
     try {
-      const response = await fetch(`/api/so-sessions/${params.id}/scan`, {
+      // Get token from localStorage
+      const token = localStorage.getItem('auth_token')
+      if (!token) {
+        console.error('No auth token found')
+        setScanError('Authentication required')
+        setScanning(false)
+        return
+      }
+
+      const response = await fetch(`/api/so-sessions/${params.id}/scan/`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify({ assetNumber })
       })
 
@@ -461,7 +754,7 @@ export default function ScanPage() {
         // Auto-open edit dialog with API response data
         await handleScanSuccessAndEdit({
           assetNumber,
-          assetData: data // Pass the full API response
+          entry: data.entry
         })
 
         fetchScannedAssets()
@@ -498,9 +791,9 @@ export default function ScanPage() {
     try {
       const result = await scanner.scanFile(file, true)
       await handleQRScanSuccess(result)
-    } catch (error) {
+    } catch (error: any) {
       if (error.message.includes('No QR code found')) {
-        toast.error('No QR code found in the image')
+        toast.error('No QR code found in image')
       } else {
         toast.error('Failed to scan QR code from image')
       }
@@ -508,7 +801,7 @@ export default function ScanPage() {
   }
 
   const switchCamera = async () => {
-    const currentIndex = devices.findIndex(device => device.id === selectedDevice)
+    const currentIndex = devices.findIndex((device: any) => device.id === selectedDevice)
     const nextIndex = (currentIndex + 1) % devices.length
     const nextDevice = devices[nextIndex]
 
@@ -558,6 +851,7 @@ export default function ScanPage() {
     )
   }
 
+
   return (
     <div className="container mx-auto py-3 px-1.5 sm:py-6 sm:px-4 max-w-7xl min-h-screen w-full overflow-x-hidden">
       {/* Header */}
@@ -592,7 +886,7 @@ export default function ScanPage() {
                 <span className="hidden sm:inline">Complete</span>
               </Button>
             )}
-            {session.scannedAssets > 0 && (
+            {scannedCount > 0 && (
               <Button
                 onClick={() => setShowCancelDialog(true)}
                 variant="outline"
@@ -614,7 +908,7 @@ export default function ScanPage() {
             <div>
               <h3 className="font-semibold mb-1 text-sm sm:text-base">Scanning Progress</h3>
               <p className="text-xs sm:text-sm text-muted-foreground">
-                {session.scannedAssets} of {session.totalAssets} assets scanned
+                {scannedCount} of {totalAssets} assets scanned
               </p>
               <p className="text-xs sm:text-sm text-green-600 font-medium">
                 ✓ {getIdentifiedCount()} assets verified
@@ -644,14 +938,14 @@ export default function ScanPage() {
               {/* QR Scanner */}
               <div className="relative bg-black aspect-square sm:aspect-square rounded-lg overflow-hidden">
                 <div id={scanRegionId} className="w-full h-full" />
-
+ 
                 {!isQRScanning && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center bg-black bg-opacity-90 text-white px-4">
                     <Smartphone className="h-8 w-8 sm:h-12 sm:w-12 mb-2 sm:mb-3 opacity-80" />
                     <p className="text-xs sm:text-sm text-center">Ready to scan</p>
                   </div>
                 )}
-
+ 
                 {scanning && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center bg-black bg-opacity-90 text-white px-4">
                     <div className="animate-spin h-6 w-6 sm:h-8 sm:w-8 border-4 border-white border-t-transparent rounded-full mb-2 sm:mb-3"></div>
@@ -729,7 +1023,7 @@ export default function ScanPage() {
           </Card>
 
           {/* Quick Actions */}
-          {session.scannedAssets === session.totalAssets && (
+          {scannedCount === totalAssets && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-green-700">Session Complete!</CardTitle>
@@ -780,7 +1074,18 @@ export default function ScanPage() {
                             variant={entry.isIdentified ? "default" : "secondary"}
                             className="text-xs px-1 py-0"
                           >
-                            {entry.isIdentified ? "✓" : "?"}
+                          {entry.isIdentified ? "✓" : "?"}
+                          </Badge>
+                          <Badge
+                            variant="outline"
+                            className={`text-xs px-1 py-0 ${
+                              entry.tempStatus === 'Active' ? 'border-green-500 text-green-700' :
+                              entry.tempStatus === 'Broken' ? 'border-red-500 text-red-700' :
+                              entry.tempStatus === 'Lost/Missing' ? 'border-orange-500 text-orange-700' :
+                              'border-gray-500 text-gray-700'
+                            }`}
+                          >
+                            {entry.tempStatus}
                           </Badge>
                         </div>
                         <p className="text-xs text-muted-foreground truncate">
@@ -836,7 +1141,7 @@ export default function ScanPage() {
                   </div>
                   <div>
                     <div className="text-base sm:text-2xl font-bold">
-                      {session.totalAssets - session.scannedAssets}
+                      {remainingAssets}
                     </div>
                     <div className="text-xs text-muted-foreground">Left</div>
                   </div>
@@ -945,20 +1250,20 @@ export default function ScanPage() {
               {/* Responsive Grid Layout */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 {/* First Row - Asset Number & Asset Name */}
-                <div className="space-y-2">
-                  <Label htmlFor="noAsset" className="text-xs sm:text-sm font-medium">Asset Number</Label>
+                <div className="space-y-2 sm:col-span-2">
+                  <Label htmlFor="assetNumber" className="text-xs sm:text-sm font-medium">Asset Number</Label>
                   <Input
-                    id="noAsset"
-                    value={selectedAsset?.asset?.noAsset || ''}
+                    id="assetNumber"
+                    value={editForm.assetNumber || selectedAsset?.asset?.noAsset || ''}
                     disabled
                     className="bg-gray-100 text-gray-700 text-xs sm:text-sm"
                   />
                   <p className="text-xs text-muted-foreground">
-                    Asset number cannot be modified
+                    Asset number generated from the selected category and site
                   </p>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-2 sm:col-span-2">
                   <Label htmlFor="tempName" className="text-xs sm:text-sm font-medium">Asset Name</Label>
                   <Input
                     id="tempName"
@@ -989,7 +1294,7 @@ export default function ScanPage() {
                 {/* Third Row - Site & Category */}
                 <div className="space-y-2">
                   <Label htmlFor="tempSiteId" className="text-xs sm:text-sm font-medium">Site</Label>
-                  <Select value={editForm.tempSiteId} onValueChange={(value) => setEditForm({ ...editForm, tempSiteId: value })}>
+                  <Select value={editForm.tempSiteId} onValueChange={handleSiteChange}>
                     <SelectTrigger className="text-xs sm:text-sm">
                       <SelectValue placeholder="Select site" />
                     </SelectTrigger>
@@ -1005,7 +1310,7 @@ export default function ScanPage() {
 
                 <div className="space-y-2">
                   <Label htmlFor="tempCategoryId" className="text-xs sm:text-sm font-medium">Category</Label>
-                  <Select value={editForm.tempCategoryId} onValueChange={(value) => setEditForm({ ...editForm, tempCategoryId: value })}>
+                  <Select value={editForm.tempCategoryId} onValueChange={handleCategoryChange}>
                     <SelectTrigger className="text-xs sm:text-sm">
                       <SelectValue placeholder="Select category" />
                     </SelectTrigger>
@@ -1055,59 +1360,32 @@ export default function ScanPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="tempPic" className="text-xs sm:text-sm font-medium">PIC</Label>
-                  <Select value={editForm.tempPic} onValueChange={(value) => setEditForm({ ...editForm, tempPic: value })}>
+                  <Select
+                    value={editForm.tempPicId || undefined}
+                    onValueChange={(value) => {
+                      const selected = pics.find((pic: any) => pic.id === value)
+                      setEditForm({
+                        ...editForm,
+                        tempPicId: value,
+                        tempPic: selected?.name || ''
+                      })
+                    }}>
                     <SelectTrigger className="text-xs sm:text-sm">
                       <SelectValue placeholder="Select PIC" />
                     </SelectTrigger>
                     <SelectContent>
                       {pics.map((pic: any) => (
-                        <SelectItem key={pic.id} value={pic.name}>
+                        <SelectItem key={pic.id} value={pic.id}>
                           {pic.name}
                         </SelectItem>
                       ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Fifth Row - Purchase Date & Cost */}
-                <div className="space-y-2">
-                  <Label htmlFor="tempPurchaseDate" className="text-xs sm:text-sm font-medium">Purchase Date</Label>
-                  <Input
-                    id="tempPurchaseDate"
-                    type="date"
-                    value={editForm.tempPurchaseDate}
-                    onChange={(e) => setEditForm({ ...editForm, tempPurchaseDate: e.target.value })}
-                    className="text-xs sm:text-sm"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="tempCost" className="text-xs sm:text-sm font-medium">Cost (Rp)</Label>
-                  <Input
-                    id="tempCost"
-                    type="number"
-                    step="0.01"
-                    value={editForm.tempCost}
-                    onChange={(e) => setEditForm({ ...editForm, tempCost: e.target.value })}
-                    placeholder="0.00"
-                    className="text-xs sm:text-sm"
-                  />
-                </div>
-
-                {/* Sixth Row - Department (Full Width) */}
-                <div className="space-y-2 sm:col-span-2">
-                  <Label htmlFor="tempDepartmentId" className="text-xs sm:text-sm font-medium">Department</Label>
-                  <Select value={editForm.tempDepartmentId} onValueChange={(value) => setEditForm({ ...editForm, tempDepartmentId: value })}>
-                    <SelectTrigger className="text-xs sm:text-sm">
-                      <SelectValue placeholder="Select department" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {departments.map((department: any) => (
-                        <SelectItem key={department.id} value={department.id}>
-                          {department.name}
-                        </SelectItem>
-                      ))}
+                      {editForm.tempPicId &&
+                        editForm.tempPic &&
+                        !pics.some((pic: any) => pic.id === editForm.tempPicId) && (
+                          <SelectItem value={editForm.tempPicId} disabled>
+                            {editForm.tempPic}
+                          </SelectItem>
+                        )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -1132,7 +1410,11 @@ export default function ScanPage() {
                   <Checkbox
                     id="isIdentified"
                     checked={editForm.isIdentified}
-                    onCheckedChange={(checked) => setEditForm({ ...editForm, isIdentified: checked as boolean })}
+                    onCheckedChange={(checked) => {
+                      console.log('Checkbox changed:', checked);
+                      setEditForm({ ...editForm, isIdentified: checked as boolean });
+                    }}
+                    className="cursor-pointer"
                   />
                   <Label htmlFor="isIdentified" className="text-xs sm:text-sm font-medium cursor-pointer">
                     Asset verified and complete
@@ -1215,5 +1497,13 @@ export default function ScanPage() {
         className="hidden"
       />
     </div>
+  )
+}
+
+export default function ScanPage() {
+  return (
+    <ProtectedRoute allowedRoles={['ADMIN', 'SO_ASSET_USER']}>
+      <ScanPageContent />
+    </ProtectedRoute>
   )
 }

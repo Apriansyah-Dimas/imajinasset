@@ -150,14 +150,10 @@ export default function Dashboard() {
       {/* Page Header */}
       <div className="mb-8 flex items-center gap-4">
         <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg">
-          <img
-            src="/logo.svg"
-            alt="AssetSO Logo"
-            className="w-8 h-8 object-contain"
-          />
+          <Package className="w-7 h-7 text-white" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-1">AssetSO Dashboard</h1>
+          <h1 className="text-2xl font-bold text-gray-900 mb-1">DASHBOARD</h1>
           <p className="text-gray-600 text-sm">Sistem Manajemen Aset Perusahaan</p>
         </div>
       </div>

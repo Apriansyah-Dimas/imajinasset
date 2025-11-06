@@ -34,7 +34,7 @@ export default function AdminPage() {
     {
       id: 'backup-restore',
       title: 'Backup & Restore',
-      description: 'Single-click export/import database dan uploads',
+      description: 'Single-click export/import database & uploads plus clean data tools',
       icon: Database,
       color: 'orange',
       href: '/admin/backup'

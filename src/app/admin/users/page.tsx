@@ -407,91 +407,168 @@ export default function UserManagementPage() {
                     </Button>
                   </div>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead className="bg-gray-50 border-b">
-                        <tr>
-                          <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            User
-                          </th>
-                          <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Role
-                          </th>
-                          <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Status
-                          </th>
-                          <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Created
-                          </th>
-                          <th className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Actions
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {users.map((user) => (
-                          <tr key={user.id} className="hover:bg-gray-50">
-                            <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
+                  <>
+                    <div className="hidden sm:block overflow-x-auto">
+                      <table className="w-full">
+                        <thead className="bg-gray-50 border-b">
+                          <tr>
+                            <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              User
+                            </th>
+                            <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Role
+                            </th>
+                            <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Status
+                            </th>
+                            <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Created
+                            </th>
+                            <th className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Actions
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {users.map((user) => (
+                            <tr key={user.id} className="hover:bg-gray-50">
+                              <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
+                                <div>
+                                  <div className="text-sm font-medium text-gray-900">
+                                    {user.name}
+                                  </div>
+                                  <div className="text-xs text-gray-500">
+                                    {user.email}
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
+                                <Badge className={getRoleBadgeColor(user.role)}>
+                                  <span className="flex items-center gap-1">
+                                    {getRoleIcon(user.role)}
+                                    {user.role.replace("_", " ")}
+                                  </span>
+                                </Badge>
+                              </td>
+                              <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
+                                <Badge
+                                  variant={
+                                    user.isActive ? "default" : "secondary"
+                                  }
+                                >
+                                  {user.isActive ? "Active" : "Inactive"}
+                                </Badge>
+                              </td>
+                              <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-xs text-gray-500">
+                                {new Date(user.createdAt).toLocaleDateString()}
+                              </td>
+                              <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-xs font-medium">
+                                <div className="flex justify-end gap-1">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => openEditDialog(user)}
+                                  >
+                                    <Edit className="h-3 w-3" />
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => openPasswordDialog(user)}
+                                  >
+                                    <Key className="h-3 w-3" />
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => openDeleteDialog(user)}
+                                    className="text-red-600 hover:text-red-700"
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <div className="sm:hidden space-y-3">
+                      {users.map((user) => (
+                        <Card
+                          key={user.id}
+                          className="border border-gray-200 shadow-sm"
+                        >
+                          <CardContent className="p-3 space-y-3">
+                            <div className="space-y-2">
                               <div>
-                                <div className="text-sm font-medium text-gray-900">
+                                <div className="text-sm font-semibold text-gray-900">
                                   {user.name}
                                 </div>
-                                <div className="text-xs text-gray-500">
+                                <div className="text-xs text-gray-500 break-words">
                                   {user.email}
                                 </div>
                               </div>
-                            </td>
-                            <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
-                              <Badge className={getRoleBadgeColor(user.role)}>
-                                <span className="flex items-center gap-1">
-                                  {getRoleIcon(user.role)}
-                                  {user.role.replace("_", " ")}
-                                </span>
-                              </Badge>
-                            </td>
-                            <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
-                              <Badge
-                                variant={
-                                  user.isActive ? "default" : "secondary"
-                                }
-                              >
-                                {user.isActive ? "Active" : "Inactive"}
-                              </Badge>
-                            </td>
-                            <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-xs text-gray-500">
-                              {new Date(user.createdAt).toLocaleDateString()}
-                            </td>
-                            <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-xs font-medium">
-                              <div className="flex justify-end gap-1">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => openEditDialog(user)}
+                              <div className="flex flex-wrap gap-2">
+                                <Badge
+                                  className={`${getRoleBadgeColor(
+                                    user.role
+                                  )} text-xs px-2 py-1`}
                                 >
-                                  <Edit className="h-3 w-3" />
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => openPasswordDialog(user)}
+                                  <span className="flex items-center gap-1">
+                                    {getRoleIcon(user.role)}
+                                    {user.role.replace("_", " ")}
+                                  </span>
+                                </Badge>
+                                <Badge
+                                  variant={
+                                    user.isActive ? "default" : "secondary"
+                                  }
+                                  className="text-xs px-2 py-1"
                                 >
-                                  <Key className="h-3 w-3" />
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => openDeleteDialog(user)}
-                                  className="text-red-600 hover:text-red-700"
-                                >
-                                  <Trash2 className="h-3 w-3" />
-                                </Button>
+                                  {user.isActive ? "Active" : "Inactive"}
+                                </Badge>
                               </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                              <div className="text-xs text-gray-400">
+                                Created{" "}
+                                {new Date(
+                                  user.createdAt
+                                ).toLocaleDateString()}
+                              </div>
+                            </div>
+
+                            <div className="flex flex-wrap gap-2">
+                              <Button
+                                variant="outline"
+                                onClick={() => openEditDialog(user)}
+                                className="flex-1 min-w-[110px] justify-center"
+                              >
+                                <Edit className="h-4 w-4 mr-2" />
+                                Edit
+                              </Button>
+                              <Button
+                                variant="outline"
+                                onClick={() => openPasswordDialog(user)}
+                                className="flex-1 min-w-[110px] justify-center"
+                              >
+                                <Key className="h-4 w-4 mr-2" />
+                                Password
+                              </Button>
+                              <Button
+                                variant="outline"
+                                onClick={() => openDeleteDialog(user)}
+                                className="flex-1 min-w-[110px] justify-center text-red-600 border-red-300 hover:bg-red-50"
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete
+                              </Button>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  </>
                 )}
               </CardContent>
             </Card>

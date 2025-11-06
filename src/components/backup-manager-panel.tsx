@@ -194,11 +194,18 @@ export function BackupManagerPanel({
     [resetImportFeedback]
   )
 
+  const importPreviewList = useMemo(() => {
+    if (!importSummary) return null
+    return Object.entries(importSummary.tables)
+      .filter(([, count]) => typeof count === 'number')
+      .slice(0, hideMetadataPreview ? 4 : 8)
+  }, [importSummary, hideMetadataPreview])
+
   const handleCleanData = useCallback(async () => {
     if (isCleaning) return
     if (typeof window !== 'undefined') {
       const confirmed = window.confirm(
-        'Tindakan ini akan menghapus seluruh data Assets, Employees, SO Sessions, Maintenance, dan User non-admin.\nPastikan Anda sudah melakukan backup terlebih dahulu.\nLanjutkan?'
+        'Tindakan ini akan menghapus seluruh data Assets, Employees, SO Sessions, dan User non-admin.\nPastikan Anda sudah melakukan backup terlebih dahulu.\nLanjutkan?'
       )
       if (!confirmed) return
     }
@@ -235,13 +242,6 @@ export function BackupManagerPanel({
       setTimeout(resetCleanFeedback, 6000)
     }
   }, [isCleaning, resetCleanFeedback])
-
-  const importPreviewList = useMemo(() => {
-    if (!importSummary) return null
-    return Object.entries(importSummary.tables)
-      .filter(([, count]) => typeof count === 'number')
-      .slice(0, hideMetadataPreview ? 4 : 8)
-  }, [importSummary, hideMetadataPreview])
 
   return (
     <div className={className}>
@@ -357,54 +357,53 @@ export function BackupManagerPanel({
             </div>
           </div>
         </div>
-        <div className="mt-4">
-          <div className="rounded-lg border border-red-200 bg-red-50 p-4 sm:p-5">
-            <div className="flex flex-col gap-3">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h3 className="text-sm sm:text-base font-semibold text-red-900">Clean Data Sandbox</h3>
-                  <p className="text-xs sm:text-sm text-red-700/80">
-                    Hapus seluruh data Assets, Employees, SO Sessions, Maintenance, dan Users non-admin untuk pengujian backup/restore.
-                  </p>
-                </div>
-                <Button
-                  onClick={handleCleanData}
-                  disabled={isCleaning}
-                  className="bg-red-600 hover:bg-red-700 text-white font-bold border-2 border-red-700 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm"
-                >
-                  {isCleaning ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Trash2 className="mr-2 h-4 w-4" />
-                  )}
-                  {isCleaning ? 'Cleaning...' : 'Clean Data'}
-                </Button>
-              </div>
-              <div className="flex items-center gap-2 text-xs sm:text-sm text-red-800">
-                {isCleaning ? (
-                  <Loader2 className="h-4 w-4 animate-spin text-red-600" />
-                ) : cleanSummary ? (
-                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                ) : (
-                  <Trash2 className="h-4 w-4 text-red-600" />
-                )}
-                <span className="font-medium">{cleanStatus}</span>
-              </div>
 
-              {cleanSummary && (
-                <div className="rounded-md border border-red-200 bg-white/90 p-3 text-xs sm:text-sm text-red-800">
-                  <div className="font-semibold text-red-900 mb-2">Rows deleted per table:</div>
-                  <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
-                    {Object.entries(cleanSummary).map(([table, count]) => (
-                      <div key={table} className="flex items-center justify-between uppercase tracking-wide">
-                        <span className="mr-2 text-[11px] sm:text-xs text-red-700">{table.replace(/([A-Z])/g, ' $1').trim()}</span>
-                        <span className="font-semibold text-red-900">{count}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+        <div className="mt-4 sm:mt-4 rounded-lg border border-red-200 bg-red-50 p-4 sm:p-5">
+          <div className="flex flex-col gap-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-sm sm:text-base font-semibold text-red-900">Clean Data Sandbox</h3>
+                <p className="text-xs sm:text-sm text-red-700/80">
+                  Hapus seluruh data Assets, Employees, SO Sessions, dan Users non-admin untuk pengujian backup/restore.
+                </p>
+              </div>
+              <Button
+                onClick={handleCleanData}
+                disabled={isCleaning}
+                className="bg-red-600 hover:bg-red-700 text-white font-bold border-2 border-red-700 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm"
+              >
+                {isCleaning ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Trash2 className="mr-2 h-4 w-4" />
+                )}
+                {isCleaning ? 'Cleaning...' : 'Clean Data'}
+              </Button>
             </div>
+            <div className="flex items-center gap-2 text-xs sm:text-sm text-red-800">
+              {isCleaning ? (
+                <Loader2 className="h-4 w-4 animate-spin text-red-600" />
+              ) : cleanSummary ? (
+                <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+              ) : (
+                <Trash2 className="h-4 w-4 text-red-600" />
+              )}
+              <span className="font-medium">{cleanStatus}</span>
+            </div>
+
+            {cleanSummary && (
+              <div className="rounded-md border border-red-200 bg-white/90 p-3 text-xs sm:text-sm text-red-800">
+                <div className="font-semibold text-red-900 mb-2">Rows deleted per table:</div>
+                <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
+                  {Object.entries(cleanSummary).map(([table, count]) => (
+                    <div key={table} className="flex items-center justify-between uppercase tracking-wide">
+                      <span className="mr-2 text-[11px] sm:text-xs text-red-700">{table.replace(/([A-Z])/g, ' $1').trim()}</span>
+                      <span className="font-semibold text-red-900">{count}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

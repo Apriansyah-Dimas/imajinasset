@@ -1,15 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
-import { supabaseAdmin } from '@/lib/supabase'
+import { db } from '@/lib/db'
+import type { Prisma } from '@prisma/client'
 
 const mapUser = (user: any) => ({
   id: user.id,
   email: user.email,
   name: user.name,
   role: user.role,
-  isActive: user.isactive,
-  createdAt: user.createdat,
-  updatedAt: user.updatedat,
+  isActive: user.isActive ?? user.isactive,
+  createdAt: user.createdAt ?? user.createdat,
+  updatedAt: user.updatedAt ?? user.updatedat,
   creator: user.creator ? { name: user.creator.name } : undefined
 })
 
@@ -22,64 +23,41 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search') || ''
     const role = searchParams.get('role') || ''
 
-    const from = (page - 1) * limit
-    const to = from + limit - 1
+    const skip = (page - 1) * limit
 
-    let query = supabaseAdmin
-      .from('users')
-      .select(
-        `
-          id,
-          email,
-          name,
-          role,
-          isactive,
-          createdat,
-          updatedat,
-          createdby,
-          creator:createdby (
-            name
-          )
-        `,
-        { count: 'exact' }
-      )
+    const where: Prisma.UserWhereInput = {}
 
     if (role && role !== 'all') {
-      query = query.eq('role', role)
+      where.role = role
     }
 
     if (search) {
       const trimmed = search.trim()
       if (trimmed) {
-        const pattern = `%${trimmed
-          .replace(/[%_]/g, (char) => `\\${char}`)
-          .replace(/,/g, '\\,')}%`
-
-        query = query.or(`name.ilike.${pattern},email.ilike.${pattern}`)
+        where.OR = [
+          { name: { contains: trimmed, mode: 'insensitive' } },
+          { email: { contains: trimmed, mode: 'insensitive' } }
+        ]
       }
     }
 
-    const { data, error, count } = await query
-      .order('createdat', { ascending: false })
-      .range(from, to)
+    const [users, total] = await Promise.all([
+      db.user.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          creator: { select: { name: true } }
+        }
+      }),
+      db.user.count({ where })
+    ])
 
-    if (error) {
-      console.error('Supabase error fetching users:', error)
-      return NextResponse.json(
-        {
-          error: 'Failed to fetch users',
-          details: error.message
-        },
-        { status: 500 }
-      )
-    }
-
-    const users = (data ?? []).map(mapUser)
-    const total = count ?? 0
     const totalPages = total > 0 ? Math.ceil(total / limit) : 1
 
     return NextResponse.json({
-      users,
+      users: users.map(mapUser),
       pagination: {
         page,
         limit,
@@ -124,19 +102,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { data: existingUser, error: existingError } = await supabaseAdmin
-      .from('users')
-      .select('id')
-      .eq('email', email)
-      .maybeSingle()
-
-    if (existingError) {
-      console.error('Error checking existing user:', existingError)
-      return NextResponse.json(
-        { error: 'Failed to create user' },
-        { status: 500 }
-      )
-    }
+    const existingUser = await db.user.findUnique({
+      where: { email },
+      select: { id: true }
+    })
 
     if (existingUser) {
       return NextResponse.json(
@@ -147,30 +116,17 @@ export async function POST(request: NextRequest) {
 
     const hashedPassword = await bcrypt.hash(password, 10)
 
-    const { data: newUser, error: createError } = await supabaseAdmin
-      .from('users')
-      .insert({
+    const newUser = await db.user.create({
+      data: {
         email,
         name,
         password: hashedPassword,
         role,
-        isactive: true
-      })
-      .select(
-        `
-          id,
-          email,
-          name,
-          role,
-          isactive,
-          createdat,
-          updatedat
-        `
-      )
-      .single()
+        isActive: true
+      }
+    })
 
-    if (createError || !newUser) {
-      console.error('Error creating user:', createError)
+    if (!newUser) {
       return NextResponse.json(
         { error: 'Failed to create user' },
         { status: 500 }

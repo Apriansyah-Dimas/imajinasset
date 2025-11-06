@@ -298,7 +298,7 @@ export default function AddAssetModal({ open, onOpenChange, onSuccess }: AddAsse
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="md:col-span-2">
               <Label className="text-sm font-medium">Asset Image</Label>
-              <p className="text-xs text-gray-500 mb-2">Optional. Upload a square image (max 200KB) to help identify the asset.</p>
+              <p className="text-xs text-gray-500 mb-2">Optional. Upload a square image (max 50KB) to help identify the asset.</p>
               <ImageUpload
                 value={formData.imageUrl}
                 onChange={(url) => setFormData((prev) => ({ ...prev, imageUrl: url }))}

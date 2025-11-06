@@ -1,136 +1,141 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "sqlite"
-  url      = "file:dev.db"
+  url      = "file:./dev.db"
 }
 
 model Asset {
-  id           String   @id @default(cuid())
-  name         String
-  noAsset      String   @unique
-  status       String   @default("Unidentified") // Unidentified, Active, Broken, Lost/Missing, Sell
-  serialNo     String?
-  purchaseDate DateTime?
-  cost         Float?
-  brand        String?
-  model        String?
-  siteId       String?
-  categoryId   String?
-  departmentId String?
-  picId        String?  // Foreign key to Employee
-  pic          String?  // Keep for backward compatibility
-  imageUrl     String?
-  notes        String?  // For additional information (JSON string)
-  dateCreated  DateTime @default(now())
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  site       Site?       @relation(fields: [siteId], references: [id])
-  category   Category?   @relation(fields: [categoryId], references: [id])
-  department Department? @relation(fields: [departmentId], references: [id])
-  employee   Employee?   @relation(fields: [picId], references: [id])
+  id             String            @id @default(cuid())
+  name           String
+  noAsset        String            @unique @map("no_asset")
+  status         String            @default("Unidentified")
+  serialNo       String?           @map("serial_no")
+  purchaseDate   DateTime?         @map("purchase_date")
+  cost           Decimal?
+  brand          String?
+  model          String?
+  siteId         String?           @map("site_id")
+  categoryId     String?           @map("category_id")
+  departmentId   String?           @map("department_id")
+  picId          String?           @map("pic_id")
+  pic            String?
+  imageUrl       String?           @map("image_url")
+  notes          String?
+  dateCreated    DateTime          @default(now()) @map("date_created")
+  createdAt      DateTime          @default(now()) @map("createdat")
+  updatedAt      DateTime          @updatedAt @map("updatedat")
   soAssetEntries SOAssetEntry[]
-  customValues AssetCustomValue[]
+  customValues   AssetCustomValue[]
+  site           Site?             @relation(fields: [siteId], references: [id])
+  category       Category?         @relation(fields: [categoryId], references: [id])
+  department     Department?       @relation(fields: [departmentId], references: [id])
+  employee       Employee?         @relation(fields: [picId], references: [id])
+
+  @@map("assets")
+  @@index([siteId])
+  @@index([categoryId])
+  @@index([departmentId])
+  @@index([picId])
 }
 
 model Site {
-  id          String    @id @default(cuid())
-  name        String    @unique
-  address     String?
-  city        String?
-  province    String?
-  postalCode  String?
-  country     String?   @default("Indonesia")
-  phone       String?
-  email       String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  assets      Asset[]
+  id         String   @id @default(cuid())
+  name       String   @unique
+  address    String?
+  city       String?
+  province   String?
+  postalCode String?  @map("postal_code")
+  country    String?  @default("Indonesia")
+  phone      String?
+  email      String?
+  createdAt  DateTime @default(now()) @map("createdat")
+  updatedAt  DateTime @updatedAt @map("updatedat")
+  assets     Asset[]
+
+  @@map("sites")
 }
 
 model Category {
-  id          String    @id @default(cuid())
-  name        String    @unique
+  id         String   @id @default(cuid())
+  name       String   @unique
   description String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  assets      Asset[]
+  createdAt  DateTime @default(now()) @map("createdat")
+  updatedAt  DateTime @updatedAt @map("updatedat")
+  assets     Asset[]
+
+  @@map("categories")
 }
 
 model Department {
-  id          String    @id @default(cuid())
-  name        String    @unique
+  id          String   @id @default(cuid())
+  name        String   @unique
   description String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt   DateTime @default(now()) @map("createdat")
+  updatedAt   DateTime @updatedAt @map("updatedat")
   assets      Asset[]
+
+  @@map("departments")
 }
 
 model Employee {
-  id          String    @id @default(cuid())
-  employeeId  String    @unique
-  name        String
-  email       String?   @unique
-  department  String?
-  position    String?
-  joinDate    DateTime?
-  isActive    Boolean   @default(true)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id         String   @id @default(cuid())
+  employeeId String   @unique @map("employee_id")
+  name       String
+  email      String?  @unique
+  department String?
+  position   String?
+  joinDate   DateTime? @map("join_date")
+  isActive   Boolean  @default(true) @map("isactive")
+  createdAt  DateTime @default(now()) @map("createdat")
+  updatedAt  DateTime @updatedAt @map("updatedat")
+  assets     Asset[]
 
-  // Relations - employees can be PIC for assets
-  assets      Asset[]
-  
+  @@map("employees")
 }
 
 model SOSession {
-  id          String    @id @default(cuid())
-  name        String
-  year        Int
-  description String?
-  status      String    @default("Active") // Active, Completed, Cancelled
-  totalAssets Int       @default(0)
-  scannedAssets Int     @default(0)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  startedAt   DateTime?
-  completedAt DateTime?
-
+  id             String          @id @default(cuid())
+  name           String
+  year           Int
+  description    String?
+  status         String          @default("Active")
+  totalAssets    Int             @default(0) @map("total_assets")
+  scannedAssets  Int             @default(0) @map("scanned_assets")
+  createdAt      DateTime        @default(now()) @map("createdat")
+  updatedAt      DateTime        @updatedAt @map("updatedat")
+  startedAt      DateTime?       @map("started_at")
+  completedAt    DateTime?       @map("completed_at")
   soAssetEntries SOAssetEntry[]
+
+  @@map("so_sessions")
 }
 
 model SOAssetEntry {
-  id            String    @id @default(cuid())
-  soSessionId   String
-  assetId       String
-  scannedAt     DateTime  @default(now())
-  status        String    @default("Scanned") // Scanned, Updated, Not Found
-  isIdentified  Boolean   @default(false) // Whether asset has been identified/updated
+  id           String    @id @default(cuid())
+  soSessionId  String    @map("so_session_id")
+  assetId      String    @map("asset_id")
+  scannedAt    DateTime  @default(now()) @map("scanned_at")
+  status       String    @default("Scanned")
+  isIdentified Boolean   @default(false) @map("isidentified")
+  tempName     String?   @map("temp_name")
+  tempStatus   String?   @map("temp_status")
+  tempSerialNo String?   @map("temp_serial_no")
+  tempPic      String?   @map("temp_pic")
+  tempNotes    String?   @map("temp_notes")
+  tempBrand    String?   @map("temp_brand")
+  tempModel    String?   @map("temp_model")
+  tempCost     Decimal?  @map("temp_cost")
+  createdAt    DateTime  @default(now()) @map("createdat")
+  updatedAt    DateTime  @updatedAt @map("updatedat")
+  soSession    SOSession @relation(fields: [soSessionId], references: [id])
+  asset        Asset     @relation(fields: [assetId], references: [id])
 
-  // Temporary data that can be edited during SO without affecting main asset
-  tempName      String?
-  tempStatus    String?
-  tempSerialNo  String?
-  tempPic       String?
-  tempNotes     String?
-  tempBrand     String?
-  tempModel     String?
-  tempCost      Float?
-
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-
-  soSession     SOSession @relation(fields: [soSessionId], references: [id])
-  asset         Asset     @relation(fields: [assetId], references: [id])
+  @@map("so_asset_entries")
+  @@index([soSessionId])
+  @@index([assetId])
 }
 
 model User {
@@ -139,50 +144,79 @@ model User {
   name      String
   password  String
   role      String   @default("VIEWER")
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  createdBy String?
-
-  // Relations
+  isActive  Boolean  @default(true) @map("isactive")
+  createdAt DateTime @default(now()) @map("createdat")
+  updatedAt DateTime @updatedAt @map("updatedat")
+  createdBy String?  @map("createdby")
   createdUsers User[] @relation("UserCreator")
-  creator      User?   @relation("UserCreator", fields: [createdBy], references: [id])
+  creator      User?  @relation("UserCreator", fields: [createdBy], references: [id])
+  logs        Log[]    @relation("UserLogs")
+  backups     Backup[] @relation("UserBackups")
+
+  @@map("users")
 }
 
 model AssetCustomField {
-  id           String    @id @default(cuid())
-  name         String    @unique
-  label        String    // Display label (e.g., "Price", "Warranty Expiry")
-  fieldType    String // text, number, date, select, textarea
-  required     Boolean   @default(false)
-  isActive     Boolean   @default(true)
-  showCondition String?  // Conditional display logic (e.g., "status=Sell")
-  options      String?   // JSON string for select options
-  defaultValue  String?
+  id           String   @id @default(cuid())
+  name         String   @unique
+  label        String
+  fieldType    String   @map("field_type")
+  required     Boolean  @default(false)
+  isActive     Boolean  @default(true) @map("isactive")
+  showCondition String? @map("show_condition")
+  options      String?
+  defaultValue String?  @map("default_value")
   description  String?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-
+  createdAt    DateTime @default(now()) @map("createdat")
+  updatedAt    DateTime @updatedAt @map("updatedat")
   customValues AssetCustomValue[]
+
+  @@map("asset_custom_fields")
 }
 
 model AssetCustomValue {
-  id           String   @id @default(cuid())
-  assetId      String
-  customFieldId String
-  stringValue  String?
-  numberValue  Float?
-  dateValue    DateTime?
-  booleanValue Boolean?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  asset       Asset            @relation(fields: [assetId], references: [id], onDelete: Cascade)
-  customField AssetCustomField @relation(fields: [customFieldId], references: [id], onDelete: Cascade)
+  id            String   @id @default(cuid())
+  assetId       String   @map("asset_id")
+  customFieldId String   @map("custom_field_id")
+  stringValue   String?  @map("string_value")
+  numberValue   Decimal? @map("number_value")
+  dateValue     DateTime? @map("date_value")
+  booleanValue  Boolean? @map("boolean_value")
+  createdAt     DateTime @default(now()) @map("createdat")
+  updatedAt     DateTime @updatedAt @map("updatedat")
+  asset         Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  customField   AssetCustomField @relation(fields: [customFieldId], references: [id], onDelete: Cascade)
 
   @@unique([assetId, customFieldId])
+  @@map("asset_custom_values")
 }
 
-// SQLite doesn't support enums, using String instead
-// FieldType: TEXT, NUMBER, DATE, BOOLEAN, SELECT, TEXTAREA
-// Role: ADMIN, SO_ASSET_USER, VIEWER
+model Log {
+  id         String   @id @default(cuid())
+  level      String
+  message    String
+  data       String?
+  userId     String?  @map("user_id")
+  ipAddress  String?  @map("ip_address")
+  userAgent  String?  @map("user_agent")
+  createdAt  DateTime @default(now()) @map("createdat")
+  updatedAt  DateTime @updatedAt @map("updatedat")
+  user       User?    @relation("UserLogs", fields: [userId], references: [id])
+
+  @@map("logs")
+  @@index([userId])
+}
+
+model Backup {
+  id        String   @id @default(cuid())
+  name      String
+  filePath  String   @map("file_path")
+  fileSize  Int?     @map("file_size")
+  status    String   @default("completed")
+  createdAt DateTime @default(now()) @map("createdat")
+  createdBy String?  @map("createdby")
+  creator   User?    @relation("UserBackups", fields: [createdBy], references: [id])
+
+  @@map("backups")
+  @@index([createdBy])
+}

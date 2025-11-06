@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase'
+import { db } from '@/lib/db'
 
 export async function DELETE(request: NextRequest) {
   try {
@@ -14,18 +14,7 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    // Get count of assets before deletion for response
-    const { count: assetsCount, error: countError } = await supabaseAdmin
-      .from('assets')
-      .select('*', { count: 'exact', head: true })
-
-    if (countError) {
-      console.error('Error counting assets:', countError)
-      return NextResponse.json(
-        { error: 'Failed to count assets' },
-        { status: 500 }
-      )
-    }
+    const assetsCount = await db.asset.count()
 
     if (!assetsCount || assetsCount === 0) {
       return NextResponse.json(
@@ -34,19 +23,7 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    // Delete all assets
-    const { error: deleteError } = await supabaseAdmin
-      .from('assets')
-      .delete()
-      .neq('id', '') // Delete all rows (using a condition that's always true)
-
-    if (deleteError) {
-      console.error('Error deleting all assets:', deleteError)
-      return NextResponse.json(
-        { error: 'Failed to delete assets', details: deleteError.message },
-        { status: 500 }
-      )
-    }
+    await db.asset.deleteMany()
 
     return NextResponse.json({
       success: true,

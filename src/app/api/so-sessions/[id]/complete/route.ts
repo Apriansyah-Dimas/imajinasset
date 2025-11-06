@@ -1,12 +1,40 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { verifyToken, canCompleteSOSession } from '@/lib/auth'
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const sessionId = params.id
+    // Check authentication
+    const authHeader = request.headers.get('authorization')
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      )
+    }
+
+    const token = authHeader.substring(7)
+    const user = verifyToken(token)
+    
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Invalid or expired token' },
+        { status: 401 }
+      )
+    }
+
+    // Check if user has permission to complete SO session
+    if (!canCompleteSOSession(user.role)) {
+      return NextResponse.json(
+        { error: 'Insufficient permissions to complete SO session' },
+        { status: 403 }
+      )
+    }
+
+    const { id: sessionId } = await params
 
     // Check if session exists
     const session = await db.sOSession.findUnique({
@@ -44,10 +72,44 @@ export async function POST(
       }
     })
 
+    // Get all SO asset entries for this session
+    const soAssetEntries = await db.sOAssetEntry.findMany({
+      where: { soSessionId: sessionId },
+      include: { asset: true }
+    })
+
+    console.log('DEBUG: Syncing SO entries to main assets:', soAssetEntries.length)
+
+    // Update main assets with data from SO session
+    for (const entry of soAssetEntries) {
+      if (entry.isIdentified) {
+        console.log('DEBUG: Updating asset:', entry.asset.noAsset)
+        console.log('DEBUG: New status:', entry.tempStatus)
+        console.log('DEBUG: New name:', entry.tempName)
+        
+        await db.asset.update({
+          where: { id: entry.assetId },
+          data: {
+            name: entry.tempName || entry.asset.name,
+            status: entry.tempStatus || entry.asset.status,
+            serialNo: entry.tempSerialNo || entry.asset.serialNo,
+            pic: entry.tempPic || entry.asset.pic,
+            brand: entry.tempBrand || entry.asset.brand,
+            model: entry.tempModel || entry.asset.model,
+            cost: entry.tempCost || entry.asset.cost,
+            updatedAt: new Date()
+          }
+        })
+      }
+    }
+
+    console.log('DEBUG: Completed syncing SO entries to main assets')
+
     return NextResponse.json({
       success: true,
-      message: 'SO Session completed successfully',
-      session: updatedSession
+      message: 'SO Session completed successfully and main assets updated',
+      session: updatedSession,
+      assetsUpdated: soAssetEntries.filter(e => e.isIdentified).length
     })
   } catch (error) {
     console.error('Complete SO session error:', error)

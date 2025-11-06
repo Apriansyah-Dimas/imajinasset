@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase";
+import { db } from "@/lib/db";
 
 interface ImportAsset {
   NameOfAsset: string;
@@ -64,42 +64,36 @@ const parseDate = (value: string | null) => {
 };
 
 const ensureReference = async (table: "categories" | "sites" | "departments", name: string) => {
-  const { data: existing, error: fetchError } = await supabaseAdmin
-    .from(table)
-    .select("id")
-    .eq("name", name)
-    .maybeSingle();
+  const trimmed = name.trim();
 
-  if (fetchError && fetchError.code !== "PGRST116") {
-    throw new Error(`Failed to lookup ${table}: ${fetchError.message}`);
-  }
-
-  if (existing?.id) {
-    return existing.id as string;
-  }
-
-  const newId = randomUUID();
-  const { data: created, error: insertError } = await supabaseAdmin
-    .from(table)
-    .insert({ id: newId, name })
-    .select("id")
-    .single();
-
-  if (insertError) {
-    if (insertError.code === "23505") {
-      const { data: retry } = await supabaseAdmin
-        .from(table)
-        .select("id")
-        .eq("name", name)
-        .maybeSingle();
-      if (retry?.id) {
-        return retry.id as string;
-      }
+  switch (table) {
+    case "categories": {
+      const record = await db.category.upsert({
+        where: { name: trimmed },
+        update: {},
+        create: { name: trimmed }
+      });
+      return record.id;
     }
-    throw new Error(`Failed to create ${table}: ${insertError.message}`);
+    case "sites": {
+      const record = await db.site.upsert({
+        where: { name: trimmed },
+        update: {},
+        create: { name: trimmed }
+      });
+      return record.id;
+    }
+    case "departments": {
+      const record = await db.department.upsert({
+        where: { name: trimmed },
+        update: {},
+        create: { name: trimmed }
+      });
+      return record.id;
+    }
+    default:
+      throw new Error(`Unsupported reference table: ${table}`);
   }
-
-  return created?.id as string;
 };
 
 export async function POST(request: NextRequest) {
@@ -174,46 +168,37 @@ export async function POST(request: NextRequest) {
           departmentId = await ensureReference("departments", departmentName);
         }
 
-        const nowIso = new Date().toISOString();
+        const existingAsset = await db.asset.findUnique({
+          where: { noAsset }
+        });
 
-        const { data: existingAsset, error: existingError } = await supabaseAdmin
-          .from("assets")
-          .select("id")
-          .eq("no_asset", noAsset)
-          .maybeSingle();
-
-        if (existingError && existingError.code !== "PGRST116") {
-          throw new Error(`Failed to verify asset: ${existingError.message}`);
-        }
-
-        if (existingAsset?.id) {
+        if (existingAsset) {
           results.skipped++;
           results.errors.push(`Asset number ${noAsset} already exists`);
           continue;
         }
 
         const assetId = randomUUID();
-        const { error: insertError } = await supabaseAdmin.from("assets").insert({
-          id: assetId,
-          name,
-          no_asset: noAsset,
-          status,
-          serial_no: serialNo,
-          brand,
-          model,
-          pic,
-          category_id: categoryId,
-          site_id: siteId,
-          department_id: departmentId,
-          cost: costValue,
-          purchase_date: purchaseDate ? purchaseDate.toISOString() : null,
-          createdat: nowIso,
-          updatedat: nowIso,
+        await db.asset.create({
+          data: {
+            id: assetId,
+            name,
+            noAsset,
+            status,
+            serialNo: serialNo ?? null,
+            brand: brand ?? null,
+            model: model ?? null,
+            pic: pic ?? null,
+            categoryId,
+            siteId,
+            departmentId,
+            cost: costValue,
+            purchaseDate,
+            notes: null,
+            imageUrl: null,
+            picId: null
+          }
         });
-
-        if (insertError) {
-          throw new Error(insertError.message);
-        }
 
         results.imported++;
       } catch (error: any) {

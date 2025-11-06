@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
-import { supabaseAdmin } from './supabase';
+import { db } from './db';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 const JWT_EXPIRES_IN = '7d';
@@ -36,46 +36,43 @@ export const verifyToken = (token: string): JWTPayload | null => {
 
 // User utilities
 export const findUserByEmail = async (email: string) => {
-  const { data, error } = await supabaseAdmin
-    .from('users')
-    .select('id, email, name, role, password, isactive, createdat, updatedat')
-    .eq('email', email)
-    .single();
+  const user = await db.user.findUnique({
+    where: { email }
+  });
 
-  if (error || !data) return null;
+  if (!user) return null;
 
-  // Map column names to match expected interface
   return {
-    id: data.id,
-    email: data.email,
-    name: data.name,
-    role: data.role,
-    password: data.password,
-    isActive: data.isactive,
-    createdAt: data.createdat,
-    updatedAt: data.updatedat
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role as JWTPayload['role'],
+    password: user.password,
+    isActive: user.isActive,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt
   };
 };
 
 export const findUserById = async (id: string) => {
-  const { data, error } = await supabaseAdmin
-    .from('users')
-    .select('id, email, name, role, isactive, createdat, updatedat, createdby')
-    .eq('id', id)
-    .single();
+  const user = await db.user.findUnique({
+    where: { id },
+    include: {
+      creator: { select: { id: true, name: true, email: true } }
+    }
+  });
 
-  if (error || !data) return null;
+  if (!user) return null;
 
-  // Map column names to match expected interface
   return {
-    id: data.id,
-    email: data.email,
-    name: data.name,
-    role: data.role,
-    isActive: data.isactive,
-    createdAt: data.createdat,
-    updatedAt: data.updatedat,
-    createdBy: data.createdby
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role as JWTPayload['role'],
+    isActive: user.isActive,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt,
+    createdBy: user.createdBy
   };
 };
 
@@ -112,7 +109,23 @@ export const hasPermission = (userRole: string, requiredRole: string): boolean =
 };
 
 export const canAccessSOAsset = (userRole: string): boolean => {
+  return userRole === 'ADMIN' || userRole === 'SO_ASSET_USER' || userRole === 'VIEWER';
+};
+
+export const canCreateSOSession = (userRole: string): boolean => {
+  return userRole === 'ADMIN';
+};
+
+export const canViewSOSession = (userRole: string): boolean => {
+  return userRole === 'ADMIN' || userRole === 'SO_ASSET_USER' || userRole === 'VIEWER';
+};
+
+export const canScanInSOSession = (userRole: string): boolean => {
   return userRole === 'ADMIN' || userRole === 'SO_ASSET_USER';
+};
+
+export const canCompleteSOSession = (userRole: string): boolean => {
+  return userRole === 'ADMIN';
 };
 
 export const canCancelSOSession = (userRole: string): boolean => {

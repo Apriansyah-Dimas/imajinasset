@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase'
+import { db } from '@/lib/db'
 
 export async function PUT(
   request: NextRequest,
@@ -9,21 +9,16 @@ export async function PUT(
     const { id } = await params
     const body = await request.json()
 
-    const transformedBody = {
-      name: body.name,
-      description: body.description || null,
-      updatedat: new Date().toISOString()
-    }
+    const department = await db.department.update({
+      where: { id },
+      data: {
+        name: body.name,
+        description: body.description || null
+      }
+    })
 
-    const { data: department, error } = await supabaseAdmin
-      .from('departments')
-      .update(transformedBody)
-      .eq('id', id)
-      .select()
-      .single()
-
-    if (error || !department) {
-      console.error('Department PUT error:', error)
+    if (!department) {
+      console.error('Department PUT error: department not found')
       return NextResponse.json(
         { error: 'Failed to update department' },
         { status: 500 }
@@ -48,18 +43,9 @@ export async function DELETE(
     // Check if department is being used by any assets
     const { id } = await params
 
-    const { count: assetsCount, error: countError } = await supabaseAdmin
-      .from('assets')
-      .select('*', { count: 'exact', head: true })
-      .eq('department_id', id)
-
-    if (countError) {
-      console.error('Error checking department usage:', countError)
-      return NextResponse.json(
-        { error: 'Failed to check department usage' },
-        { status: 500 }
-      )
-    }
+    const assetsCount = await db.asset.count({
+      where: { departmentId: id }
+    })
 
     if (assetsCount && assetsCount > 0) {
       return NextResponse.json(
@@ -68,13 +54,11 @@ export async function DELETE(
       )
     }
 
-    // Delete the department
-    const { error: deleteError } = await supabaseAdmin
-      .from('departments')
-      .delete()
-      .eq('id', id)
-
-    if (deleteError) {
+    try {
+      await db.department.delete({
+        where: { id }
+      })
+    } catch (deleteError) {
       console.error('Department DELETE error:', deleteError)
       return NextResponse.json(
         { error: 'Failed to delete department' },

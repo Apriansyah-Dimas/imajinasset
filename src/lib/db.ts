@@ -1,4 +1,9 @@
-import { PrismaClient } from '@prisma/client'
+import { Prisma, PrismaClient } from '@prisma/client'
+
+// Ensure Prisma Decimal values serialize as numbers in JSON responses
+Prisma.Decimal.prototype.toJSON = function toJSON() {
+  return this.toNumber()
+}
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined

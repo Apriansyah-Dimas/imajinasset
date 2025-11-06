@@ -1,5 +1,6 @@
+import { randomUUID } from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase'
+import { db } from '@/lib/db'
 
 interface ParsedAssetRow {
   noAsset?: string
@@ -240,6 +241,17 @@ export async function POST(request: NextRequest) {
         missingFields.forEach(field => issueFields.add(field))
       }
 
+      let parsedPurchaseDate: Date | null = null
+      if (asset.purchaseDate) {
+        const parsed = new Date(asset.purchaseDate)
+        if (Number.isNaN(parsed.getTime())) {
+          rowIssues.push('Invalid purchase date format')
+          issueFields.add('purchaseDate')
+        } else {
+          parsedPurchaseDate = parsed
+        }
+      }
+
       if (rowIssues.length) {
         skipped++
         issues.push({
@@ -250,90 +262,72 @@ export async function POST(request: NextRequest) {
         continue
       }
 
-      const nowIso = new Date().toISOString()
-      const baseData: Record<string, any> = {
-        name: asset.name,
-        no_asset: asset.noAsset,
-        status: asset.status || 'Active',
-        serial_no: asset.serialNo ?? null,
-        brand: asset.brand ?? null,
-        model: asset.model ?? null,
-        pic: asset.pic ?? null,
-        pic_id: asset.picId ?? null,
-        cost: typeof asset.cost === 'number' ? asset.cost : null,
-        notes: asset.notes ?? null,
-        site_id: asset.siteId ?? null,
-        category_id: asset.categoryId ?? null,
-        department_id: asset.departmentId ?? null,
-        updatedat: nowIso
-      }
-
-      if (asset.purchaseDate) {
-        baseData.purchase_date = asset.purchaseDate
-      }
-
       try {
-        const { data: existing, error: fetchError } = await supabaseAdmin
-          .from('assets')
-          .select('id')
-          .eq('no_asset', asset.noAsset)
-          .maybeSingle()
-
-        if (fetchError && fetchError.code !== 'PGRST116') {
-          skipped++
-          issues.push({
-            row: rowNumber,
-            reason: `Failed to check existing asset: ${fetchError.message}`
-          })
-          continue
-        }
-
-        let assetId: string | null = null
+        const existing = await db.asset.findUnique({
+          where: { noAsset: asset.noAsset! },
+          select: { id: true }
+        })
 
         if (existing) {
-          const { data: updatedAsset, error: updateError } = await supabaseAdmin
-            .from('assets')
-            .update(baseData)
-            .eq('no_asset', asset.noAsset)
-            .select('id')
-            .single()
-
-          if (updateError) {
+          try {
+            await db.asset.update({
+              where: { id: existing.id },
+              data: {
+                name: asset.name!,
+                status: asset.status || 'Active',
+                serialNo: asset.serialNo ?? null,
+                brand: asset.brand ?? null,
+                model: asset.model ?? null,
+                pic: asset.pic ?? null,
+                picId: asset.picId ?? null,
+                cost: typeof asset.cost === 'number' ? asset.cost : null,
+                notes: asset.notes ?? null,
+                siteId: asset.siteId ?? null,
+                categoryId: asset.categoryId ?? null,
+                departmentId: asset.departmentId ?? null,
+                purchaseDate: parsedPurchaseDate
+              }
+            })
+          } catch (updateError: any) {
             skipped++
             issues.push({
               row: rowNumber,
-              reason: `Failed to update asset: ${updateError.message}`
+              reason: `Failed to update asset: ${updateError?.message ?? 'Unknown error'}`
             })
             continue
           }
-
-          assetId = updatedAsset?.id ?? existing.id ?? null
         } else {
-          const newId = randomUUID()
-          const { data: insertedAsset, error: insertError } = await supabaseAdmin
-            .from('assets')
-            .insert({
-              id: newId,
-              ...baseData,
-              createdat: nowIso
+          try {
+            await db.asset.create({
+              data: {
+                id: randomUUID(),
+                name: asset.name!,
+                noAsset: asset.noAsset!,
+                status: asset.status || 'Active',
+                serialNo: asset.serialNo ?? null,
+                brand: asset.brand ?? null,
+                model: asset.model ?? null,
+                pic: asset.pic ?? null,
+                picId: asset.picId ?? null,
+                cost: typeof asset.cost === 'number' ? asset.cost : null,
+                notes: asset.notes ?? null,
+                siteId: asset.siteId ?? null,
+                categoryId: asset.categoryId ?? null,
+                departmentId: asset.departmentId ?? null,
+                purchaseDate: parsedPurchaseDate
+              }
             })
-            .select('id')
-            .single()
-
-          if (insertError) {
+          } catch (insertError: any) {
             skipped++
             issues.push({
               row: rowNumber,
-              reason: `Failed to create asset: ${insertError.message}`
+              reason: `Failed to create asset: ${insertError?.message ?? 'Unknown error'}`
             })
             continue
           }
-
-          assetId = insertedAsset?.id ?? newId
         }
 
         imported++
-
       } catch (error: any) {
         skipped++
         issues.push({

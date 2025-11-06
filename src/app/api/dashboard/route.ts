@@ -1,130 +1,101 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase'
+import { db } from '@/lib/db'
 
 export async function GET() {
   try {
     // Get total assets count
-    const { count: totalAssets } = await supabaseAdmin
-      .from('assets')
-      .select('*', { count: 'exact', head: true })
+    const totalAssets = await db.asset.count()
 
     console.log('Dashboard API - Total Assets:', totalAssets)
 
     // Get assets by site
-    const { data: assetsBySiteData } = await supabaseAdmin
-      .from('assets')
-      .select(`
-        site_id,
-        sites (
-          id,
-          name
-        )
-      `)
-      .not('site_id', 'is', null)
+    const assetsBySiteData = await db.asset.groupBy({
+      by: ['siteId'],
+      where: { siteId: { not: null } },
+      _count: { siteId: true }
+    })
 
-    // Group by site
-    const assetsBySite = (assetsBySiteData || []).reduce((acc, item) => {
-      const siteName = item.sites?.name || 'Unknown'
-      const existing = acc.find(site => site.siteId === item.site_id)
-      if (existing) {
-        existing.value += 1
-      } else {
-        acc.push({
-          siteId: item.site_id,
-          name: siteName,
-          value: 1
-        })
-      }
-      return acc
-    }, [] as { siteId: string; name: string; value: number }[])
+    // Get site details
+    const siteIds = assetsBySiteData.map(item => item.siteId!).filter(Boolean)
+    const sites = siteIds.length > 0
+      ? await db.site.findMany({ where: { id: { in: siteIds } }, select: { id: true, name: true } })
+      : []
+
+    const siteMap = new Map(sites.map(site => [site.id, site.name]))
+
+    const assetsBySite = assetsBySiteData.map(item => ({
+      siteId: item.siteId!,
+      name: siteMap.get(item.siteId!) || 'Unknown',
+      value: item._count.siteId
+    }))
 
     // Get assets by category
-    const { data: assetsByCategoryData } = await supabaseAdmin
-      .from('assets')
-      .select(`
-        category_id,
-        categories (
-          id,
-          name
-        )
-      `)
-      .not('category_id', 'is', null)
+    const assetsByCategoryData = await db.asset.groupBy({
+      by: ['categoryId'],
+      where: { categoryId: { not: null } },
+      _count: { categoryId: true }
+    })
 
-    // Group by category
-    const assetsByCategory = (assetsByCategoryData || []).reduce((acc, item) => {
-      const categoryName = item.categories?.name || 'Unknown'
-      const existing = acc.find(cat => cat.categoryId === item.category_id)
-      if (existing) {
-        existing.value += 1
-      } else {
-        acc.push({
-          categoryId: item.category_id,
-          name: categoryName,
-          value: 1
-        })
-      }
-      return acc
-    }, [] as { categoryId: string; name: string; value: number }[])
+    // Get category details
+    const categoryIds = assetsByCategoryData.map(item => item.categoryId!).filter(Boolean)
+    const categories = categoryIds.length > 0
+      ? await db.category.findMany({ where: { id: { in: categoryIds } }, select: { id: true, name: true } })
+      : []
+
+    const categoryMap = new Map(categories.map(category => [category.id, category.name]))
+
+    const assetsByCategory = assetsByCategoryData.map(item => ({
+      categoryId: item.categoryId!,
+      name: categoryMap.get(item.categoryId!) || 'Unknown',
+      value: item._count.categoryId
+    }))
 
     // Get assets by department
-    const { data: assetsByDepartmentData } = await supabaseAdmin
-      .from('assets')
-      .select(`
-        department_id,
-        departments (
-          id,
-          name
-        )
-      `)
-      .not('department_id', 'is', null)
+    const assetsByDepartmentData = await db.asset.groupBy({
+      by: ['departmentId'],
+      where: { departmentId: { not: null } },
+      _count: { departmentId: true }
+    })
 
-    // Group by department
-    const assetsByDepartment = (assetsByDepartmentData || []).reduce((acc, item) => {
-      const departmentName = item.departments?.name || 'Unknown'
-      const existing = acc.find(dept => dept.departmentId === item.department_id)
-      if (existing) {
-        existing.value += 1
-      } else {
-        acc.push({
-          departmentId: item.department_id,
-          name: departmentName,
-          value: 1
-        })
-      }
-      return acc
-    }, [] as { departmentId: string; name: string; value: number }[])
+    // Get department details
+    const departmentIds = assetsByDepartmentData.map(item => item.departmentId!).filter(Boolean)
+    const departments = departmentIds.length > 0
+      ? await db.department.findMany({ where: { id: { in: departmentIds } }, select: { id: true, name: true } })
+      : []
 
-    // Get total cost by category (using raw SQL since Supabase doesn't have SUM in client)
-    const { data: totalCostByCategoryData } = await supabaseAdmin
-      .from('assets')
-      .select(`
-        category_id,
-        cost,
-        categories (
-          id,
-          name
-        )
-      `)
-      .not('cost', 'is', null)
-      .not('category_id', 'is', null)
+    const departmentMap = new Map(departments.map(department => [department.id, department.name]))
 
-    // Group and sum by category
-    const totalCostByCategory = (totalCostByCategoryData || []).reduce((acc, item) => {
-      const categoryName = item.categories?.name || 'Unknown'
-      const existing = acc.find(cat => cat.categoryId === item.category_id)
-      if (existing) {
-        existing.cost += Number(item.cost) || 0
-        existing.count += 1
-      } else {
-        acc.push({
-          categoryId: item.category_id,
-          name: categoryName,
-          cost: Number(item.cost) || 0,
-          count: 1
-        })
-      }
-      return acc
-    }, [] as { categoryId: string; name: string; cost: number; count: number }[])
+    const assetsByDepartment = assetsByDepartmentData.map(item => ({
+      departmentId: item.departmentId!,
+      name: departmentMap.get(item.departmentId!) || 'Unknown',
+      value: item._count.departmentId
+    }))
+
+    // Get total cost by category
+    const assetsWithCost = await db.asset.groupBy({
+      by: ['categoryId'],
+      where: {
+        cost: { not: null },
+        categoryId: { not: null }
+      },
+      _sum: { cost: true },
+      _count: { categoryId: true }
+    })
+
+    // Get category details for cost data
+    const costCategoryIds = assetsWithCost.map(item => item.categoryId!).filter(Boolean)
+    const costCategories = costCategoryIds.length > 0
+      ? await db.category.findMany({ where: { id: { in: costCategoryIds } }, select: { id: true, name: true } })
+      : []
+
+    const costCategoryMap = new Map(costCategories.map(category => [category.id, category.name]))
+
+    const totalCostByCategory = assetsWithCost.map(item => ({
+      categoryId: item.categoryId!,
+      name: costCategoryMap.get(item.categoryId!) || 'Unknown',
+      cost: item._sum.cost || 0,
+      count: item._count.categoryId
+    }))
 
     // Format total cost data
     const formattedTotalCostByCategory = totalCostByCategory.map(item => ({
@@ -134,7 +105,7 @@ export async function GET() {
     }))
 
     return NextResponse.json({
-      totalAssets: totalAssets || 0,
+      totalAssets,
       totalCostByCategory: formattedTotalCostByCategory,
       assetsBySite,
       assetsByCategory,

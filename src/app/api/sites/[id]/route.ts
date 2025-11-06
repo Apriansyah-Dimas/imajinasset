@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase'
+import { db } from '@/lib/db'
 
 export async function PUT(
   request: NextRequest,
@@ -9,27 +9,22 @@ export async function PUT(
     const { id } = await params
     const body = await request.json()
 
-    const transformedBody = {
-      name: body.name,
-      address: body.address || null,
-      city: body.city || null,
-      province: body.province || null,
-      postal_code: body.postalCode || null,
-      country: body.country || null,
-      phone: body.phone || null,
-      email: body.email || null,
-      updatedat: new Date().toISOString()
-    }
+    const site = await db.site.update({
+      where: { id },
+      data: {
+        name: body.name,
+        address: body.address || null,
+        city: body.city || null,
+        province: body.province || null,
+        postalCode: body.postalCode || null,
+        country: body.country || null,
+        phone: body.phone || null,
+        email: body.email || null
+      }
+    })
 
-    const { data: site, error } = await supabaseAdmin
-      .from('sites')
-      .update(transformedBody)
-      .eq('id', id)
-      .select()
-      .single()
-
-    if (error || !site) {
-      console.error('Site PUT error:', error)
+    if (!site) {
+      console.error('Site PUT error: site not found')
       return NextResponse.json(
         { error: 'Failed to update site' },
         { status: 500 }
@@ -54,18 +49,9 @@ export async function DELETE(
     // Check if site is being used by any assets
     const { id } = await params
 
-    const { count: assetsCount, error: countError } = await supabaseAdmin
-      .from('assets')
-      .select('*', { count: 'exact', head: true })
-      .eq('site_id', id)
-
-    if (countError) {
-      console.error('Error checking site usage:', countError)
-      return NextResponse.json(
-        { error: 'Failed to check site usage' },
-        { status: 500 }
-      )
-    }
+    const assetsCount = await db.asset.count({
+      where: { siteId: id }
+    })
 
     if (assetsCount && assetsCount > 0) {
       return NextResponse.json(
@@ -74,13 +60,11 @@ export async function DELETE(
       )
     }
 
-    // Delete the site
-    const { error: deleteError } = await supabaseAdmin
-      .from('sites')
-      .delete()
-      .eq('id', id)
-
-    if (deleteError) {
+    try {
+      await db.site.delete({
+        where: { id }
+      })
+    } catch (deleteError) {
       console.error('Site DELETE error:', deleteError)
       return NextResponse.json(
         { error: 'Failed to delete site' },

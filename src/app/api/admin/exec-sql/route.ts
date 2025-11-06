@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase'
+import { db } from '@/lib/db'
 
 export async function POST(request: Request) {
   try {
@@ -12,17 +12,16 @@ export async function POST(request: Request) {
       )
     }
     
-    // Execute the SQL using Supabase's raw SQL execution
-    const { data, error } = await supabaseAdmin.rpc('execute_sql', { sql_query: sql })
-    
-    if (error) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 500 }
-      )
+    const trimmed = sql.trim().toLowerCase()
+    const isSelect = trimmed.startsWith('select')
+
+    if (isSelect) {
+      const data = await db.$queryRawUnsafe(sql)
+      return NextResponse.json({ success: true, data })
     }
-    
-    return NextResponse.json({ success: true, data })
+
+    const result = await db.$executeRawUnsafe(sql)
+    return NextResponse.json({ success: true, affectedRows: Number(result) })
   } catch (error) {
     console.error('Error executing SQL:', error)
     return NextResponse.json(

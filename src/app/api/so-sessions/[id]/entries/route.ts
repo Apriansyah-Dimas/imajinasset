@@ -1,12 +1,40 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { verifyToken, canViewSOSession } from '@/lib/auth'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const sessionId = params.id
+    // Check authentication
+    const authHeader = request.headers.get('authorization')
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      )
+    }
+
+    const token = authHeader.substring(7)
+    const user = verifyToken(token)
+    
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Invalid or expired token' },
+        { status: 401 }
+      )
+    }
+
+    // Check if user has permission to view SO sessions
+    if (!canViewSOSession(user.role)) {
+      return NextResponse.json(
+        { error: 'Insufficient permissions to view SO sessions' },
+        { status: 403 }
+      )
+    }
+
+    const { id: sessionId } = await params
     const { searchParams } = new URL(request.url)
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '10')
@@ -59,7 +87,17 @@ export async function GET(
             site: { select: { id: true, name: true } },
             category: { select: { id: true, name: true } },
             department: { select: { id: true, name: true } },
-            employee: { select: { id: true, name: true } }
+            employee: {
+              select: {
+                id: true,
+                employeeId: true,
+                name: true,
+                email: true,
+                department: true,
+                position: true,
+                isActive: true
+              }
+            }
           }
         }
       }
@@ -76,6 +114,7 @@ export async function GET(
       tempStatus: entry.tempStatus,
       tempSerialNo: entry.tempSerialNo,
       tempPic: entry.tempPic,
+      tempPicId: entry.asset?.employee?.id || null,
       tempBrand: entry.tempBrand,
       tempModel: entry.tempModel,
       tempCost: entry.tempCost,
@@ -111,3 +150,4 @@ export async function GET(
     )
   }
 }
+

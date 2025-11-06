@@ -137,14 +137,7 @@ export default function LoginPage() {
           </div>
 
           {mounted && (
-            <div className="mt-6 border-t border-gray-200 pt-6">
-              <h3 className="text-sm font-medium text-gray-900 mb-3">Demo Accounts:</h3>
-              <div className="space-y-2 text-xs text-gray-600">
-                <div><strong>Admin:</strong> admin@assetso.com / admin123</div>
-                <div><strong>SO Asset:</strong> soasset@assetso.com / soasset123</div>
-                <div><strong>Viewer:</strong> viewer@assetso.com / viewer123</div>
-              </div>
-            </div>
+            <div className="mt-6 border-t border-gray-200 pt-6" />
           )}
         </form>
       </div>

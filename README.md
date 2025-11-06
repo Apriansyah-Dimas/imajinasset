@@ -83,7 +83,7 @@ npm install
 
 # Setup environment variables
 cp .env.example .env.local
-# Edit .env.local dengan database credentials
+# Edit .env.local sesuai kebutuhan; default kami gunakan SQLite dengan DATABASE_URL="file:./dev.db"
 
 # Setup database
 npm run db:push
@@ -124,7 +124,6 @@ src/
 │   └── ...
 ├── lib/                     # Utility functions
 │   ├── db.ts               # Database configuration
-│   ├── supabase.ts         # Supabase client
 │   └── ...
 └── hooks/                   # Custom React hooks
 ```

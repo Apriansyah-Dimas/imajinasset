@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase'
+import { db } from '@/lib/db'
 
 export async function PUT(
   request: NextRequest,
@@ -9,21 +9,16 @@ export async function PUT(
     const { id } = await params
     const body = await request.json()
 
-    const transformedBody = {
-      name: body.name,
-      description: body.description || null,
-      updatedat: new Date().toISOString()
-    }
+    const category = await db.category.update({
+      where: { id },
+      data: {
+        name: body.name,
+        description: body.description || null
+      }
+    })
 
-    const { data: category, error } = await supabaseAdmin
-      .from('categories')
-      .update(transformedBody)
-      .eq('id', id)
-      .select()
-      .single()
-
-    if (error || !category) {
-      console.error('Category PUT error:', error)
+    if (!category) {
+      console.error('Category PUT error: category not found')
       return NextResponse.json(
         { error: 'Failed to update category' },
         { status: 500 }
@@ -48,18 +43,9 @@ export async function DELETE(
     // Check if category is being used by any assets
     const { id } = await params
 
-    const { count: assetsCount, error: countError } = await supabaseAdmin
-      .from('assets')
-      .select('*', { count: 'exact', head: true })
-      .eq('category_id', id)
-
-    if (countError) {
-      console.error('Error checking category usage:', countError)
-      return NextResponse.json(
-        { error: 'Failed to check category usage' },
-        { status: 500 }
-      )
-    }
+    const assetsCount = await db.asset.count({
+      where: { categoryId: id }
+    })
 
     if (assetsCount && assetsCount > 0) {
       return NextResponse.json(
@@ -68,13 +54,11 @@ export async function DELETE(
       )
     }
 
-    // Delete the category
-    const { error: deleteError } = await supabaseAdmin
-      .from('categories')
-      .delete()
-      .eq('id', id)
-
-    if (deleteError) {
+    try {
+      await db.category.delete({
+        where: { id }
+      })
+    } catch (deleteError) {
       console.error('Category DELETE error:', deleteError)
       return NextResponse.json(
         { error: 'Failed to delete category' },

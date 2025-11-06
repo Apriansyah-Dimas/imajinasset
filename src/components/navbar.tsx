@@ -32,8 +32,8 @@ export default function Navbar() {
       { name: "Assets", href: "/assets", icon: Package },
     ];
 
-    // Add SO Asset for Admin and SO Asset Users
-    if (user && (user.role === "ADMIN" || user.role === "SO_ASSET_USER")) {
+    // Add SO Asset for Admin, SO Asset Users, and Viewers
+    if (user && (user.role === "ADMIN" || user.role === "SO_ASSET_USER" || user.role === "VIEWER")) {
       baseNav.push({ name: "SO Asset", href: "/so-asset", icon: Search });
     }
 
@@ -102,18 +102,14 @@ export default function Navbar() {
           <div className="p-4 sm:p-4 min-h-[80px] flex items-center">
             <Link
               href="/"
-              className="flex items-center justify-end w-full"
+              className="flex items-center justify-end w-full gap-3 sm:gap-4"
               onClick={() => setSidebarOpen(false)}
             >
-              <span className="text-primary-foreground font-bold text-base sm:text-lg text-right text-shadow-white">
-                AssetSO
+              <span className="text-primary-foreground font-bold text-base sm:text-lg text-right text-shadow-white uppercase">
+                IMAJIN ASSET
               </span>
-              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-accent text-accent-foreground flex items-center justify-center ml-3 sm:ml-4 flex-shrink-0 rounded-lg overflow-hidden">
-                <img
-                  src="/logo.svg"
-                  alt="AssetSO Logo"
-                  className="w-6 h-6 sm:w-8 sm:h-8 object-contain"
-                />
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-accent text-accent-foreground flex items-center justify-center rounded-lg flex-shrink-0">
+                <LayoutDashboard className="w-5 h-5 sm:w-6 sm:h-6" />
               </div>
             </Link>
           </div>
@@ -195,7 +191,7 @@ export default function Navbar() {
 
             {/* Copyright */}
             <div className="text-xs text-primary-foreground/60 text-center mt-3 pt-3">
-              © 2025 Asset Management System
+              © 2025 Imajin Asset
             </div>
           </div>
         </div>

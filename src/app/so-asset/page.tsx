@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Plus, Play, Calendar, CheckCircle, Clock, XCircle, List, Search, Trash2 } from 'lucide-react'
+import { Plus, Play, Calendar, CheckCircle, Clock, XCircle, List, Search, Trash2, Eye } from 'lucide-react'
 import Link from 'next/link'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import RoleBasedAccess from '@/components/RoleBasedAccess'
@@ -29,6 +29,7 @@ interface SOSession {
 }
 
 function SOAssetPageContent() {
+  const { user } = useAuth()
   const [sessions, setSessions] = useState<SOSession[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
@@ -43,6 +44,10 @@ function SOAssetPageContent() {
     description: ''
   })
 
+  const isViewer = user?.role === 'VIEWER'
+  const canCreate = user?.role === 'ADMIN'
+  const canScan = user?.role === 'ADMIN' || user?.role === 'SO_ASSET_USER'
+
   useEffect(() => {
     fetchSessions()
   }, [])
@@ -50,14 +55,32 @@ function SOAssetPageContent() {
   const fetchSessions = async () => {
     console.log('Fetching SO sessions...')
     try {
-      const response = await fetch('/api/so-sessions')
+      // Get token from localStorage
+      const token = localStorage.getItem('auth_token')
+      if (!token) {
+        console.error('No auth token found')
+        setSessions([])
+        setLoading(false)
+        return
+      }
+
+      const response = await fetch('/api/so-sessions', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      
       console.log('Response status:', response.status)
+      console.log('Response headers:', response.headers)
+      
       if (response.ok) {
         const data = await response.json()
         console.log('Sessions data:', data)
         setSessions(Array.isArray(data) ? data : [])
       } else {
-        console.log('Failed to fetch sessions')
+        const errorData = await response.json()
+        console.error('Failed to fetch sessions:', errorData)
         setSessions([])
       }
     } catch (error) {
@@ -71,9 +94,19 @@ function SOAssetPageContent() {
   const handleCreateSession = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
+      // Get token from localStorage
+      const token = localStorage.getItem('auth_token')
+      if (!token) {
+        console.error('No auth token found')
+        return
+      }
+
       const response = await fetch('/api/so-sessions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify(formData)
       })
 
@@ -81,6 +114,9 @@ function SOAssetPageContent() {
         setShowCreateDialog(false)
         setFormData({ name: '', year: new Date().getFullYear(), description: '' })
         fetchSessions()
+      } else {
+        const errorData = await response.json()
+        console.error('Failed to create session:', errorData)
       }
     } catch (error) {
       console.error('Error creating SO session:', error)
@@ -92,14 +128,28 @@ function SOAssetPageContent() {
 
     setCancelling(true)
     try {
+      // Get token from localStorage
+      const token = localStorage.getItem('auth_token')
+      if (!token) {
+        console.error('No auth token found')
+        return
+      }
+
       const response = await fetch(`/api/so-sessions/${selectedSession.id}/cancel`, {
-        method: 'POST'
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
       })
 
       if (response.ok) {
         setShowCancelDialog(false)
         setSelectedSession(null)
         fetchSessions()
+      } else {
+        const errorData = await response.json()
+        console.error('Failed to cancel session:', errorData)
       }
     } catch (error) {
       console.error('Error cancelling SO session:', error)
@@ -118,14 +168,28 @@ function SOAssetPageContent() {
 
     setDeleting(true)
     try {
+      // Get token from localStorage
+      const token = localStorage.getItem('auth_token')
+      if (!token) {
+        console.error('No auth token found')
+        return
+      }
+
       const response = await fetch(`/api/so-sessions/${selectedSession.id}/delete`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
       })
 
       if (response.ok) {
         setShowDeleteDialog(false)
         setSelectedSession(null)
         fetchSessions()
+      } else {
+        const errorData = await response.json()
+        console.error('Failed to delete session:', errorData)
       }
     } catch (error) {
       console.error('Error deleting SO session:', error)
@@ -183,16 +247,18 @@ function SOAssetPageContent() {
             <h1 className="text-2xl font-bold text-gray-900 mb-2">STOCK OPNAME</h1>
             <p className="text-gray-600 text-sm">Manage asset tracking and inventory sessions</p>
           </div>
-          <button
-            onClick={() => {
-              console.log('Button clicked')
-              setShowCreateDialog(true)
-            }}
-            className="flex items-center justify-center px-4 py-2 bg-blue-600 text-white border border-blue-700 hover:bg-blue-700 font-medium text-sm"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            START NEW SESSION
-          </button>
+          <RoleBasedAccess allowedRoles={['ADMIN']}>
+            <button
+              onClick={() => {
+                console.log('Button clicked')
+                setShowCreateDialog(true)
+              }}
+              className="flex items-center justify-center px-4 py-2 bg-blue-600 text-white border border-blue-700 hover:bg-blue-700 font-medium text-sm"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              START NEW SESSION
+            </button>
+          </RoleBasedAccess>
         </div>
 
         {/* Quick Stats */}
@@ -234,13 +300,15 @@ function SOAssetPageContent() {
             <p className="text-gray-600 text-sm mb-6">
               Create your first stock opname session to start tracking assets
             </p>
-            <button
-              onClick={() => setShowCreateDialog(true)}
-              className="inline-flex items-center px-4 py-2 bg-blue-600 text-white border border-blue-700 hover:bg-blue-700 font-medium text-sm"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              START FIRST SESSION
-            </button>
+            <RoleBasedAccess allowedRoles={['ADMIN']}>
+              <button
+                onClick={() => setShowCreateDialog(true)}
+                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white border border-blue-700 hover:bg-blue-700 font-medium text-sm"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                START FIRST SESSION
+              </button>
+            </RoleBasedAccess>
           </div>
         </div>
       ) : (
@@ -314,12 +382,23 @@ function SOAssetPageContent() {
                 <div className="flex gap-2">
                   {session.status === 'Active' && (
                     <>
-                      <Link href={`/so-asset/${session.id}/scan`} className="flex-1">
-                        <button className="w-full flex items-center justify-center px-3 py-2 bg-blue-600 text-white border border-blue-700 hover:bg-blue-700 text-xs font-medium">
+                      {canScan ? (
+                        <Link href={`/so-asset/${session.id}/scan`} className="flex-1">
+                          <button className="w-full flex items-center justify-center px-3 py-2 bg-blue-600 text-white border border-blue-700 hover:bg-blue-700 text-xs font-medium">
+                            <Search className="h-3 w-3 mr-1" />
+                            SCAN
+                          </button>
+                        </Link>
+                      ) : (
+                        <button
+                          disabled
+                          className="flex-1 flex items-center justify-center px-3 py-2 bg-gray-300 text-gray-500 border border-gray-400 text-xs font-medium cursor-not-allowed"
+                          title="Scan access restricted"
+                        >
                           <Search className="h-3 w-3 mr-1" />
                           SCAN
                         </button>
-                      </Link>
+                      )}
                       <RoleBasedAccess allowedRoles={['ADMIN']}>
                         <button
                           onClick={() => openCancelDialog(session)}
@@ -331,13 +410,12 @@ function SOAssetPageContent() {
                     </>
                   )}
                   {session.status === 'Completed' && (
-                    <button
-                      disabled
-                      className="w-full flex items-center justify-center px-3 py-2 bg-gray-300 text-gray-500 border border-gray-400 text-xs font-medium cursor-not-allowed"
-                    >
-                      <CheckCircle className="h-3 w-3 mr-1" />
-                      COMPLETED
-                    </button>
+                    <Link href={`/so-asset/${session.id}/identified-assets`} className="flex-1">
+                      <button className="w-full flex items-center justify-center px-3 py-2 bg-green-600 text-white border border-green-700 hover:bg-green-700 text-xs font-medium">
+                        <Eye className="h-3 w-3 mr-1" />
+                        VIEW PROGRESS
+                      </button>
+                    </Link>
                   )}
                   {session.status === 'Cancelled' && (
                     <>
@@ -510,13 +588,24 @@ function SOAssetPageContent() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Read-only message for Viewer users */}
+      {isViewer && (
+        <div className="fixed bottom-4 right-4 bg-yellow-100 border border-yellow-400 text-yellow-800 px-4 py-2 rounded-lg shadow-lg max-w-xs z-50">
+          <div className="flex items-center space-x-2">
+            <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
+            <span className="text-sm font-medium">Read-only Mode</span>
+          </div>
+          <p className="text-xs mt-1">You can view SO Asset progress but cannot make changes.</p>
+        </div>
+      )}
     </div>
   )
 }
 
 export default function SOAssetPage() {
   return (
-    <ProtectedRoute allowedRoles={['ADMIN', 'SO_ASSET_USER']}>
+    <ProtectedRoute allowedRoles={['ADMIN', 'SO_ASSET_USER', 'VIEWER']}>
       <SOAssetPageContent />
     </ProtectedRoute>
   )

@@ -1,11 +1,67 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from '@supabase/supabase-js';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
+import { db } from '@/lib/db';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const jwtSecret = process.env.JWT_SECRET!;
+const DEFAULT_ADMIN_EMAIL = process.env.DEFAULT_ADMIN_EMAIL ?? 'admin@assetso.com';
+const DEFAULT_ADMIN_NAME = process.env.DEFAULT_ADMIN_NAME ?? 'Administrator';
+const DEFAULT_ADMIN_PASSWORD = process.env.DEFAULT_ADMIN_PASSWORD ?? 'admin123';
+
+async function ensureDefaultAdmin() {
+  const defaultAdmin = await db.user.findUnique({
+    where: { email: DEFAULT_ADMIN_EMAIL }
+  });
+
+  if (!defaultAdmin) {
+    const hashedPassword = await bcrypt.hash(DEFAULT_ADMIN_PASSWORD, 10);
+    await db.user.create({
+      data: {
+        email: DEFAULT_ADMIN_EMAIL,
+        name: DEFAULT_ADMIN_NAME,
+        password: hashedPassword,
+        role: 'ADMIN',
+        isActive: true
+      }
+    });
+    return;
+  }
+
+  const needsRoleUpdate = defaultAdmin.role !== 'ADMIN';
+  const needsActivation = !defaultAdmin.isActive;
+  const needsName = !defaultAdmin.name;
+
+  if (needsRoleUpdate || needsActivation || needsName) {
+    await db.user.update({
+      where: { email: DEFAULT_ADMIN_EMAIL },
+      data: {
+        role: 'ADMIN',
+        isActive: true,
+        ...(needsName ? { name: DEFAULT_ADMIN_NAME } : {})
+      }
+    });
+  }
+
+  const activeAdminExists = await db.user.findFirst({
+    where: {
+      role: 'ADMIN',
+      isActive: true
+    },
+    select: { id: true }
+  });
+
+  if (!activeAdminExists) {
+    const hashedPassword = await bcrypt.hash(DEFAULT_ADMIN_PASSWORD, 10);
+    await db.user.update({
+      where: { email: DEFAULT_ADMIN_EMAIL },
+      data: {
+        password: hashedPassword,
+        role: 'ADMIN',
+        isActive: true
+      }
+    });
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,16 +74,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if user exists in our database first
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    await ensureDefaultAdmin();
 
-    const { data: userData, error: userError } = await supabase
-      .from('users')
-      .select('id, email, name, role, isactive, password')
-      .eq('email', email)
-      .single();
+    const user = await db.user.findUnique({
+      where: { email }
+    });
 
-    if (userError || !userData) {
+    if (!user) {
       return NextResponse.json(
         { error: "Invalid credentials" },
         { status: 401 }
@@ -35,7 +88,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user is active (handle undefined case)
-    if (userData.isactive === false) {
+    if (!user.isActive) {
       return NextResponse.json(
         { error: "Account is inactive" },
         { status: 403 }
@@ -43,7 +96,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify password (assuming passwords are already hashed in database)
-    const isValidPassword = await bcrypt.compare(password, userData.password);
+    const isValidPassword = await bcrypt.compare(password, user.password);
 
     if (!isValidPassword) {
       return NextResponse.json(
@@ -55,9 +108,9 @@ export async function POST(request: NextRequest) {
     // Generate JWT token
     const token = jwt.sign(
       {
-        userId: userData.id,
-        email: userData.email,
-        role: userData.role
+        userId: user.id,
+        email: user.email,
+        role: user.role
       },
       jwtSecret,
       { expiresIn: '7d' }
@@ -67,10 +120,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       user: {
-        id: userData.id,
-        email: userData.email,
-        name: userData.name,
-        role: userData.role,
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
       },
       token,
     });

@@ -1,4 +1,4 @@
-import { supabaseAdmin } from './supabase';
+import { db } from './db';
 
 export interface LogData {
   userId: string;
@@ -25,10 +25,9 @@ export interface LogData {
  */
 export async function createLog(logData: LogData) {
   try {
-    const { error } = await supabaseAdmin
-      .from('logs')
-      .insert({
-        user_id: logData.userId,
+    await db.log.create({
+      data: {
+        userId: logData.userId,
         level: 'INFO',
         message: logData.description || `${logData.action} ${logData.entityType}`,
         data: {
@@ -38,13 +37,10 @@ export async function createLog(logData: LogData) {
           old_values: logData.oldValues,
           new_values: logData.newValues
         },
-        ip_address: logData.ipAddress,
-        user_agent: logData.userAgent
-      });
-
-    if (error) {
-      console.error("Failed to create system log:", error);
-    }
+        ipAddress: logData.ipAddress,
+        userAgent: logData.userAgent
+      }
+    });
   } catch (error) {
     console.error("Failed to create system log:", error);
   }

@@ -1,15 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
-import { supabaseAdmin } from '@/lib/supabase'
+import { db } from '@/lib/db'
+import type { Prisma } from '@prisma/client'
 
 const mapUser = (user: any) => ({
   id: user.id,
   email: user.email,
   name: user.name,
   role: user.role,
-  isActive: user.isactive,
-  createdAt: user.createdat,
-  updatedAt: user.updatedat,
+  isActive: user.isActive ?? user.isactive,
+  createdAt: user.createdAt ?? user.createdat,
+  updatedAt: user.updatedAt ?? user.updatedat,
   creator: user.creator ? { name: user.creator.name } : undefined
 })
 
@@ -20,48 +21,18 @@ export async function GET(
   try {
     const { id } = await params
 
-    const { data, error } = await supabaseAdmin
-      .from('users')
-      .select(
-        `
-          id,
-          email,
-          name,
-          role,
-          isactive,
-          createdat,
-          updatedat,
-          createdby,
-          creator:createdby (
-            name
-          )
-        `
-      )
-      .eq('id', id)
-      .maybeSingle()
-
-    if (error) {
-      if (error.code === 'PGRST116') {
-        return NextResponse.json(
-          { error: 'User not found' },
-          { status: 404 }
-        )
+    const user = await db.user.findUnique({
+      where: { id },
+      include: {
+        creator: { select: { name: true } }
       }
-      console.error('Error fetching user from Supabase:', error)
-      return NextResponse.json(
-        { error: 'Failed to fetch user' },
-        { status: 500 }
-      )
+    })
+
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    if (!data) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      )
-    }
-
-    return NextResponse.json(mapUser(data))
+    return NextResponse.json(mapUser(user))
   } catch (error) {
     console.error('Error fetching user:', error)
     return NextResponse.json(
@@ -86,6 +57,7 @@ export async function PUT(
       isactive,
       isActive
     } = body
+
     const validRoles = ['ADMIN', 'SO_ASSET_USER', 'VIEWER']
 
     if (role && !validRoles.includes(role)) {
@@ -95,113 +67,71 @@ export async function PUT(
       )
     }
 
-    const { data: user, error: userError } = await supabaseAdmin
-      .from('users')
-      .select('id, email, role')
-      .eq('id', id)
-      .maybeSingle()
+    const existing = await db.user.findUnique({
+      where: { id },
+      select: { id: true, email: true, role: true }
+    })
 
-    if (userError) {
-      if (userError.code === 'PGRST116') {
-        return NextResponse.json(
-          { error: 'User not found' },
-          { status: 404 }
-        )
-      }
-      console.error('Error fetching user for update:', userError)
-      return NextResponse.json(
-        { error: 'Failed to update user' },
-        { status: 500 }
-      )
+    if (!existing) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    if (!user) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      )
-    }
+    if (email && email !== existing.email) {
+      const emailOwner = await db.user.findUnique({
+        where: { email },
+        select: { id: true }
+      })
 
-    if (email && email !== user.email) {
-      const { data: existingUser, error: emailError } = await supabaseAdmin
-        .from('users')
-        .select('id')
-        .eq('email', email)
-        .maybeSingle()
-
-      if (emailError) {
-        console.error('Error checking email uniqueness:', emailError)
+      if (emailOwner && emailOwner.id !== id) {
         return NextResponse.json(
-          { error: 'Failed to update user' },
-          { status: 500 }
-        )
-      }
-
-      if (existingUser && existingUser.id !== id) {
-        return NextResponse.json(
-          { error: 'User with this email already exists' },
+          { error: 'Email is already in use by another user' },
           { status: 409 }
         )
       }
     }
 
-    const updateData: Record<string, any> = {
-      updatedat: new Date().toISOString()
+    const updateData: Prisma.UserUpdateInput = {}
+
+    if (typeof name === 'string' && name.trim().length) {
+      updateData.name = name.trim()
     }
 
-    if (name !== undefined) updateData.name = name
-    if (email !== undefined) updateData.email = email
-    if (role !== undefined) updateData.role = role
+    if (typeof email === 'string' && email.trim().length) {
+      updateData.email = email.trim()
+    }
 
-    const isActiveValue =
+    if (typeof role === 'string' && validRoles.includes(role)) {
+      updateData.role = role
+    }
+
+    const resolvedIsActive =
       typeof isActive === 'boolean'
         ? isActive
         : typeof isactive === 'boolean'
           ? isactive
           : undefined
-
-    if (isActiveValue !== undefined) {
-      updateData.isactive = isActiveValue
+    if (typeof resolvedIsActive === 'boolean') {
+      updateData.isActive = resolvedIsActive
     }
 
-    if (password) {
+    if (password && typeof password === 'string' && password.trim().length) {
       updateData.password = await bcrypt.hash(password, 10)
     }
 
-    if (Object.keys(updateData).length === 1 && updateData.updatedat) {
+    if (Object.keys(updateData).length === 0) {
       return NextResponse.json(
         { error: 'No changes provided' },
         { status: 400 }
       )
     }
 
-    const { data: updatedUser, error: updateError } = await supabaseAdmin
-      .from('users')
-      .update(updateData)
-      .eq('id', id)
-      .select(
-        `
-          id,
-          email,
-          name,
-          role,
-          isactive,
-          createdat,
-          updatedat,
-          creator:createdby (
-            name
-          )
-        `
-      )
-      .single()
-
-    if (updateError || !updatedUser) {
-      console.error('Error updating user:', updateError)
-      return NextResponse.json(
-        { error: 'Failed to update user' },
-        { status: 500 }
-      )
-    }
+    const updatedUser = await db.user.update({
+      where: { id },
+      data: updateData,
+      include: {
+        creator: { select: { name: true } }
+      }
+    })
 
     return NextResponse.json(mapUser(updatedUser))
   } catch (error) {
@@ -220,48 +150,21 @@ export async function DELETE(
   try {
     const { id } = await params
 
-    const { data: user, error: userError } = await supabaseAdmin
-      .from('users')
-      .select('id, role')
-      .eq('id', id)
-      .maybeSingle()
-
-    if (userError) {
-      if (userError.code === 'PGRST116') {
-        return NextResponse.json(
-          { error: 'User not found' },
-          { status: 404 }
-        )
-      }
-      console.error('Error fetching user for delete:', userError)
-      return NextResponse.json(
-        { error: 'Failed to delete user' },
-        { status: 500 }
-      )
-    }
+    const user = await db.user.findUnique({
+      where: { id },
+      select: { id: true, role: true }
+    })
 
     if (!user) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
     if (user.role === 'ADMIN') {
-      const { count: adminCount, error: countError } = await supabaseAdmin
-        .from('users')
-        .select('id', { count: 'exact', head: true })
-        .eq('role', 'ADMIN')
+      const adminCount = await db.user.count({
+        where: { role: 'ADMIN' }
+      })
 
-      if (countError) {
-        console.error('Error counting admins:', countError)
-        return NextResponse.json(
-          { error: 'Failed to delete user' },
-          { status: 500 }
-        )
-      }
-
-      if ((adminCount ?? 0) <= 1) {
+      if (adminCount <= 1) {
         return NextResponse.json(
           { error: 'Cannot delete the last admin user' },
           { status: 400 }
@@ -269,18 +172,9 @@ export async function DELETE(
       }
     }
 
-    const { error: deleteError } = await supabaseAdmin
-      .from('users')
-      .delete()
-      .eq('id', id)
-
-    if (deleteError) {
-      console.error('Error deleting user:', deleteError)
-      return NextResponse.json(
-        { error: 'Failed to delete user' },
-        { status: 500 }
-      )
-    }
+    await db.user.delete({
+      where: { id }
+    })
 
     return NextResponse.json({ message: 'User deleted successfully' })
   } catch (error) {

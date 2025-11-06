@@ -89,34 +89,58 @@ export default function AssetDetailModal({ asset, open, onOpenChange, onUpdate }
 
   useEffect(() => {
     if (asset) {
-      setFormData({ ...asset })
-      setOriginalData({ ...asset })
-      setIsEditing(false)
-      // Parse additional information from notes field
-      if (asset.notes) {
+      // Verify asset still exists when opening modal
+      const verifyAsset = async () => {
         try {
-          const additionalInfo = JSON.parse(asset.notes)
-          const fields = Object.entries(additionalInfo).map(([name, value], index) => ({
-            id: Date.now().toString() + index,
-            name,
-            value: String(value)
-          }))
-          setAdditionalFields(fields)
+          const response = await fetch(`/api/assets/${asset.id}`)
+          if (!response.ok) {
+            // Asset doesn't exist, notify parent and close modal
+            alert('Asset not found. The asset may have been deleted by another user.')
+            onUpdate() // Refresh the assets list
+            onOpenChange(false)
+            return
+          }
+
+          // Asset exists, proceed with setting form data
+          setFormData({ ...asset })
+          setOriginalData({ ...asset })
+          setIsEditing(false)
+
+          // Parse additional information from notes field
+          if (asset.notes) {
+            try {
+              const additionalInfo = JSON.parse(asset.notes)
+              const fields = Object.entries(additionalInfo).map(([name, value], index) => ({
+                id: Date.now().toString() + index,
+                name,
+                value: String(value)
+              }))
+              setAdditionalFields(fields)
+            } catch (error) {
+              setAdditionalFields([])
+            }
+          } else {
+            setAdditionalFields([])
+          }
+
+          // Set asset prefix and suffix
+          const [prefix = 'FA001', categoryPart = 'I', sitePart = '01'] = (asset.noAsset || '').split('/')
+          setAssetPrefix(prefix || 'FA001')
+          setAssetSuffix({
+            categoryRoman: categoryPart || 'I',
+            siteNumber: sitePart || '01'
+          })
         } catch (error) {
-          setAdditionalFields([])
+          console.error('Error verifying asset:', error)
+          setFormData({ ...asset })
+          setOriginalData({ ...asset })
+          setIsEditing(false)
         }
-      } else {
-        setAdditionalFields([])
       }
 
-      const [prefix = 'FA001', categoryPart = 'I', sitePart = '01'] = (asset.noAsset || '').split('/')
-      setAssetPrefix(prefix || 'FA001')
-      setAssetSuffix({
-        categoryRoman: categoryPart || 'I',
-        siteNumber: sitePart || '01'
-      })
+      verifyAsset();
     }
-  }, [asset])
+  }, [asset]);
 
   useEffect(() => {
     if (open) {
@@ -280,7 +304,19 @@ export default function AssetDetailModal({ asset, open, onOpenChange, onUpdate }
       onOpenChange(false)
       setIsEditing(false)
     } catch (error) {
-      alert(`Failed to update asset: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+
+      // If asset is not found, refresh the assets list and close modal
+      if (errorMessage.includes('Asset not found') || errorMessage.includes('404')) {
+        alert('Asset not found. The asset may have been deleted by another user.')
+        onUpdate() // Refresh the assets list
+        onOpenChange(false)
+        setIsEditing(false)
+      } else if (errorMessage.includes('not found') || errorMessage.includes('Invalid reference')) {
+        alert(`Failed to update asset: ${errorMessage}. Please check if the selected items still exist.`)
+      } else {
+        alert(`Failed to update asset: ${errorMessage}`)
+      }
     } finally {
       setLoading(false)
     }
@@ -332,6 +368,11 @@ export default function AssetDetailModal({ asset, open, onOpenChange, onUpdate }
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
           <div className="sm:col-span-2">
             <Label className="text-sm font-medium">Asset Image</Label>
+            {isEditing ? (
+              <p className="text-xs text-gray-500 mt-1">Upload a square image (max 50KB) for best results.</p>
+            ) : (
+              <p className="text-xs text-gray-500 mt-1">Asset image (read-only)</p>
+            )}
             {isEditing ? (
               <div className="mt-2">
                 <ImageUpload

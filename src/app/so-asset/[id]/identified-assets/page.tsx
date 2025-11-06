@@ -29,6 +29,8 @@ import {
   CheckCheck
 } from 'lucide-react'
 import Link from 'next/link'
+import ProtectedRoute from '@/components/ProtectedRoute'
+import { useAuth } from '@/contexts/AuthContext'
 
 interface SOAssetEntry {
   id: string
@@ -54,9 +56,9 @@ interface SOAssetEntry {
     brand?: string
     model?: string
     cost?: number
-    site?: { name: string }
-    category?: { name: string }
-    department?: { name: string }
+    site?: { id: string; name: string }
+    category?: { id: string; name: string }
+    department?: { id: string; name: string }
   }
 }
 
@@ -69,7 +71,7 @@ interface SOSession {
   scannedAssets: number
 }
 
-export default function IdentifiedAssetsPage() {
+function IdentifiedAssetsPageContent() {
   const params = useParams()
   const router = useRouter()
   const [session, setSession] = useState<SOSession | null>(null)
@@ -77,6 +79,10 @@ export default function IdentifiedAssetsPage() {
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [activeTab, setActiveTab] = useState('all')
+  const [sites, setSites] = useState<any[]>([])
+  const [categories, setCategories] = useState<any[]>([])
+  const [departments, setDepartments] = useState<any[]>([])
+  const [pics, setPics] = useState<any[]>([])
 
   // Edit dialog states
   const [showEditDialog, setShowEditDialog] = useState(false)
@@ -90,22 +96,75 @@ export default function IdentifiedAssetsPage() {
     tempBrand: '',
     tempModel: '',
     tempCost: '',
+    tempSiteId: '',
+    tempCategoryId: '',
+    tempDepartmentId: '',
     isIdentified: false
   })
+
+  const { user } = useAuth()
+  const isViewer = user?.role === 'VIEWER'
+  const canEdit = user?.role === 'ADMIN' || user?.role === 'SO_ASSET_USER'
 
   useEffect(() => {
     if (params.id) {
       fetchSession()
       fetchScannedAssets()
+      fetchMasterData()
     }
   }, [params.id])
 
+  const fetchMasterData = async () => {
+    try {
+      // Get token from localStorage
+      const token = localStorage.getItem('auth_token')
+      if (!token) {
+        console.error('No auth token found')
+        return
+      }
+
+      const headers = {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+
+      const [sitesRes, categoriesRes, departmentsRes, picsRes] = await Promise.all([
+        fetch('/api/sites', { headers }),
+        fetch('/api/categories', { headers }),
+        fetch('/api/departments', { headers }),
+        fetch('/api/pics', { headers })
+      ])
+
+      if (sitesRes.ok) setSites(await sitesRes.json())
+      if (categoriesRes.ok) setCategories(await categoriesRes.json())
+      if (departmentsRes.ok) setDepartments(await departmentsRes.json())
+      if (picsRes.ok) setPics(await picsRes.json())
+    } catch (error) {
+      console.error('Error fetching master data:', error)
+    }
+  }
+
   const fetchSession = async () => {
     try {
-      const response = await fetch(`/api/so-sessions/${params.id}`)
+      // Get token from localStorage
+      const token = localStorage.getItem('auth_token')
+      if (!token) {
+        console.error('No auth token found')
+        return
+      }
+
+      const response = await fetch(`/api/so-sessions/${params.id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
       if (response.ok) {
         const data = await response.json()
         setSession(data)
+      } else {
+        const errorData = await response.json()
+        console.error('Failed to fetch session:', errorData)
       }
     } catch (error) {
       console.error('Error fetching session:', error)
@@ -114,19 +173,57 @@ export default function IdentifiedAssetsPage() {
 
   const fetchScannedAssets = async () => {
     try {
-      const response = await fetch(`/api/so-sessions/${params.id}/entries`)
+      console.log('DEBUG: identified-assets - Starting fetch for session:', params.id)
+      
+      // Get token from localStorage
+      const token = localStorage.getItem('auth_token')
+      if (!token) {
+        console.error('No auth token found')
+        setScannedAssets([])
+        setLoading(false)
+        return
+      }
+
+      const response = await fetch(`/api/so-sessions/${params.id}/entries`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
       if (response.ok) {
         const data = await response.json()
-        setScannedAssets(data)
+        console.log('DEBUG: identified-assets - API response:', data)
+        console.log('DEBUG: identified-assets - First entry tempStatus:', data.entries?.[0]?.tempStatus)
+        console.log('DEBUG: identified-assets - First entry tempName:', data.entries?.[0]?.tempName)
+        
+        // Handle both direct array and wrapped response
+        if (Array.isArray(data)) {
+          setScannedAssets(data)
+        } else if (Array.isArray(data.entries)) {
+          setScannedAssets(data.entries)
+        } else {
+          console.log('DEBUG: identified-assets - No array found in response')
+          setScannedAssets([])
+        }
+      } else {
+        const errorData = await response.json()
+        console.error('Failed to fetch scanned assets:', errorData)
+        setScannedAssets([])
       }
     } catch (error) {
-      console.error('Error fetching scanned assets:', error)
+      console.error('DEBUG: identified-assets - Error fetching scanned assets:', error)
+      setScannedAssets([])
     } finally {
       setLoading(false)
     }
   }
 
   const handleEditAsset = (asset: SOAssetEntry) => {
+    if (!canEdit) {
+      alert('You do not have permission to edit assets')
+      return
+    }
+    
     setSelectedAsset(asset)
     setEditForm({
       tempName: asset.tempName || asset.asset.name,
@@ -137,6 +234,9 @@ export default function IdentifiedAssetsPage() {
       tempBrand: asset.tempBrand || asset.asset.brand || '',
       tempModel: asset.tempModel || asset.asset.model || '',
       tempCost: asset.tempCost?.toString() || asset.asset.cost?.toString() || '',
+      tempSiteId: asset.asset.site?.id || '',
+      tempCategoryId: asset.asset.category?.id || '',
+      tempDepartmentId: asset.asset.department?.id || '',
       isIdentified: asset.isIdentified
     })
     setShowEditDialog(true)
@@ -146,19 +246,42 @@ export default function IdentifiedAssetsPage() {
     if (!selectedAsset) return
 
     try {
+      console.log('DEBUG: identified-assets - editForm before sending:', editForm)
+      console.log('DEBUG: identified-assets - tempStatus value:', editForm.tempStatus)
+      
+      // Get token from localStorage
+      const token = localStorage.getItem('auth_token')
+      if (!token) {
+        console.error('No auth token found')
+        return
+      }
+
       const response = await fetch(`/api/so-sessions/${params.id}/entries/${selectedAsset.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify(editForm)
       })
 
+      const data = await response.json()
+      
       if (response.ok) {
+        console.log('DEBUG: identified-assets - API response successful:', data)
+        console.log('DEBUG: identified-assets - Updated entry tempStatus:', data.entry?.tempStatus)
         setShowEditDialog(false)
         setSelectedAsset(null)
-        fetchScannedAssets()
+        
+        // Force refresh with delay
+        setTimeout(() => {
+          fetchScannedAssets()
+        }, 500)
+      } else {
+        console.error('DEBUG: identified-assets - Save failed:', data)
       }
     } catch (error) {
-      console.error('Error updating asset:', error)
+      console.error('DEBUG: identified-assets - Error updating asset:', error)
     }
   }
 
@@ -288,6 +411,17 @@ export default function IdentifiedAssetsPage() {
         </CardContent>
       </Card>
 
+      {/* Read-only message for Viewer users */}
+      {isViewer && (
+        <div className="fixed bottom-4 right-4 bg-yellow-100 border border-yellow-400 text-yellow-800 px-4 py-2 rounded-lg shadow-lg max-w-xs z-50">
+          <div className="flex items-center space-x-2">
+            <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
+            <span className="text-sm font-medium">Read-only Mode</span>
+          </div>
+          <p className="text-xs mt-1">You can view SO Asset progress but cannot make changes.</p>
+        </div>
+      )}
+
       <div className="grid gap-6 lg:grid-cols-4">
         {/* Main Content */}
         <div className="lg:col-span-3 space-y-4">
@@ -367,6 +501,8 @@ export default function IdentifiedAssetsPage() {
                         variant="ghost"
                         size="sm"
                         onClick={() => handleEditAsset(entry)}
+                        disabled={!canEdit}
+                        title={canEdit ? "Edit asset" : "You don't have permission to edit"}
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
@@ -454,20 +590,47 @@ export default function IdentifiedAssetsPage() {
           {selectedAsset && (
             <div className="space-y-4">
               <div className="grid gap-2">
-                <Label>Asset Number</Label>
-                <Input value={selectedAsset.asset.noAsset} disabled />
-              </div>
-              <div className="grid gap-2">
                 <Label htmlFor="tempName">Asset Name</Label>
                 <Input
                   id="tempName"
                   value={editForm.tempName}
                   onChange={(e) => setEditForm({ ...editForm, tempName: e.target.value })}
+                  disabled={!canEdit}
                 />
               </div>
               <div className="grid gap-2">
+                <Label htmlFor="tempSiteId">Site</Label>
+                <Select value={editForm.tempSiteId} onValueChange={(value) => setEditForm({ ...editForm, tempSiteId: value })} disabled={!canEdit}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select site" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {sites.map((site: any) => (
+                      <SelectItem key={site.id} value={site.id}>
+                        {site.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="tempCategoryId">Category</Label>
+                <Select value={editForm.tempCategoryId} onValueChange={(value) => setEditForm({ ...editForm, tempCategoryId: value })} disabled={!canEdit}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((category: any) => (
+                      <SelectItem key={category.id} value={category.id}>
+                        {category.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
                 <Label htmlFor="tempStatus">Status</Label>
-                <Select value={editForm.tempStatus} onValueChange={(value) => setEditForm({ ...editForm, tempStatus: value })}>
+                <Select value={editForm.tempStatus} onValueChange={(value) => setEditForm({ ...editForm, tempStatus: value })} disabled={!canEdit}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -486,6 +649,7 @@ export default function IdentifiedAssetsPage() {
                   id="tempSerialNo"
                   value={editForm.tempSerialNo}
                   onChange={(e) => setEditForm({ ...editForm, tempSerialNo: e.target.value })}
+                  disabled={!canEdit}
                 />
               </div>
               <div className="grid gap-2">
@@ -494,6 +658,7 @@ export default function IdentifiedAssetsPage() {
                   id="tempPic"
                   value={editForm.tempPic}
                   onChange={(e) => setEditForm({ ...editForm, tempPic: e.target.value })}
+                  disabled={!canEdit}
                 />
               </div>
               <div className="grid gap-2">
@@ -502,6 +667,7 @@ export default function IdentifiedAssetsPage() {
                   id="tempBrand"
                   value={editForm.tempBrand}
                   onChange={(e) => setEditForm({ ...editForm, tempBrand: e.target.value })}
+                  disabled={!canEdit}
                 />
               </div>
               <div className="grid gap-2">
@@ -510,6 +676,7 @@ export default function IdentifiedAssetsPage() {
                   id="tempModel"
                   value={editForm.tempModel}
                   onChange={(e) => setEditForm({ ...editForm, tempModel: e.target.value })}
+                  disabled={!canEdit}
                 />
               </div>
               <div className="grid gap-2">
@@ -521,6 +688,7 @@ export default function IdentifiedAssetsPage() {
                   value={editForm.tempCost}
                   onChange={(e) => setEditForm({ ...editForm, tempCost: e.target.value })}
                   placeholder="0.00"
+                  disabled={!canEdit}
                 />
               </div>
               <div className="grid gap-2">
@@ -530,6 +698,7 @@ export default function IdentifiedAssetsPage() {
                   value={editForm.tempNotes}
                   onChange={(e) => setEditForm({ ...editForm, tempNotes: e.target.value })}
                   rows={3}
+                  disabled={!canEdit}
                 />
               </div>
 
@@ -539,6 +708,7 @@ export default function IdentifiedAssetsPage() {
                   id="isIdentified"
                   checked={editForm.isIdentified}
                   onCheckedChange={(checked) => setEditForm({ ...editForm, isIdentified: checked as boolean })}
+                  disabled={!canEdit}
                 />
                 <Label htmlFor="isIdentified" className="text-sm font-medium">
                   Mark as Identified
@@ -548,7 +718,7 @@ export default function IdentifiedAssetsPage() {
                 <Button variant="outline" onClick={() => setShowEditDialog(false)}>
                   Cancel
                 </Button>
-                <Button onClick={handleSaveEdit}>
+                <Button onClick={handleSaveEdit} disabled={!canEdit}>
                   <Save className="h-4 w-4 mr-2" />
                   Save Changes
                 </Button>
@@ -558,5 +728,13 @@ export default function IdentifiedAssetsPage() {
         </DialogContent>
       </Dialog>
     </div>
+  )
+}
+
+export default function IdentifiedAssetsPage() {
+  return (
+    <ProtectedRoute allowedRoles={['ADMIN', 'SO_ASSET_USER', 'VIEWER']}>
+      <IdentifiedAssetsPageContent />
+    </ProtectedRoute>
   )
 }

@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { verifyToken, canScanInSOSession } from '@/lib/auth'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string; entryId: string } }
+  { params }: { params: Promise<{ id: string; entryId: string }> }
 ) {
   try {
-    const sessionId = params.id
-    const entryId = params.entryId
+    const { id: sessionId, entryId } = await params
 
     // Check if session exists
     const session = await db.sOSession.findUnique({
@@ -30,7 +30,7 @@ export async function GET(
             site: { select: { id: true, name: true } },
             category: { select: { id: true, name: true } },
             department: { select: { id: true, name: true } },
-            employee: { select: { id: true, name: true } }
+            employee: { select: { id: true, employeeId: true, name: true, email: true, department: true, position: true, isActive: true } }
           }
         }
       }
@@ -61,6 +61,7 @@ export async function GET(
       tempStatus: entry.tempStatus,
       tempSerialNo: entry.tempSerialNo,
       tempPic: entry.tempPic,
+      tempPicId: entry.asset?.employee?.id || null,
       tempBrand: entry.tempBrand,
       tempModel: entry.tempModel,
       tempCost: entry.tempCost,
@@ -88,12 +89,17 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string; entryId: string } }
+  { params }: { params: Promise<{ id: string; entryId: string }> }
 ) {
   try {
-    const sessionId = params.id
-    const entryId = params.entryId
+    const { id: sessionId, entryId } = await params
     const body = await request.json()
+
+    console.log('DEBUG: Received update body:', body)
+    console.log('DEBUG: body.tempStatus:', body.tempStatus)
+    console.log('DEBUG: body.status:', body.status)
+    console.log('DEBUG: body.tempPic:', body.tempPic)
+    console.log('DEBUG: body.pic:', body.pic)
 
     // Check if session exists and is active
     const session = await db.sOSession.findUnique({
@@ -133,27 +139,31 @@ export async function PUT(
       )
     }
 
-    // Update entry
+    // Update entry - FIX: Use correct field mapping
+    const updateData: any = {
+      tempName: body.tempName || body.name,
+      tempStatus: body.tempStatus || body.status,
+      tempSerialNo: body.tempSerialNo || body.serialNo,
+      tempPic: body.tempPic || body.pic,
+      tempBrand: body.tempBrand || body.brand,
+      tempModel: body.tempModel || body.model,
+      tempCost: body.tempCost ? parseFloat(body.tempCost) : (body.cost ? parseFloat(body.cost) : null),
+      isIdentified: body.isIdentified !== undefined ? body.isIdentified : true,
+      status: 'Updated'
+    }
+
+    console.log('DEBUG: Update data prepared:', updateData)
+
     const updatedEntry = await db.sOAssetEntry.update({
       where: { id: entryId },
-      data: {
-        tempName: body.name,
-        tempStatus: body.status,
-        tempSerialNo: body.serialNo,
-        tempPic: body.pic,
-        tempBrand: body.brand,
-        tempModel: body.model,
-        tempCost: body.cost ? parseFloat(body.cost) : null,
-        isIdentified: true,
-        status: 'Updated'
-      },
+      data: updateData,
       include: {
         asset: {
           include: {
             site: { select: { id: true, name: true } },
             category: { select: { id: true, name: true } },
             department: { select: { id: true, name: true } },
-            employee: { select: { id: true, name: true } }
+            employee: { select: { id: true, employeeId: true, name: true, email: true, department: true, position: true, isActive: true } }
           }
         }
       }
@@ -170,6 +180,7 @@ export async function PUT(
       tempStatus: updatedEntry.tempStatus,
       tempSerialNo: updatedEntry.tempSerialNo,
       tempPic: updatedEntry.tempPic,
+      tempPicId: updatedEntry.asset?.employee?.id || null,
       tempBrand: updatedEntry.tempBrand,
       tempModel: updatedEntry.tempModel,
       tempCost: updatedEntry.tempCost,
@@ -195,3 +206,5 @@ export async function PUT(
     )
   }
 }
+
+

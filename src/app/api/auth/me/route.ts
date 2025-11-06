@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from '@supabase/supabase-js';
 import jwt from 'jsonwebtoken';
+import { db } from '@/lib/db';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const jwtSecret = process.env.JWT_SECRET!;
 
 export async function GET(request: NextRequest) {
@@ -32,17 +30,18 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get user data from database
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const user = await db.user.findUnique({
+      where: { id: decoded.userId },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        isActive: true
+      }
+    });
 
-    const { data: userData, error: dbError } = await supabase
-      .from('users')
-      .select('id, email, name, role, isactive')
-      .eq('id', decoded.userId)
-      .single();
-
-    if (dbError || !userData) {
-      console.error("Auth/me - Database error:", dbError);
+    if (!user) {
       return NextResponse.json(
         { error: "User data not found" },
         { status: 404 }
@@ -50,7 +49,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Check if user is active (handle undefined case)
-    if (userData.isactive === false) {
+    if (!user.isActive) {
       return NextResponse.json(
         { error: "Account is inactive" },
         { status: 403 }
@@ -60,10 +59,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       user: {
-        id: userData.id,
-        email: userData.email,
-        name: userData.name,
-        role: userData.role,
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
       },
     });
   } catch (error) {

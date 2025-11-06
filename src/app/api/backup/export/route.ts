@@ -4,9 +4,7 @@ import { promises as fs } from 'node:fs'
 import { PassThrough, Readable } from 'node:stream'
 import path from 'node:path'
 import crypto from 'node:crypto'
-import { Pool, PoolClient } from 'pg'
-import { supabaseAdmin } from '@/lib/supabase'
-import type { PostgrestError } from '@supabase/supabase-js'
+import { db } from '@/lib/db'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -25,44 +23,87 @@ const TABLES_TO_EXPORT = [
   'so_asset_entries',
   'logs',
   'backups'
-]
+] as const
 
 type TableDump = Record<string, unknown[]>
 
+type AssetImageManifestEntry = {
+  assetId: string
+  imageUrl: string
+  relativePath: string
+  fileName: string
+  fileSize: number
+}
+
+type CollectedAssetImages = {
+  manifest: AssetImageManifestEntry[]
+  files: { relativePath: string; absolutePath: string }[]
+  summary: {
+    referenced: number
+    included: number
+    uniqueFiles: number
+    missing: number
+    skipped: number
+  }
+}
+
 function isMissingTableError(error: unknown) {
   if (!error) return false
-  const message =
-    error instanceof Error
-      ? error.message.toLowerCase()
-      : typeof error === 'string'
-        ? error.toLowerCase()
-        : ''
 
-  if (
+  const message = (error instanceof Error ? error.message : String(error ?? '')).toLowerCase()
+
+  return (
     message.includes('does not exist') ||
     message.includes('undefined table') ||
     message.includes('schema cache') ||
-    message.includes('relation') && message.includes('not found')
-  ) {
-    return true
-  }
-
-  if ((error as Partial<PostgrestError>).code) {
-    const code = (error as Partial<PostgrestError>).code!.toUpperCase()
-    if (code === '42P01' || code === 'PGRST116') {
-      return true
-    }
-  }
-
-  const details = (error as Partial<PostgrestError>).details?.toLowerCase() ?? ''
-  const hint = (error as Partial<PostgrestError>).hint?.toLowerCase() ?? ''
-  return details.includes('does not exist') || hint.includes('does not exist')
+    (message.includes('relation') && message.includes('not found')) ||
+    message.includes('no such table')
+  )
 }
 
-async function fetchTableRowsPg(client: PoolClient, table: string): Promise<unknown[]> {
+function ensureArrayRecords(value: unknown): Record<string, unknown>[] {
+  if (!Array.isArray(value)) return []
+  return value
+    .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object')
+    .map(item => item)
+}
+
+function getValue(row: Record<string, unknown>, keys: string[]) {
+  for (const key of keys) {
+    if (key in row) {
+      const value = row[key]
+      if (value !== undefined) {
+        return value
+      }
+    }
+  }
+  return undefined
+}
+
+const stringOptional = (row: Record<string, unknown>, ...keys: string[]) => {
+  const raw = getValue(row, keys)
+  if (raw === undefined || raw === null) return null
+  if (typeof raw === 'string') return raw
+  if (typeof raw === 'object') return JSON.stringify(raw)
+  return String(raw)
+}
+
+const stringRequired = (table: string, row: Record<string, unknown>, ...keys: string[]) => {
+  const value = stringOptional(row, ...keys)
+  if (value === null || value === '') {
+    throw new Error(`[backup/export] Missing required string "${keys[0]}" in table "${table}".`)
+  }
+  return value
+}
+
+async function fetchTableRowsPrisma(table: string): Promise<unknown[]> {
+  if (!TABLES_TO_EXPORT.includes(table as (typeof TABLES_TO_EXPORT)[number])) {
+    throw new Error(`Unsupported table requested: ${table}`)
+  }
+
   try {
-    const result = await client.query(`SELECT * FROM ${table}`)
-    return result.rows ?? []
+    const rows = await db.$queryRawUnsafe<unknown[]>(`SELECT * FROM "${table}"`)
+    return rows ?? []
   } catch (error) {
     if (isMissingTableError(error)) {
       console.warn(`Skipping missing table during export: ${table}`)
@@ -75,40 +116,65 @@ async function fetchTableRowsPg(client: PoolClient, table: string): Promise<unkn
   }
 }
 
-async function fetchTableRowsSupabase(table: string): Promise<unknown[]> {
-  const chunkSize = 1000
-  let from = 0
-  const rows: unknown[] = []
+async function collectAssetImages(
+  database: TableDump,
+  uploadsDir: string
+): Promise<CollectedAssetImages> {
+  const assets = ensureArrayRecords(database.assets)
+  const uniqueImageUrls = new Set<string>()
+  const manifest: AssetImageManifestEntry[] = []
+  const files: { relativePath: string; absolutePath: string }[] = []
 
-  while (true) {
-    const { data, error } = await supabaseAdmin
-      .from(table)
-      .select('*', { head: false })
-      .range(from, from + chunkSize - 1)
+  for (const asset of assets) {
+    const imageUrl = stringOptional(asset, 'imageUrl', 'image_url')
+    if (!imageUrl) continue
 
-    if (error) {
-      if (isMissingTableError(error)) {
-        console.warn(`Skipping missing table during export: ${table}`, error)
-        return []
-      }
-      console.error(`Failed to export table ${table} via Supabase`, error)
-      throw new Error(error.message ?? `Unable to export table ${table}`)
+    // Skip external URLs
+    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+      console.log(`Skipping external image URL: ${imageUrl}`)
+      continue
     }
 
-    if (!data || data.length === 0) {
-      break
+    // Skip if already processed this URL
+    if (uniqueImageUrls.has(imageUrl)) continue
+    uniqueImageUrls.add(imageUrl)
+
+    const assetId = stringRequired('assets', asset, 'id')
+    const fileName = path.basename(imageUrl)
+    const relativePath = `uploads/${fileName}`
+    const absolutePath = path.join(uploadsDir, fileName)
+
+    const entry: AssetImageManifestEntry = {
+      assetId,
+      imageUrl,
+      relativePath,
+      fileName,
+      fileSize: 0 // Will be updated if file exists
     }
 
-    rows.push(...data)
-
-    if (data.length < chunkSize) {
-      break
+    try {
+      const stats = await fs.stat(absolutePath)
+      entry.fileSize = stats.size
+      files.push({ relativePath, absolutePath })
+    } catch (error) {
+      console.warn(`Image file not found for asset ${assetId}: ${absolutePath}`)
     }
 
-    from += chunkSize
+    manifest.push(entry)
   }
 
-  return rows
+  const summary = {
+    referenced: assets.filter(a => stringOptional(a, 'imageUrl', 'image_url')).length,
+    included: files.length,
+    uniqueFiles: uniqueImageUrls.size,
+    missing: manifest.filter(e => e.fileSize === 0).length,
+    skipped: assets.filter(a => {
+      const url = stringOptional(a, 'imageUrl', 'image_url')
+      return url && (url.startsWith('http://') || url.startsWith('https://'))
+    }).length
+  }
+
+  return { manifest, files, summary }
 }
 
 async function readPackageVersion() {
@@ -117,42 +183,13 @@ async function readPackageVersion() {
   return packageJson.version ?? '0.0.0'
 }
 
-async function exportUsingPg() {
-  if (!process.env.DATABASE_URL) {
-    throw new Error('DATABASE_URL is missing. Cannot access database using direct connection.')
-  }
-
-  const useSsl = !process.env.DATABASE_URL.includes('localhost') && !process.env.DATABASE_URL.includes('127.0.0.1')
-  const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: useSsl ? { rejectUnauthorized: false } : undefined
-  })
-  const client = await pool.connect()
-  return { pool, client }
-}
-
-async function buildDumpWithPg(client: PoolClient) {
+async function buildDumpWithPrisma() {
   const databaseDump: TableDump = {}
   const tableCounts: Record<string, number> = {}
   let totalRecords = 0
 
   for (const table of TABLES_TO_EXPORT) {
-    const rows = await fetchTableRowsPg(client, table)
-    databaseDump[table] = rows
-    tableCounts[table] = rows.length
-    totalRecords += rows.length
-  }
-
-  return { databaseDump, tableCounts, totalRecords }
-}
-
-async function buildDumpWithSupabase() {
-  const databaseDump: TableDump = {}
-  const tableCounts: Record<string, number> = {}
-  let totalRecords = 0
-
-  for (const table of TABLES_TO_EXPORT) {
-    const rows = await fetchTableRowsSupabase(table)
+    const rows = await fetchTableRowsPrisma(table)
     databaseDump[table] = rows
     tableCounts[table] = rows.length
     totalRecords += rows.length
@@ -175,44 +212,14 @@ export async function GET() {
   const archiveName = `assetso-backup-${normalizedDate}.zip`
   const archiveLabel = `assetso-backup-${normalizedDate}`
 
-  let pool: Pool | null = null
-  let client: PoolClient | null = null
-
   try {
-    let databaseDump: TableDump
-    let tableCounts: Record<string, number>
-    let totalRecords: number
-    let strategy: 'pg' | 'supabase' = 'pg'
-
-    try {
-      const connection = await exportUsingPg()
-      pool = connection.pool
-      client = connection.client
-      const dump = await buildDumpWithPg(connection.client)
-      databaseDump = dump.databaseDump
-      tableCounts = dump.tableCounts
-      totalRecords = dump.totalRecords
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error)
-      console.warn('Falling back to Supabase API for export due to error:', errorMessage)
-      if (client) {
-        client.release()
-        client = null
-      }
-      if (pool) {
-        await pool.end()
-        pool = null
-      }
-
-      const dump = await buildDumpWithSupabase()
-      databaseDump = dump.databaseDump
-      tableCounts = dump.tableCounts
-      totalRecords = dump.totalRecords
-      strategy = 'supabase'
-    }
-
+    const { databaseDump, tableCounts, totalRecords } = await buildDumpWithPrisma()
     const databaseJsonString = JSON.stringify(databaseDump, null, 2)
     const databaseChecksum = crypto.createHash('sha256').update(databaseJsonString).digest('hex')
+
+    // Collect asset images
+    const uploadsDir = path.join(process.cwd(), 'public', 'uploads')
+    const { manifest, files, summary } = await collectAssetImages(databaseDump, uploadsDir)
 
     const metadata = {
       name: archiveLabel,
@@ -225,13 +232,28 @@ export async function GET() {
         fileSizeBytes: Buffer.byteLength(databaseJsonString, 'utf-8'),
         checksumSha256: databaseChecksum
       },
+      images: {
+        ...summary,
+        manifest: manifest.map(({ assetId, fileName, relativePath, imageUrl }) => ({
+          assetId,
+          fileName,
+          relativePath,
+          originalUrl: imageUrl
+        }))
+      },
       notes:
-        'Generated by /api/backup/export. Includes relational data (users, assets, employees, SO sessions, logs). Media uploads are not bundled in this export.',
-      engine: strategy
+        `Generated by /api/backup/export. Includes relational data (users, assets, employees, SO sessions, logs) and ${summary.included} asset images (${summary.missing} images missing).`,
+      engine: 'prisma'
     }
 
+    // Add database files
     archive.append(databaseJsonString, { name: 'database.json' })
     archive.append(JSON.stringify(metadata, null, 2), { name: 'metadata.json' })
+
+    // Add image files
+    for (const { relativePath, absolutePath } of files) {
+      archive.file(absolutePath, { name: relativePath })
+    }
 
     archive.finalize().catch(error => {
       stream.destroy(error)
@@ -255,12 +277,5 @@ export async function GET() {
       { error: `Failed to generate backup export: ${message}` },
       { status: 500 }
     )
-  } finally {
-    if (client) {
-      client.release()
-    }
-    if (pool) {
-      await pool.end()
-    }
   }
 }

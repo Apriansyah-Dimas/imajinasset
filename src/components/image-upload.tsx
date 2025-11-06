@@ -17,7 +17,7 @@ export default function ImageUpload({
   onChange,
   placeholder = "Upload image",
   className = "",
-  maxSize = 200, // 200KB default
+  maxSize = 50, // 50KB default
   acceptedTypes = ["image/jpeg", "image/jpg", "image/png"],
 }: ImageUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
@@ -80,7 +80,7 @@ export default function ImageUpload({
                     } else {
                       reject(
                         new Error(
-                          `Processed image is still too large. Maximum size is ${maxSize}KB.`
+                      `Processed image is still too large. Maximum size is ${maxSize}KB.`
                         )
                       );
                     }

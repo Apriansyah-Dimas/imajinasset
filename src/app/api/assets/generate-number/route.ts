@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase";
+import { db } from "@/lib/db";
 
 const toRoman = (value: number): string => {
   if (value <= 0) return "I";
@@ -37,34 +37,19 @@ export async function GET(request: NextRequest) {
     const categoryId = searchParams.get("categoryId");
     const siteId = searchParams.get("siteId");
 
-    const [{ data: categories, error: categoriesError }, { data: sites, error: sitesError }] =
-      await Promise.all([
-        supabaseAdmin
-          .from("categories")
-          .select("id, createdat")
-          .order("createdat", { ascending: true }),
-        supabaseAdmin
-          .from("sites")
-          .select("id, createdat")
-          .order("createdat", { ascending: true }),
-      ]);
+    const [categories, sites, assetCount] = await Promise.all([
+      db.category.findMany({
+        select: { id: true },
+        orderBy: { name: "asc" }
+      }),
+      db.site.findMany({
+        select: { id: true },
+        orderBy: { name: "asc" }
+      }),
+      db.asset.count()
+    ]);
 
-    if (categoriesError) {
-      throw new Error(`Failed to fetch categories: ${categoriesError.message}`);
-    }
-    if (sitesError) {
-      throw new Error(`Failed to fetch sites: ${sitesError.message}`);
-    }
-
-    const { count: assetCount, error: assetCountError } = await supabaseAdmin
-      .from("assets")
-      .select("id", { count: "exact", head: true });
-
-    if (assetCountError) {
-      throw new Error(`Failed to count assets: ${assetCountError.message}`);
-    }
-
-    const nextNumber = (assetCount ?? 0) + 1;
+    const nextNumber = assetCount + 1;
     const paddedNumber = nextNumber.toString().padStart(3, "0");
 
     let categoryRoman = "I";
@@ -86,7 +71,8 @@ export async function GET(request: NextRequest) {
     const assetNumber = `FA${paddedNumber}/${categoryRoman}/${siteNumber}`;
 
     return NextResponse.json({
-      number: assetNumber,
+      assetNumber: assetNumber,
+      number: assetNumber, // For backward compatibility
       categoryRoman,
       siteNumber,
     });

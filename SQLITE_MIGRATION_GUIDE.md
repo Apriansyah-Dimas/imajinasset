@@ -1,5 +1,7 @@
 # Migrasi Asset SO dari Supabase ke SQLite
 
+> **Catatan:** Konfigurasi aktif sekarang menggunakan SQLite via Prisma. Dokumen ini dipertahankan sebagai referensi historis apabila diperlukan migrasi ulang.
+
 ## Ringkasan
 
 Dokumentasi ini menjelaskan proses migrasi aplikasi Asset SO dari Supabase kembali ke SQLite lokal untuk mengatasi berbagai masalah yang terjadi.

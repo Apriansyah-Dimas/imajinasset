@@ -10,7 +10,7 @@ export async function GET() {
       select: { id: true }
     })
     
-    const countMethod3 = await db.$queryRaw`SELECT COUNT(*) as count FROM Asset`
+    const countMethod3 = await db.$queryRaw`SELECT COUNT(*) as count FROM "assets"`
     
     // Get sample of assets
     const sampleAssets = await db.asset.findMany({

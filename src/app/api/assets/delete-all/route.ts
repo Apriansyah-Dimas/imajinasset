@@ -1,25 +1,13 @@
 import { NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase";
+import { db } from "@/lib/db";
 
 export async function DELETE() {
   try {
-    const { data, error } = await supabaseAdmin
-      .from("assets")
-      .delete()
-      .neq("id", "")
-      .select("id");
-
-    if (error) {
-      console.error("Delete all assets error:", error);
-      return NextResponse.json(
-        { error: "Failed to delete assets", details: error.message },
-        { status: 500 }
-      );
-    }
+    const deleted = await db.asset.deleteMany();
 
     return NextResponse.json({
       success: true,
-      deleted: data?.length ?? 0,
+      deleted: deleted.count,
     });
   } catch (error: any) {
     console.error("Unexpected delete all assets error:", error);
