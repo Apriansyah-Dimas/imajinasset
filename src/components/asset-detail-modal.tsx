@@ -24,13 +24,13 @@ interface Asset {
   cost?: number
   brand?: string
   model?: string
-  site?: { name: string; id: string }
-  category?: { name: string; id: string }
-  department?: { name: string; id: string }
+  site?: { id: string; name: string }
+  category?: { id: string; name: string }
+  department?: { id: string; name: string }
   pic?: string | null
   picId?: string
   imageUrl?: string | null
-  notes?: string
+  notes?: string | null
   employee?: {
     id: string
     employeeId: string
@@ -38,7 +38,7 @@ interface Asset {
     email?: string
     department?: string
     position?: string
-    isActive: boolean
+    isActive?: boolean
   }
   dateCreated: string
 }
@@ -705,7 +705,7 @@ export default function AssetDetailModal({ asset, open, onOpenChange, onUpdate }
                       setFormData({
                         ...formData,
                         pic: null,
-                        picId: null,
+                        picId: undefined,
                         employee: undefined
                       })
                     }}

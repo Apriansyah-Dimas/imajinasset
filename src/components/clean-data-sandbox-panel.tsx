@@ -147,25 +147,25 @@ export function CleanDataSandboxPanel({ className }: CleanDataSandboxPanelProps)
     {
       title: 'Assets',
       value: dataSummary.assets,
-      subtext: 'Total aset di sandbox',
+      subtext: 'Total assets in the sandbox',
       iconClass: 'text-blue-600'
     },
     {
       title: 'Employees',
       value: dataSummary.employees,
-      subtext: 'Total pegawai',
+      subtext: 'Total employees',
       iconClass: 'text-emerald-600'
     },
     {
       title: 'SO Sessions',
       value: dataSummary.soSessions,
-      subtext: 'Total sesi stock opname',
+      subtext: 'Total stock opname sessions',
       iconClass: 'text-purple-600'
     },
     {
       title: 'Non-Admin Users',
       value: dataSummary.nonAdminUsers,
-      subtext: 'Akun user non-admin',
+      subtext: 'Non-admin user accounts',
       iconClass: 'text-orange-600'
     }
   ]
@@ -184,7 +184,7 @@ export function CleanDataSandboxPanel({ className }: CleanDataSandboxPanelProps)
       <div className="space-y-2">
         <h2 className="text-xl font-semibold text-gray-900">Clean Data Sandbox</h2>
         <p className="text-sm text-gray-600">
-          Bersihkan data testing di lingkungan sandbox. Lakukan export backup terlebih dahulu karena proses tidak dapat dibatalkan.
+          Clear test data in the sandbox environment. Export a backup first because this process cannot be undone.
         </p>
       </div>
 
@@ -211,15 +211,15 @@ export function CleanDataSandboxPanel({ className }: CleanDataSandboxPanelProps)
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-red-600">
             <Trash2 className="h-5 w-5" />
-            Bersihkan Data Sandbox
+            Clean Sandbox Data
           </CardTitle>
           <CardDescription>
-            Menghapus seluruh data operasional sandbox dan membuat ulang admin default untuk pengujian ulang.
+            Deletes all sandbox operational data and recreates the default admin for repeated testing.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-gray-600">
-            Gunakan fitur ini hanya setelah Anda menyimpan backup terbaru. Semua data akan hilang permanen.
+            Use this feature only after you have saved the latest backup. All data will be removed permanently.
           </p>
           <div className="flex flex-wrap items-center gap-3">
             <Button
@@ -229,11 +229,11 @@ export function CleanDataSandboxPanel({ className }: CleanDataSandboxPanelProps)
               className="flex items-center gap-2"
             >
               {cleaning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-              {cleaning ? 'Membersihkan data...' : 'Clean Data Sandbox'}
+              {cleaning ? 'Cleaning data...' : 'Clean Data Sandbox'}
             </Button>
             {cleanResult?.cleanedAt && (
               <span className="text-xs text-gray-500">
-                Terakhir dibersihkan: {new Date(cleanResult.cleanedAt).toLocaleString()}
+                Last cleaned: {new Date(cleanResult.cleanedAt).toLocaleString()}
               </span>
             )}
           </div>

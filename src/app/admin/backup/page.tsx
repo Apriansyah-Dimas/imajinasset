@@ -17,7 +17,7 @@ export default function AdminBackupPage() {
             <div>
               <h1 className="text-lg font-bold text-gray-900 sm:text-2xl">SYSTEM BACKUP & RESTORE</h1>
               <p className="text-xs text-gray-600 sm:text-sm">
-                Satu klik untuk export database + uploads dan restore secara atomic.
+                One click to export the database plus uploads and restore everything atomically.
               </p>
             </div>
           </div>
@@ -32,9 +32,9 @@ export default function AdminBackupPage() {
               <h2 className="text-sm font-semibold text-gray-900 sm:text-base">Tips Export</h2>
             </div>
             <ul className="space-y-2 text-xs text-gray-700 sm:text-sm">
-              <li>Pastikan koneksi stabil sebelum memulai proses download.</li>
-              <li>File zip berisi `database.json`, `metadata.json`, dan folder `uploads/`.</li>
-              <li>Simpan backup di lokasi aman (cloud storage atau external drive).</li>
+              <li>Ensure your connection is stable before starting the download.</li>
+              <li>The zip file contains `database.json`, `metadata.json`, and the `uploads/` folder.</li>
+              <li>Store the backup in a secure location (cloud storage or external drive).</li>
             </ul>
           </div>
           <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
@@ -43,9 +43,9 @@ export default function AdminBackupPage() {
               <h2 className="text-sm font-semibold text-gray-900 sm:text-base">Tips Restore</h2>
             </div>
             <ul className="space-y-2 text-xs text-gray-700 sm:text-sm">
-              <li>Gunakan file zip hasil export terbaru (maksimal 200 MB).</li>
-              <li>Selama proses restore, data lama akan ditimpa secara otomatis.</li>
-              <li>Jika terjadi error, sistem otomatis rollback ke kondisi sebelum restore.</li>
+              <li>Use the most recent exported zip file (maximum 200 MB).</li>
+              <li>During restore, existing data is overwritten automatically.</li>
+              <li>If an error occurs, the system automatically rolls back to the state before the restore.</li>
             </ul>
           </div>
         </div>

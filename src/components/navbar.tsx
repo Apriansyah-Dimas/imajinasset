@@ -4,140 +4,379 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
-  Menu,
-  X,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Database,
   LayoutDashboard,
+  LogOut,
   Package,
   Search,
-  Plus,
-  FileText,
-  Users,
-  LogOut,
+  Shield,
   User,
+  Users,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSidebar } from "@/contexts/SidebarContext";
+import { useMotionPreference } from "@/hooks/useMotionPreference";
+import type { LucideIcon } from "lucide-react";
+
+type NavigationChild = {
+  name: string;
+  href?: string;
+  icon: LucideIcon;
+  action?: "logout";
+};
+
+type NavigationItem = {
+  name: string;
+  href?: string;
+  icon: LucideIcon;
+  children?: NavigationChild[];
+};
 
 export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useAuth();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
+  const { isSidebarOpen, setIsSidebarOpen, toggleSidebar, isMobile, setIsMobile } = useSidebar();
+  const lastIsMobileRef = useRef<boolean | null>(null);
+  const reduceMotion = useMotionPreference();
 
-  // Role-based navigation
-  const getNavigation = () => {
-    const baseNav = [
+  const navigation = useMemo<NavigationItem[]>(() => {
+    const baseNav: NavigationItem[] = [
       { name: "Dashboard", href: "/", icon: LayoutDashboard },
       { name: "Assets", href: "/assets", icon: Package },
     ];
 
-    // Add SO Asset for Admin, SO Asset Users, and Viewers
-    if (user && (user.role === "ADMIN" || user.role === "SO_ASSET_USER" || user.role === "VIEWER")) {
+    if (
+      user &&
+      (user.role === "ADMIN" ||
+        user.role === "SO_ASSET_USER" ||
+        user.role === "VIEWER")
+    ) {
       baseNav.push({ name: "SO Asset", href: "/so-asset", icon: Search });
     }
 
-    // Add Admin menu for Admin users
     if (user && user.role === "ADMIN") {
-      baseNav.push({ name: "Admin", href: "/admin", icon: Users });
+      baseNav.push({
+        name: "Admin",
+        icon: Users,
+        children: [
+          { name: "User Management", href: "/admin/users", icon: Users },
+          { name: "SO Asset Management", href: "/admin/sessions", icon: Search },
+          { name: "Employee Management", href: "/admin/employees", icon: User },
+          { name: "Backup & Restore", href: "/admin/backup", icon: Database },
+        ],
+      });
     }
 
     return baseNav;
-  };
+  }, [user]);
 
-  const navigation = getNavigation();
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 1024);
+    const handleViewportChange = () => {
+      const mobile = window.innerWidth < 1024;
+      setIsMobile(mobile);
+
+      if (lastIsMobileRef.current === null || lastIsMobileRef.current !== mobile) {
+        setIsSidebarOpen(!mobile);
+        lastIsMobileRef.current = mobile;
+      }
     };
 
-    checkMobile();
-    window.addEventListener("resize", checkMobile);
+    handleViewportChange();
+    window.addEventListener("resize", handleViewportChange, { passive: true });
+    return () => window.removeEventListener("resize", handleViewportChange);
+  }, [setIsMobile, setIsSidebarOpen]);
 
-    return () => window.removeEventListener("resize", checkMobile);
-  }, []);
+  useEffect(() => {
+    setExpandedSections((prev) => {
+      const next = { ...prev };
+      navigation.forEach((item) => {
+        if (!item.children) return;
+        const hasActiveChild = item.children.some((child) => isActive(child.href));
+        if (hasActiveChild) {
+          next[item.name] = true;
+        }
+      });
+      return next;
+    });
+  }, [navigation, pathname]);
 
   const isActive = (href: string) => {
     if (href === "/") return pathname === href;
     return pathname.startsWith(href);
   };
 
+  const toggleSection = (section: string) => {
+    setExpandedSections((prev) => ({
+      ...prev,
+      [section]: !prev[section],
+    }));
+  };
+
+  const isSectionExpanded = (section: string, fallback: boolean) => {
+    const stored = expandedSections[section];
+    return typeof stored === "boolean" ? stored : fallback;
+  };
+
+  const handleChildAction = async (child: NavigationChild) => {
+    if (child.action === "logout") {
+      await logout();
+      router.push("/login");
+    }
+    if (isMobile) {
+      setIsSidebarOpen(false);
+    }
+  };
+
+  const mobileToggleClasses = useMemo(
+    () =>
+      cn(
+        "flex h-10 w-10 items-center justify-center rounded-2xl border border-border bg-white text-primary shadow-sm touch-none",
+        reduceMotion
+          ? "transition-opacity duration-150"
+          : "transition-all duration-300 ease-[cubic-bezier(0.25,0.46,0.45,0.94)] hover:-translate-y-0.5 hover:shadow-lg hover:scale-105 active:scale-95"
+      ),
+    [reduceMotion]
+  );
+
+  const sidebarToggleClasses = useMemo(
+    () =>
+      cn(
+        "flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-white shadow-md hover:bg-gray-50",
+        reduceMotion
+          ? "transition-opacity duration-150"
+          : "transition-all duration-300 ease-[cubic-bezier(0.25,0.46,0.45,0.94)] hover:shadow-lg hover:scale-105 active:scale-95"
+      ),
+    [reduceMotion]
+  );
+
+  const sidebarClasses = useMemo(
+    () =>
+      cn(
+        "fixed top-0 left-0 z-50 flex h-screen w-60 flex-col sneat-sidebar px-4 will-change-transform",
+        reduceMotion
+          ? "transition-all duration-200 ease-in-out"
+          : "transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",
+        isSidebarOpen ? "translate-x-0 opacity-100" : "-translate-x-full opacity-0",
+        isMobile ? "shadow-2xl" : "shadow-lg"
+      ),
+    [reduceMotion, isSidebarOpen, isMobile]
+  );
+
+  const collapsedToggleClasses = useMemo(
+    () =>
+      cn(
+        "relative flex h-screen w-8 flex-col items-center justify-center gap-3 rounded-r-3xl border border-white/35 bg-[var(--background)]/95 text-primary shadow-[0_18px_45px_rgba(15,18,63,0.22)]",
+        reduceMotion
+          ? "transition-opacity duration-150"
+          : "transition-all duration-400 ease-[cubic-bezier(0.22,1,0.36,1)] hover:translate-x-1 hover:shadow-[0_24px_65px_rgba(15,18,63,0.25)] active:scale-95",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
+      ),
+    [reduceMotion]
+  );
+
+  const overlayClasses = useMemo(
+    () =>
+      cn(
+        "fixed inset-0 z-30 bg-[#1f2041]/20 backdrop-blur-sm transition-opacity",
+        isSidebarOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+      ),
+    [isSidebarOpen]
+  );
+
+  const navItemBaseClasses = useMemo(
+    () =>
+      reduceMotion
+        ? "flex min-h-[40px] items-center gap-3 rounded-2xl px-3.5 py-2.5 text-[0.7rem] font-medium transition-colors duration-150"
+        : "flex min-h-[40px] items-center gap-3 rounded-2xl px-3.5 py-2.5 text-[0.7rem] font-medium transition-all duration-200 hover:-translate-y-0.5",
+    [reduceMotion]
+  );
+
+  const childNavItemClasses = useMemo(
+    () =>
+      reduceMotion
+        ? "flex w-full min-h-[36px] items-center gap-2 rounded-xl px-3 py-2 text-[0.65rem] font-medium transition-colors duration-150"
+        : "flex w-full min-h-[36px] items-center gap-2 rounded-xl px-3 py-2 text-[0.65rem] font-medium transition-all duration-200 hover:-translate-y-0.5",
+    [reduceMotion]
+  );
+
   return (
     <>
-      {/* Mobile menu button */}
-      <div
-        className={cn(
-          "fixed top-4 left-4 z-[60] transition-all duration-300",
-          !isMobile && "hidden"
-        )}
-      >
-        <button
-          onClick={() => setSidebarOpen(!sidebarOpen)}
+      {/* Toggle button (mobile) */}
+      {isMobile && (
+        <div
           className={cn(
-            "flex items-center justify-center w-12 h-12 bg-primary text-primary-foreground hover:bg-primary/90 active:bg-primary/80 transition-all duration-200 touch-none",
-            "shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95"
+            "fixed top-4 left-4 z-[60] flex",
+            reduceMotion ? "transition-opacity duration-150" : "transition-all duration-300"
           )}
         >
-          {sidebarOpen ? (
-            <X className="w-5 h-5 sm:w-6 sm:h-6" />
-          ) : (
-            <Menu className="w-5 h-5 sm:w-6 sm:h-6" />
-          )}
-        </button>
-      </div>
+          <button
+            onClick={toggleSidebar}
+            className={mobileToggleClasses}
+            aria-label={isSidebarOpen ? "Sembunyikan sidebar" : "Tampilkan sidebar"}
+          >
+            {isSidebarOpen ? (
+              <ChevronLeft className="h-5 w-5" />
+            ) : (
+              <ChevronRight className="h-5 w-5" />
+            )}
+          </button>
+        </div>
+      )}
 
-      {/* Sidebar */}
-      <div
-        className={cn(
-          "fixed top-0 left-0 z-50 transition-all duration-300 ease-in-out",
-          "w-64 h-screen gradient-sidebar",
-          sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
-          isMobile && "shadow-2xl",
-          "will-change-transform"
-        )}
-      >
-        <div className="flex flex-col h-full">
-          {/* Logo */}
-          <div className="p-4 sm:p-4 min-h-[80px] flex items-center">
+      {/* Desktop sidebar */}
+      <div className={sidebarClasses}>
+        <div className="flex h-full flex-col gap-6 py-6">
+          {/* Header with toggle button */}
+          <div className="flex items-center justify-between px-1">
             <Link
               href="/"
-              className="flex items-center justify-end w-full gap-3 sm:gap-4"
-              onClick={() => setSidebarOpen(false)}
+              className="flex items-center gap-3"
+              onClick={() => {
+                if (isMobile) {
+                  setIsSidebarOpen(false);
+                }
+              }}
             >
-              <span className="text-primary-foreground font-bold text-base sm:text-lg text-right text-shadow-white uppercase">
-                IMAJIN ASSET
-              </span>
-              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-accent text-accent-foreground flex items-center justify-center rounded-lg flex-shrink-0">
-                <LayoutDashboard className="w-5 h-5 sm:w-6 sm:h-6" />
+              <div className="flex size-11 items-center justify-center rounded-2xl bg-primary/15 text-primary">
+                <LayoutDashboard className="size-5" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[0.52rem] font-semibold uppercase tracking-[0.45em] text-text-muted">
+                  Imajin
+                </span>
+                <span className="text-lg font-semibold text-foreground">Asset</span>
               </div>
             </Link>
+
+            {/* Toggle button inside sidebar */}
+            {!isMobile && (
+              <button
+                onClick={() => setIsSidebarOpen(false)}
+                className={sidebarToggleClasses}
+                title="Sembunyikan sidebar"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+            )}
           </div>
 
-          {/* Main Navigation */}
-          <nav className="flex-1 p-2 overflow-y-auto">
-            <div className="mb-4 sm:mb-6">
-              <div className="px-3 py-2 text-xs font-semibold text-primary-foreground/80 uppercase tracking-wider text-shadow-white">
+          <nav className="flex-1 overflow-y-auto pr-1">
+            <div className="mb-6 space-y-3">
+              <div className="px-1 text-[0.52rem] font-semibold uppercase tracking-[0.6em] text-text-muted">
                 Main Menu
               </div>
-              <div className="space-y-1">
+              <div className="space-y-1.5">
                 {navigation.map((item) => {
                   const Icon = item.icon;
+                  const hasChildren = Boolean(item.children?.length);
+
+                  if (hasChildren && item.children) {
+                    const hasActiveChild = item.children.some((child) =>
+                      isActive(child.href)
+                    );
+                    const expanded = isSectionExpanded(item.name, hasActiveChild);
+
+                    return (
+                      <div key={item.name} className="space-y-1.5">
+                        <button
+                          type="button"
+                          onClick={() => toggleSection(item.name)}
+                          className={cn(
+                            navItemBaseClasses,
+                            "w-full justify-between text-left border border-transparent",
+                            expanded || hasActiveChild
+                              ? "bg-secondary text-foreground shadow-[0_12px_30px_rgba(99,101,185,0.12)]"
+                              : "text-text-muted hover:bg-secondary/60 hover:text-foreground"
+                          )}
+                        >
+                          <span className="flex items-center gap-3">
+                            <Icon className="h-4 w-4 text-primary" />
+                            <span className="truncate">{item.name}</span>
+                          </span>
+                          <ChevronDown
+                            className={cn(
+                              "h-4 w-4 text-primary transition-transform duration-200",
+                              expanded ? "rotate-180" : "rotate-0"
+                            )}
+                          />
+                        </button>
+
+                        {expanded && (
+                          <div className="ml-3 space-y-1 border-l border-border/60 pl-3">
+                            {item.children.map((child) => {
+                              const ChildIcon = child.icon;
+                              const childActive = child.href ? isActive(child.href) : false;
+                              const commonClasses = cn(
+                                childNavItemClasses,
+                                "border border-transparent",
+                                childActive
+                                  ? "bg-secondary text-foreground shadow-[0_12px_30px_rgba(99,101,185,0.08)]"
+                                  : "text-text-muted hover:bg-secondary/60 hover:text-foreground"
+                              );
+
+                              if (child.href) {
+                                return (
+                                  <Link
+                                    key={child.name}
+                                    href={child.href}
+                                    className={commonClasses}
+                                    onClick={() => {
+                                      if (isMobile) {
+                                        setIsSidebarOpen(false);
+                                      }
+                                    }}
+                                  >
+                                    <ChildIcon className="h-4 w-4 text-primary" />
+                                    <span className="truncate">{child.name}</span>
+                                  </Link>
+                                );
+                              }
+
+                              return (
+                                <button
+                                  key={child.name}
+                                  type="button"
+                                  className={cn(commonClasses, "text-left")}
+                                  onClick={() => handleChildAction(child)}
+                                >
+                                  <ChildIcon className="h-4 w-4 text-primary" />
+                                  <span className="truncate">{child.name}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+
+                  if (!item.href) return null;
+                  const active = isActive(item.href);
                   return (
                     <Link
                       key={item.name}
                       href={item.href}
                       className={cn(
-                        "flex items-center space-x-2 sm:space-x-3 px-3 sm:px-3 py-3 sm:py-2 text-xs sm:text-sm font-medium rounded transition-all duration-200",
-                        "hover:transform hover:scale-105 active:scale-95 touch-none",
-                        "min-h-[44px] sm:min-h-[40px]", // WCAG minimum touch target
-                        isActive(item.href)
-                          ? "bg-accent text-accent-foreground hover:bg-accent/90"
-                          : "text-primary-foreground/90 hover:bg-primary/80 hover:text-primary-foreground active:bg-primary/70 text-shadow-white"
+                        navItemBaseClasses,
+                        active
+                          ? "bg-secondary text-foreground shadow-[0_12px_30px_rgba(99,101,185,0.12)]"
+                          : "text-text-muted hover:bg-secondary/60 hover:text-foreground",
+                        "border border-transparent"
                       )}
-                      onClick={() => setSidebarOpen(false)}
+                      onClick={() => {
+                        if (isMobile) {
+                          setIsSidebarOpen(false);
+                        }
+                      }}
                     >
-                      <Icon className="w-4 h-4 sm:w-4 sm:h-4 flex-shrink-0" />
+                      <Icon className="h-4 w-4 text-primary" />
                       <span className="truncate">{item.name}</span>
                     </Link>
                   );
@@ -146,74 +385,77 @@ export default function Navbar() {
             </div>
           </nav>
 
-          {/* User Info & Footer */}
-          <div className="p-3 sm:p-4">
+          <div className="space-y-3 px-1">
             {user ? (
-              <div className="space-y-3">
-                {/* User Info */}
-                <div className="flex items-center space-x-2">
-                  <div className="w-8 h-8 bg-accent rounded-full flex items-center justify-center">
-                    <User className="w-4 h-4 text-white" />
+              <div className="rounded-2xl border border-border bg-white px-3.5 py-2.5 shadow-sm">
+                <div className="flex items-center justify-between gap-2.5">
+                  <div className="flex size-9 items-center justify-center rounded-2xl bg-primary/15 text-primary">
+                    <User className="size-3.5" />
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-primary-foreground truncate">
-                      {user.name}
-                    </p>
-                    <p className="text-xs text-primary-foreground/70 truncate">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[0.65rem] font-semibold text-foreground">{user.name}</p>
+                    <p className="truncate text-[0.45rem] uppercase tracking-[0.25em] text-text-muted">
                       {user.role.replace("_", " ")}
                     </p>
                   </div>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await logout();
+                      router.push("/login");
+                    }}
+                    className="text-[0.52rem] font-medium text-primary hover:text-primary/80"
+                  >
+                    Logout
+                  </button>
                 </div>
-
-                {/* Logout Button */}
-                <button
-                  onClick={async () => {
-                    await logout();
-                    router.push("/login");
-                  }}
-                  className="flex items-center space-x-2 w-full px-3 py-2 text-xs text-primary-foreground/80 border border-primary/50 rounded hover:bg-primary/80 hover:text-white transition-colors"
-                >
-                  <LogOut className="w-4 h-4" />
-                  <span>Logout</span>
-                </button>
               </div>
             ) : (
-              <div className="text-center">
+              <div className="rounded-2xl border border-dashed border-border px-4 py-5 text-center">
+                <p className="text-sm text-text-muted">Belum masuk</p>
                 <Link
                   href="/login"
-                  className="inline-flex items-center space-x-2 px-3 py-2 text-xs bg-accent text-white rounded hover:bg-accent/90 transition-colors"
+                  className="mt-3 inline-flex w-full items-center justify-center gap-2 sneat-btn sneat-btn-primary"
                 >
-                  <User className="w-4 h-4" />
+                  <User className="size-4" />
                   <span>Login</span>
                 </Link>
               </div>
             )}
 
-            {/* Copyright */}
-            <div className="text-xs text-primary-foreground/60 text-center mt-3 pt-3">
-              © 2025 Imajin Asset
+            <div className="text-center text-[0.55rem] text-text-muted">
+              &copy; {new Date().getFullYear()} Imajin Asset
             </div>
           </div>
         </div>
       </div>
 
-      {/* Overlay for mobile */}
+      {/* Only show overlay on mobile when sidebar is open */}
       {isMobile && (
         <div
-          className={cn(
-            "fixed inset-0 z-30 bg-primary/90 transition-all duration-300 touch-none",
-            sidebarOpen
-              ? "bg-opacity-50 backdrop-blur-sm pointer-events-auto"
-              : "bg-opacity-0 pointer-events-none"
-          )}
-          onClick={() => setSidebarOpen(false)}
-          onTouchStart={() => {
-            // Optional: Add haptic feedback on touch devices if supported
-            if ("vibrate" in navigator) {
-              navigator.vibrate(10);
-            }
-          }}
+          className={overlayClasses}
+          onClick={() => setIsSidebarOpen(false)}
         />
+      )}
+
+      {/* Desktop slim toggle when sidebar hidden */}
+      {!isMobile && !isSidebarOpen && (
+        <button
+          onClick={() => setIsSidebarOpen(true)}
+          className={cn("fixed left-0 top-0 z-[60]", collapsedToggleClasses)}
+          title="Tampilkan sidebar"
+          aria-label="Tampilkan sidebar"
+        >
+          <span className="sr-only">Tampilkan sidebar</span>
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-y-0 left-0 w-px bg-primary/20"
+          />
+          <div className="relative z-10 flex flex-col items-center gap-3">
+            <ChevronRight aria-hidden="true" className="h-4 w-4 drop-shadow-sm" />
+            <span aria-hidden="true" className="h-8 w-px rounded-full bg-primary/30" />
+          </div>
+        </button>
       )}
     </>
   );

@@ -209,8 +209,8 @@ export async function GET() {
   const now = new Date()
   const isoDate = now.toISOString()
   const normalizedDate = isoDate.replace(/[:.]/g, '-')
-  const archiveName = `assetso-backup-${normalizedDate}.zip`
-  const archiveLabel = `assetso-backup-${normalizedDate}`
+  const archiveName = `asset-management-backup-${normalizedDate}.zip`
+  const archiveLabel = `asset-management-backup-${normalizedDate}`
 
   try {
     const { databaseDump, tableCounts, totalRecords } = await buildDumpWithPrisma()

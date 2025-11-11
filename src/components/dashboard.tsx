@@ -154,7 +154,7 @@ export default function Dashboard() {
         </div>
         <div>
           <h1 className="text-2xl font-bold text-gray-900 mb-1">DASHBOARD</h1>
-          <p className="text-gray-600 text-sm">Sistem Manajemen Aset Perusahaan</p>
+          <p className="text-gray-600 text-sm">Enterprise Asset Management System</p>
         </div>
       </div>
 

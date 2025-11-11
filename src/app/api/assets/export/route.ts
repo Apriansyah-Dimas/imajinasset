@@ -120,7 +120,7 @@ export async function GET(
     const response = new NextResponse(csvContent, {
       headers: {
         'Content-Type': 'text/csv; charset=utf-8',
-        'Content-Disposition': `attachment; filename="assets-export-${new Date().toISOString().split('T')[0]}.csv"`
+        'Content-Disposition': `attachment; filename="asset-management-export-${new Date().toISOString().split('T')[0]}.csv"`
       }
     })
 

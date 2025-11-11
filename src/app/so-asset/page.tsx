@@ -1,9 +1,8 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -203,20 +202,6 @@ function SOAssetPageContent() {
     setShowDeleteDialog(true)
   }
 
-  const getStatusBadge = (status: string) => {
-    const variants = {
-      Active: 'default',
-      Completed: 'secondary',
-      Cancelled: 'destructive'
-    } as const
-
-    return (
-      <Badge variant={variants[status as keyof typeof variants] || 'default'}>
-        {status}
-      </Badge>
-    )
-  }
-
   const getProgressPercentage = (scanned: number, total: number) => {
     if (!scanned || !total || total === 0) return 0
     return Math.round((scanned / total) * 100)
@@ -224,226 +209,223 @@ function SOAssetPageContent() {
 
   if (loading) {
     return (
-      <div className="p-4 bg-gray-50 min-h-screen">
-        <div className="mb-6">
-          <div className="h-8 bg-gray-200 w-48 mb-2"></div>
-          <div className="h-4 bg-gray-200 w-64"></div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="h-48 bg-gray-200"></div>
-          ))}
+      <div className="min-h-screen bg-background px-4 py-8 sm:px-6 lg:px-10">
+        <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
+          <div className="space-y-3">
+            <div className="h-4 w-32 rounded-full bg-surface-border/70" />
+            <div className="h-8 w-64 rounded-xl bg-surface-border/60" />
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="surface-card animate-pulse space-y-4">
+                <div className="h-3 w-20 rounded-full bg-surface-border/70" />
+                <div className="h-6 w-28 rounded-full bg-surface-border/60" />
+                <div className="h-2 w-full rounded-full bg-surface-border/50" />
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     )
   }
 
+  const sessionCards = sessions.map((session) => {
+    const progress = getProgressPercentage(session.scannedAssets, session.totalAssets)
+    const statusClass =
+      session.status === 'Active'
+        ? 'bg-primary/10 text-primary'
+        : session.status === 'Completed'
+          ? 'bg-[#ecfdf3] text-[#1a7f5a]'
+          : 'bg-[#fff1ed] text-[#c2410c]'
+    const progressColor = progress === 100 ? 'bg-[#32c997]' : 'bg-primary'
+
+    return (
+      <div key={session.id} className="surface-card p-0">
+        <div className="space-y-4 p-5">
+          {/* Header */}
+          <div className="flex items-start justify-between">
+            <div className="flex-1 min-w-0">
+              <h3 className="text-sm font-semibold text-foreground truncate">
+                {session.name}
+              </h3>
+              <div className="mt-1 flex items-center gap-2 text-xs text-text-muted">
+                <Calendar className="h-3 w-3" />
+                <span>{session.year}</span>
+              </div>
+            </div>
+            <span className={`sneat-chip ${statusClass}`}>
+              {session.status}
+            </span>
+          </div>
+
+          {/* Description */}
+          {session.description && (
+            <p className="text-sm text-text-muted line-clamp-2">
+              {session.description}
+            </p>
+          )}
+
+          {/* Progress */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-xs text-text-muted">
+              <span>Progress</span>
+              <span className="font-semibold text-foreground">{progress}%</span>
+            </div>
+            <div className="h-2 w-full rounded-full bg-secondary/40">
+              <div
+                className={`h-2 rounded-full ${progressColor}`}
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+            <div className="flex justify-between text-[0.7rem] uppercase tracking-[0.25em] text-text-muted">
+              <span>{session.scannedAssets} scanned</span>
+              <span>{session.totalAssets} total</span>
+            </div>
+          </div>
+
+          {/* Metadata */}
+          <div className="text-[0.7rem] uppercase tracking-[0.35em] text-text-muted">
+            Created {new Date(session.createdAt).toLocaleDateString()}
+          </div>
+
+          {/* Actions */}
+          <div className="flex gap-2">
+            {session.status === 'Active' && (
+              <>
+                {canScan ? (
+                  <Link href={`/so-asset/${session.id}/scan`} className="flex-1">
+                    <button className="sneat-btn sneat-btn-primary w-full justify-center text-xs tracking-[0.2em]">
+                      <Search className="h-4 w-4" />
+                      Scan Assets
+                    </button>
+                  </Link>
+                ) : (
+                  <button
+                    disabled
+                    className="sneat-btn sneat-btn-outlined flex-1 justify-center text-xs opacity-60"
+                    title="Scan access restricted"
+                  >
+                    <Search className="h-4 w-4" />
+                    Scan
+                  </button>
+                )}
+                <RoleBasedAccess allowedRoles={['ADMIN']}>
+                  <button
+                    onClick={() => openCancelDialog(session)}
+                    className="sneat-btn flex items-center justify-center bg-[#fff1ed] text-[#c2410c] border border-[#ffcfc0]"
+                  >
+                    <XCircle className="h-4 w-4" />
+                  </button>
+                </RoleBasedAccess>
+              </>
+            )}
+            {session.status === 'Completed' && (
+              <Link href={`/so-asset/${session.id}/identified-assets`} className="flex-1">
+                <button className="sneat-btn w-full justify-center border border-[#c2f4dd] bg-[#ecfdf3] text-[#1a7f5a] text-xs tracking-[0.2em]">
+                  <Eye className="h-4 w-4" />
+                  Lihat progres
+                </button>
+              </Link>
+            )}
+            {session.status === 'Cancelled' && (
+              <>
+                <button
+                  disabled
+                  className="sneat-btn sneat-btn-outlined flex-1 justify-center text-xs opacity-60"
+                >
+                  <XCircle className="h-4 w-4" />
+                  Cancelled
+                </button>
+                <RoleBasedAccess allowedRoles={['ADMIN']}>
+                  <button
+                    onClick={() => openDeleteDialog(session)}
+                    className="sneat-btn bg-[#ffefef] text-[#d23a3a] border border-[#ffcfcf]"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </RoleBasedAccess>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  })
+
   return (
-    <div className="p-4 bg-gray-50 min-h-screen">
-      {/* Page Header */}
-      <div className="mb-6">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0 mb-6">
+    <div className="min-h-screen bg-background px-4 py-6 sm:px-6 lg:px-10">
+      <div className="mx-auto w-full max-w-7xl space-y-6">
+        {/* Page Header */}
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">STOCK OPNAME</h1>
-            <p className="text-gray-600 text-sm">Manage asset tracking and inventory sessions</p>
+            <p className="text-[0.65rem] uppercase tracking-[0.6em] text-text-muted">Stock Opname</p>
+            <h1 className="text-3xl font-semibold text-foreground">SO Asset Sessions</h1>
+            <p className="text-sm text-text-muted">
+              Monitor progres scanning dan kelola sesi inventory perusahaan
+            </p>
           </div>
           <RoleBasedAccess allowedRoles={['ADMIN']}>
-            <button
-              onClick={() => {
-                console.log('Button clicked')
-                setShowCreateDialog(true)
-              }}
-              className="flex items-center justify-center px-4 py-2 bg-blue-600 text-white border border-blue-700 hover:bg-blue-700 font-medium text-sm"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              START NEW SESSION
-            </button>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <button
+                onClick={() => setShowCreateDialog(true)}
+                className="sneat-btn sneat-btn-primary justify-center"
+              >
+                <Plus className="h-4 w-4" />
+                Mulai sesi baru
+              </button>
+            </div>
           </RoleBasedAccess>
         </div>
 
         {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white border border-gray-300 p-4">
-            <div className="text-xs font-semibold text-gray-500 mb-1">TOTAL SESSIONS</div>
-            <div className="text-2xl font-bold text-gray-900">{sessions.length}</div>
+        <div className="dashboard-grid">
+          <div className="surface-card">
+            <p className="text-xs uppercase tracking-[0.35em] text-text-muted">Total sessions</p>
+            <p className="mt-2 text-3xl font-semibold text-foreground">{sessions.length}</p>
           </div>
-          <div className="bg-white border border-gray-300 p-4">
-            <div className="text-xs font-semibold text-gray-500 mb-1">ACTIVE</div>
-            <div className="text-2xl font-bold text-blue-600">
+          <div className="surface-card">
+            <p className="text-xs uppercase tracking-[0.35em] text-text-muted">Active</p>
+            <p className="mt-2 text-3xl font-semibold text-primary">
               {sessions.filter(s => s.status === 'Active').length}
-            </div>
+            </p>
           </div>
-          <div className="bg-white border border-gray-300 p-4">
-            <div className="text-xs font-semibold text-gray-500 mb-1">COMPLETED</div>
-            <div className="text-2xl font-bold text-green-600">
+          <div className="surface-card">
+            <p className="text-xs uppercase tracking-[0.35em] text-text-muted">Completed</p>
+            <p className="mt-2 text-3xl font-semibold text-[#1a7f5a]">
               {sessions.filter(s => s.status === 'Completed').length}
-            </div>
+            </p>
           </div>
-          <div className="bg-white border border-gray-300 p-4">
-            <div className="text-xs font-semibold text-gray-500 mb-1">CANCELLED</div>
-            <div className="text-2xl font-bold text-red-600">
+          <div className="surface-card">
+            <p className="text-xs uppercase tracking-[0.35em] text-text-muted">Cancelled</p>
+            <p className="mt-2 text-3xl font-semibold text-[#d23a3a]">
               {sessions.filter(s => s.status === 'Cancelled').length}
-            </div>
+            </p>
           </div>
         </div>
-      </div>
 
-      {/* Sessions List */}
-      {sessions.length === 0 ? (
-        <div className="bg-white border border-gray-300">
-          <div className="bg-gray-800 text-white px-4 py-3 border-b border-gray-900">
-            <h2 className="text-sm font-bold text-white">NO SESSIONS FOUND</h2>
-          </div>
-          <div className="p-12 text-center">
-            <List className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-            <h3 className="text-lg font-bold text-gray-900 mb-2">No Stock Opname Sessions</h3>
-            <p className="text-gray-600 text-sm mb-6">
-              Create your first stock opname session to start tracking assets
+        {/* Sessions List */}
+        {sessions.length === 0 ? (
+          <div className="surface-card text-center">
+            <List className="mx-auto mb-4 h-12 w-12 text-primary" />
+            <h3 className="mb-2 text-lg font-semibold text-foreground">Belum ada sesi stock opname</h3>
+            <p className="text-sm text-text-muted">
+              Buat sesi pertama untuk mulai memindai dan merekonsiliasi aset.
             </p>
             <RoleBasedAccess allowedRoles={['ADMIN']}>
               <button
                 onClick={() => setShowCreateDialog(true)}
-                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white border border-blue-700 hover:bg-blue-700 font-medium text-sm"
+                className="mt-6 sneat-btn sneat-btn-primary inline-flex min-w-[200px] justify-center"
               >
-                <Plus className="h-4 w-4 mr-2" />
-                START FIRST SESSION
+                <Plus className="h-4 w-4" />
+                Mulai sesi sekarang
               </button>
             </RoleBasedAccess>
           </div>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-          {sessions.map((session) => (
-            <div key={session.id} className="bg-white border border-gray-300">
-              <div className="p-4">
-                {/* Header */}
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-sm font-bold text-gray-900 truncate">
-                      {session.name}
-                    </h3>
-                    <div className="flex items-center space-x-2 mt-1">
-                      <Calendar className="h-3 w-3 text-gray-400" />
-                      <span className="text-xs text-gray-500">{session.year}</span>
-                    </div>
-                  </div>
-                  <div className={`px-2 py-1 text-xs font-bold border ${
-                    session.status === 'Active'
-                      ? 'bg-blue-100 text-blue-800 border-blue-300'
-                      : session.status === 'Completed'
-                      ? 'bg-green-100 text-green-800 border-green-300'
-                      : 'bg-red-100 text-red-800 border-red-300'
-                  }`}>
-                    {session.status}
-                  </div>
-                </div>
-
-                {/* Description */}
-                {session.description && (
-                  <p className="text-xs text-gray-600 mb-4 line-clamp-2">
-                    {session.description}
-                  </p>
-                )}
-
-                {/* Progress */}
-                <div className="mb-4">
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-xs font-medium text-gray-700">PROGRESS</span>
-                    <span className="text-xs font-bold text-gray-900">
-                      {getProgressPercentage(session.scannedAssets, session.totalAssets)}%
-                    </span>
-                  </div>
-                  <div className="w-full bg-gray-200 border border-gray-300 h-4">
-                    <div
-                      className={`h-4 border ${
-                        getProgressPercentage(session.scannedAssets, session.totalAssets) === 100
-                          ? 'bg-green-600 border-green-700'
-                          : 'bg-blue-600 border-blue-700'
-                      }`}
-                      style={{ width: `${getProgressPercentage(session.scannedAssets, session.totalAssets)}%` }}
-                    />
-                  </div>
-                  <div className="flex justify-between items-center mt-1">
-                    <span className="text-xs text-gray-500">
-                      {session.scannedAssets} scanned
-                    </span>
-                    <span className="text-xs text-gray-500">
-                      {session.totalAssets} total
-                    </span>
-                  </div>
-                </div>
-
-                {/* Metadata */}
-                <div className="text-xs text-gray-500 mb-4">
-                  Created: {new Date(session.createdAt).toLocaleDateString()}
-                </div>
-
-                {/* Actions */}
-                <div className="flex gap-2">
-                  {session.status === 'Active' && (
-                    <>
-                      {canScan ? (
-                        <Link href={`/so-asset/${session.id}/scan`} className="flex-1">
-                          <button className="w-full flex items-center justify-center px-3 py-2 bg-blue-600 text-white border border-blue-700 hover:bg-blue-700 text-xs font-medium">
-                            <Search className="h-3 w-3 mr-1" />
-                            SCAN
-                          </button>
-                        </Link>
-                      ) : (
-                        <button
-                          disabled
-                          className="flex-1 flex items-center justify-center px-3 py-2 bg-gray-300 text-gray-500 border border-gray-400 text-xs font-medium cursor-not-allowed"
-                          title="Scan access restricted"
-                        >
-                          <Search className="h-3 w-3 mr-1" />
-                          SCAN
-                        </button>
-                      )}
-                      <RoleBasedAccess allowedRoles={['ADMIN']}>
-                        <button
-                          onClick={() => openCancelDialog(session)}
-                          className="flex items-center justify-center px-3 py-2 bg-red-600 text-white border border-red-700 hover:bg-red-700 text-xs font-medium"
-                        >
-                          <XCircle className="h-3 w-3" />
-                        </button>
-                      </RoleBasedAccess>
-                    </>
-                  )}
-                  {session.status === 'Completed' && (
-                    <Link href={`/so-asset/${session.id}/identified-assets`} className="flex-1">
-                      <button className="w-full flex items-center justify-center px-3 py-2 bg-green-600 text-white border border-green-700 hover:bg-green-700 text-xs font-medium">
-                        <Eye className="h-3 w-3 mr-1" />
-                        VIEW PROGRESS
-                      </button>
-                    </Link>
-                  )}
-                  {session.status === 'Cancelled' && (
-                    <>
-                      <button
-                        disabled
-                        className="flex-1 flex items-center justify-center px-3 py-2 bg-gray-300 text-gray-500 border border-gray-400 text-xs font-medium cursor-not-allowed"
-                      >
-                        <XCircle className="h-3 w-3 mr-1" />
-                        CANCELLED
-                      </button>
-                      <RoleBasedAccess allowedRoles={['ADMIN']}>
-                        <button
-                          onClick={() => openDeleteDialog(session)}
-                          className="flex items-center justify-center px-3 py-2 bg-red-600 text-white border border-red-700 hover:bg-red-700 text-xs font-medium"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </button>
-                      </RoleBasedAccess>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Cancel Session Dialog */}
+        ) : (
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
+            {sessionCards}
+          </div>
+        )}      {/* Cancel Session Dialog */}
       <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
         <DialogContent>
           <DialogHeader>
@@ -600,6 +582,7 @@ function SOAssetPageContent() {
         </div>
       )}
     </div>
+    </div>
   )
 }
 
@@ -610,3 +593,9 @@ export default function SOAssetPage() {
     </ProtectedRoute>
   )
 }
+
+
+
+
+
+

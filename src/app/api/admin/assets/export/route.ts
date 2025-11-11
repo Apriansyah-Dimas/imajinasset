@@ -84,7 +84,7 @@ export async function GET(request: NextRequest) {
     return new NextResponse(csvContent, {
       headers: {
         'Content-Type': 'text/csv',
-        'Content-Disposition': `attachment; filename="assets-export-${new Date().toISOString().split('T')[0]}.csv"`
+        'Content-Disposition': `attachment; filename="asset-management-export-${new Date().toISOString().split('T')[0]}.csv"`
       }
     })
 

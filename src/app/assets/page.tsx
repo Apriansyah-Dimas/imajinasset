@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -136,7 +136,7 @@ function AssetsPageContent() {
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
 
-  const observer = useRef<IntersectionObserver>()
+  const observer = useRef<IntersectionObserver | null>(null)
   const lastAssetElementRef = useCallback((node: HTMLTableRowElement | null) => {
     if (loadingMore) return
     if (observer.current) observer.current.disconnect()
@@ -259,33 +259,47 @@ function AssetsPageContent() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'Active': return 'bg-green-100 text-green-800 border-2 border-green-600'
-      case 'Broken': return 'bg-red-100 text-red-800 border-2 border-red-600'
-      case 'Maintenance Process': return 'bg-yellow-100 text-yellow-800 border-2 border-yellow-400'
-      case 'Lost/Missing': return 'bg-orange-100 text-orange-800 border-2 border-orange-600'
-      case 'Sell': return 'bg-blue-100 text-blue-800 border-2 border-blue-600'
-      default: return 'bg-gray-100 text-gray-800 border-2 border-gray-700'
+      case 'Active':
+        return 'bg-[#ecfdf3] text-[#1a7f5a] border border-[#9ce8c4]'
+      case 'Broken':
+        return 'bg-[#fff5f5] text-[#c53030] border border-[#ffc9c9]'
+      case 'Maintenance Process':
+        return 'bg-[#fff8e6] text-[#b7791f] border border-[#ffe0a6]'
+      case 'Lost/Missing':
+        return 'bg-[#fff1ed] text-[#c2410c] border border-[#ffc9b0]'
+      case 'Sell':
+        return 'bg-[#eef4ff] text-[#314299] border border-[#c7d6ff]'
+      default:
+        return 'bg-surface text-text-muted border border-surface-border'
     }
   }
 
   if (loading) {
     return (
-      <div className="p-4 bg-gray-50 min-h-screen">
-        <div className="mb-6">
-          <div className="h-8 bg-gray-200 w-48 mb-4"></div>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div className="min-h-screen bg-background px-4 py-8 sm:px-6 lg:px-10">
+        <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
+          <div className="space-y-3">
+            <div className="h-4 w-32 rounded-full bg-surface-border/70" />
+            <div className="h-9 w-64 rounded-xl bg-surface-border/60" />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="h-20 bg-gray-200"></div>
+              <div
+                key={i}
+                className="surface-card animate-pulse space-y-4"
+              >
+                <div className="h-3 w-20 rounded-full bg-surface-border/70" />
+                <div className="h-6 w-24 rounded-full bg-surface-border/60" />
+              </div>
             ))}
           </div>
-        </div>
-        <div className="bg-white border border-gray-300">
-          <div className="bg-gray-900 text-white px-4 py-3 border-b border-gray-950">
-            <h2 className="text-sm font-bold">LOADING ASSETS...</h2>
-          </div>
-          <div className="p-4 space-y-3">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="h-16 bg-gray-200"></div>
+          <div className="surface-card animate-pulse space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="h-5 w-32 rounded-full bg-surface-border/70" />
+              <div className="h-9 w-40 rounded-2xl bg-surface-border/60" />
+            </div>
+            {[1, 2, 3, 4, 5].map((row) => (
+              <div key={row} className="h-12 rounded-2xl bg-surface-border/40" />
             ))}
           </div>
         </div>
@@ -294,170 +308,130 @@ function AssetsPageContent() {
   }
 
   return (
-    <div className="p-2 sm:p-4 bg-gray-50 min-h-screen w-full overflow-x-hidden">
-      {/* Page Header */}
-      <div className="mb-4 sm:mb-6">
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-900 mb-1 sm:mb-2 break-words">ASSET MANAGEMENT</h1>
-        <p className="text-xs sm:text-sm text-gray-600 break-words">Manage and track all company assets</p>
-      </div>
+    <div className="min-h-screen bg-background px-4 py-6 sm:px-6 lg:px-10">
+      <div className="mx-auto w-full max-w-7xl space-y-6">
+        {/* Page Header */}
+        <div className="space-y-3">
+          <p className="text-[0.65rem] uppercase tracking-[0.6em] text-text-muted">
+            Monitor & Control
+          </p>
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-semibold text-foreground">Asset Management</h1>
+              <p className="text-sm text-text-muted">
+                Semua aset perusahaan dalam satu dashboard modern
+              </p>
+            </div>
+          </div>
+        </div>
 
       {/* Action Bar */}
       <RoleBasedAccess
         allowedRoles={['ADMIN', 'SO_ASSET_USER']}
         fallback={
-          <div className="bg-white border-2 border-gray-300 p-3 sm:p-3 mb-3 sm:mb-4 min-w-0">
-            <div className="text-center text-xs sm:text-sm text-gray-500">
-              <Eye className="h-5 w-5 mx-auto mb-2 text-gray-400" />
-              <div className="px-2">Read-only access - Contact admin for asset modifications</div>
-            </div>
+          <div className="surface-card border border-dashed border-surface-border text-center text-sm text-text-muted">
+            <Eye className="mx-auto mb-3 h-6 w-6 text-primary" />
+            <p>Akses baca saja -- hubungi admin untuk mengelola aset.</p>
           </div>
         }
       >
-        <div className="bg-white border-2 border-gray-300 p-3 sm:p-3 mb-3 sm:mb-4 min-w-0">
-          {/* Mobile Layout - Vertical stacking */}
-          <div className="sm:hidden space-y-2">
+        <div className="surface-card space-y-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <RoleBasedAccess allowedRoles={['ADMIN']}>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="flex flex-1 flex-wrap gap-2">
                 <button
                   onClick={() => setShowAddModal(true)}
-                  className="flex items-center justify-center px-2 py-2.5 bg-blue-600 text-white border border-blue-700 hover:bg-blue-700 font-medium text-xs rounded min-w-0"
+                  className="sneat-btn sneat-btn-primary min-w-[140px] justify-center"
                 >
-                  <Plus className="h-4 w-4 mr-1 flex-shrink-0" />
-                  <span className="truncate">ADD</span>
+                  <Plus className="h-4 w-4" />
+                  <span>Tambah Asset</span>
                 </button>
                 <button
                   onClick={() => setShowImportModal(true)}
-                  className="flex items-center justify-center px-2 py-2.5 bg-green-600 text-white border border-green-700 hover:bg-green-700 font-medium text-xs rounded min-w-0"
+                  className="sneat-btn justify-center border border-[#c8e0ff] bg-[#eef5ff] text-[#2d5fd2]"
                 >
-                  <Upload className="h-4 w-4 mr-1 flex-shrink-0" />
-                  <span className="truncate">IMPORT</span>
+                  <Upload className="h-4 w-4" />
+                  <span>Import</span>
                 </button>
                 <button
                   onClick={() => setShowDeleteAllModal(true)}
-                  className="flex items-center justify-center px-2 py-2.5 bg-red-600 text-white border border-red-700 hover:bg-red-700 font-medium text-xs rounded min-w-0"
+                  className="sneat-btn justify-center border border-[#ffd4d4] bg-[#fff4f4] text-[#d23a3a]"
                 >
-                  <Trash2 className="h-4 w-4 mr-1 flex-shrink-0" />
-                  <span className="truncate">DELETE ALL</span>
+                  <Trash2 className="h-4 w-4" />
+                  <span>Delete All</span>
                 </button>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
                 <button
                   onClick={() => setShowDropdownsModal(true)}
-                  className="flex items-center justify-center px-3 py-2.5 bg-gray-600 text-white border border-gray-700 hover:bg-gray-700 font-medium text-xs rounded min-w-0"
+                  className="sneat-btn sneat-btn-outlined justify-center"
                 >
-                  <Settings className="h-4 w-4 mr-1 flex-shrink-0" />
-                  <span className="truncate">SETTINGS</span>
-                </button>
-                <button
-                  onClick={handleExport}
-                  disabled={isExporting}
-                  className="flex items-center justify-center px-3 py-2.5 bg-purple-600 text-white border border-purple-700 hover:bg-purple-700 font-medium text-xs rounded disabled:opacity-50 min-w-0"
-                >
-                  {isExporting ? (
-                    <>
-                      <div className="h-4 w-4 mr-1 animate-spin rounded-full border-2 border-white border-t-transparent flex-shrink-0" />
-                      <span className="truncate">EXP...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Download className="h-4 w-4 mr-1 flex-shrink-0" />
-                      <span className="truncate">EXPORT</span>
-                    </>
-                  )}
+                  <Settings className="h-4 w-4" />
+                  <span>Settings</span>
                 </button>
               </div>
-            </RoleBasedAccess>
-          </div>
-
-          {/* Desktop/Table Layout - Horizontal */}
-          <div className="hidden sm:flex flex-wrap gap-2">
-            <RoleBasedAccess allowedRoles={['ADMIN']}>
-              <button
-                onClick={() => setShowAddModal(true)}
-                className="flex items-center justify-center px-3 py-2 bg-blue-600 text-white border border-blue-700 hover:bg-blue-700 font-medium text-xs sm:text-sm"
-              >
-                <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 flex-shrink-0" />
-                <span>ADD</span>
-              </button>
-              <button
-                onClick={() => setShowImportModal(true)}
-                className="flex items-center justify-center px-3 py-2 bg-green-600 text-white border border-green-700 hover:bg-green-700 font-medium text-xs sm:text-sm"
-              >
-                <Upload className="h-3 w-3 sm:h-4 sm:w-4 mr-1 flex-shrink-0" />
-                <span>IMPORT</span>
-              </button>
-              <button
-                onClick={() => setShowDeleteAllModal(true)}
-                className="flex items-center justify-center px-3 py-2 bg-red-600 text-white border border-red-700 hover:bg-red-700 font-medium text-xs sm:text-sm"
-              >
-                <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1 flex-shrink-0" />
-                <span>DELETE ALL</span>
-              </button>
-              <button
-                onClick={() => setShowDropdownsModal(true)}
-                className="flex items-center justify-center px-3 py-2 bg-gray-600 text-white border border-gray-700 hover:bg-gray-700 font-medium text-xs sm:text-sm"
-              >
-                <Settings className="h-3 w-3 sm:h-4 sm:w-4 mr-1 flex-shrink-0" />
-                <span>SETTINGS</span>
-              </button>
             </RoleBasedAccess>
             <button
               onClick={handleExport}
               disabled={isExporting}
-              className="flex items-center justify-center px-3 py-2 bg-purple-600 text-white border border-purple-700 hover:bg-purple-700 font-medium text-xs sm:text-sm disabled:opacity-50"
+              className="sneat-btn sneat-btn-soft w-full justify-center border border-[#c8caff] bg-[#f2f2ff] text-primary transition disabled:opacity-60 md:w-auto"
             >
               {isExporting ? (
                 <>
-                  <div className="h-3 w-3 sm:h-4 sm:w-4 mr-1 animate-spin rounded-full border-2 border-white border-t-transparent flex-shrink-0" />
-                  <span>EXP...</span>
+                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                  <span>Exporting...</span>
                 </>
               ) : (
                 <>
-                  <Download className="h-3 w-3 sm:h-4 sm:w-4 mr-1 flex-shrink-0" />
-                  <span>EXPORT</span>
+                  <Download className="h-4 w-4" />
+                  <span>Export CSV</span>
                 </>
               )}
             </button>
           </div>
+          <p className="text-xs uppercase tracking-[0.35em] text-text-muted">
+            Quick actions
+          </p>
         </div>
       </RoleBasedAccess>
 
       {/* Search Bar */}
-      <div className="bg-white border-2 border-gray-300 p-3 sm:p-4 mb-3 sm:mb-4 min-w-0">
-        <div className="space-y-3">
-          {/* Basic Search */}
-          <div className="relative">
-            <Search className="absolute left-2 sm:left-3 top-1/2 transform -translate-y-1/2 h-3 w-3 sm:h-4 sm:w-4 text-gray-400 flex-shrink-0" />
-            <input
-              type="text"
-              placeholder="Search assets (name, no asset, status, PIC, etc.)..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-8 sm:pl-10 pr-3 sm:pr-4 py-2 border-2 border-gray-300 focus:border-blue-500 focus:outline-none text-xs sm:text-sm min-w-0"
-            />
-          </div>
+      <div className="surface-card">
+        <div className="relative">
+          <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
+          <input
+            type="text"
+            placeholder="Cari aset (nama, nomor aset, PIC, status, dsb)"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="sneat-input w-full pl-12 text-sm"
+          />
         </div>
       </div>
 
       {/* Assets List */}
-      <div className="bg-white border-2 border-gray-300 min-w-0">
-        <div className="bg-gray-900 text-white px-3 sm:px-4 py-2 sm:py-3 border-b-2 border-gray-950">
-          <h2 className="text-xs sm:text-sm font-bold break-words text-white">
-            ASSET LIST {filteredAssets.length > 0 && `(${filteredAssets.length})`}
-          </h2>
+      <div className="surface-card min-w-0 p-0">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-surface-border px-4 py-4">
+          <div>
+            <p className="text-[0.6rem] uppercase tracking-[0.45em] text-text-muted">Daftar aset</p>
+            <h2 className="text-lg font-semibold text-foreground">Inventaris Lengkap</h2>
+          </div>
+          <span className="sneat-chip bg-primary/10 text-primary">
+            {filteredAssets.length} item
+          </span>
         </div>
 
         {filteredAssets.length > 0 ? (
           <>
             {/* Desktop/Table View - Hidden on small screens */}
-            <div className="hidden sm:block overflow-x-auto scrollbar-hide">
-              <Table className="w-full min-w-[500px]">
+            <div className="hidden sm:block">
+              <Table className="sneat-table w-full text-xs">
                 <TableHeader>
-                  <TableRow className="bg-muted/30 border-b-2 border-gray-900">
-                    <TableHead className="font-bold text-black py-2 px-3 sm:px-4 w-[45%] min-w-[200px] text-xs sm:text-sm">NAMA ASSET</TableHead>
-                    <TableHead className="font-bold text-black py-2 px-3 sm:px-4 w-[25%] min-w-[100px] text-xs sm:text-sm">NO ASSET</TableHead>
-                    <TableHead className="font-bold text-black py-2 px-3 sm:px-4 w-[15%] min-w-[80px] text-xs sm:text-sm hidden md:table-cell">STATUS</TableHead>
-                    <TableHead className="font-bold text-black py-2 px-3 sm:px-4 w-[15%] min-w-[80px] text-xs sm:text-sm text-center">VIEW</TableHead>
+                  <TableRow className="bg-secondary/60 text-[0.65rem] uppercase tracking-[0.25em] text-text-muted">
+                    <TableHead className="py-2 px-3 font-semibold text-text-muted">Asset Name</TableHead>
+                    <TableHead className="py-2 px-3 font-semibold text-text-muted">No Asset</TableHead>
+                    <TableHead className="py-2 px-3 font-semibold text-text-muted">Category</TableHead>
+                    <TableHead className="py-2 px-3 font-semibold text-text-muted">Site</TableHead>
+                    <TableHead className="py-2 px-3 font-semibold text-text-muted">Status</TableHead>
+                    <TableHead className="py-2 px-3 font-semibold text-text-muted text-center">Detail</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -465,16 +439,16 @@ function AssetsPageContent() {
                     <TableRow
                       key={asset.id}
                       ref={index === filteredAssets.length - 1 ? lastAssetElementRef : null}
-                      className="border-b border-gray-200 hover:bg-gray-50"
+                      className="border-b border-surface-border/60 transition hover:bg-secondary/20"
                     >
-                      <TableCell className="py-2 px-3 sm:px-4 w-[45%] min-w-[200px]">
-                        <div className="flex items-start gap-3">
-                          <div className="flex-shrink-0">
+                      <TableCell className="px-3 py-3 align-top">
+                        <div className="flex items-center gap-3">
+                          <div className="flex-shrink-0 w-12 h-12 rounded-lg border border-surface-border bg-surface-muted/20 flex items-center justify-center">
                             {asset.imageUrl ? (
                               <img
                                 src={asset.imageUrl}
                                 alt={asset.name}
-                                className="w-12 h-12 rounded-lg border border-gray-200 object-cover"
+                                className="w-full h-full rounded-lg object-cover"
                                 onError={(e) => {
                                   e.currentTarget.style.display = 'none'
                                   const fallback = e.currentTarget.parentElement?.querySelector('[data-placeholder]') as HTMLElement | null
@@ -482,46 +456,52 @@ function AssetsPageContent() {
                                 }}
                               />
                             ) : null}
-                            <div
-                              data-placeholder
-                              className={asset.imageUrl ? 'hidden' : ''}
-                            >
+                            <div data-placeholder className={asset.imageUrl ? 'hidden' : 'w-full h-full'}>
                               <AssetImagePlaceholder size="sm" />
                             </div>
                           </div>
-                          <div className="min-w-0 max-w-full">
-                            <div className="font-bold text-xs text-gray-900 break-all whitespace-normal leading-tight" style={{wordWrap: 'break-word', hyphens: 'auto'}}>
+                          <div className="min-w-0 flex-1 mt-3">
+                            <p className="text-xs font-semibold text-foreground leading-tight whitespace-normal break-words">
                               {asset.name}
-                            </div>
-                            <div className="text-xs text-gray-500 mt-1 break-words truncate">
-                              {asset.category?.name}
-                            </div>
-                            <div className="text-xs text-gray-400 mt-1 break-words hidden lg:block">
+                            </p>
+                            <p className="mt-1 text-[0.7rem] text-text-muted lg:block whitespace-normal break-words">
                               PIC: {asset.employee ? `${asset.employee.name} (${asset.employee.employeeId})` : (asset.pic || 'N/A')}
-                            </div>
+                            </p>
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell className="py-2 px-3 sm:px-4 w-[25%] min-w-[100px]">
-                        <div className="font-mono text-xs text-foreground break-all">
+                      <TableCell className="px-3 py-3">
+                        <div className="font-mono text-xs text-primary break-all">
                           {asset.noAsset}
                         </div>
                       </TableCell>
-                      <TableCell className="py-2 px-3 sm:px-4 w-[15%] min-w-[80px] hidden md:table-cell">
-                        <span className={`inline-flex items-center px-2 py-1 text-xs font-bold border ${getStatusColor(asset.status)} whitespace-nowrap`}>
+                      <TableCell className="px-3 py-3">
+                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[0.7rem] font-semibold ${getStatusColor(asset.status)}`}>
+                          <span className="h-1 w-1 rounded-full bg-current opacity-60" />
+                          {asset.category?.name}
+                        </span>
+                      </TableCell>
+                      <TableCell className="px-3 py-3">
+                        <span className="text-xs text-foreground break-all">
+                          {asset.site?.name}
+                        </span>
+                      </TableCell>
+                      <TableCell className="px-3 py-3">
+                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[0.7rem] font-semibold ${getStatusColor(asset.status)}`}>
+                          <span className="h-1 w-1 rounded-full bg-current opacity-60" />
                           {asset.status}
                         </span>
                       </TableCell>
-                      <TableCell className="py-2 px-3 sm:px-4 w-[15%] min-w-[80px] text-center">
+                      <TableCell className="px-3 py-3 text-center">
                         <button
                           onClick={() => {
                             setSelectedAsset(asset)
                             setShowDetailModal(true)
                           }}
-                          className="flex items-center justify-center px-2 py-1 border-2 border-gray-300 bg-blue-600 text-white hover:bg-blue-700 text-xs font-medium whitespace-nowrap w-full"
+                          className="sneat-btn sneat-btn-outlined w-full justify-center text-[0.7rem] font-semibold uppercase tracking-[0.1em] py-1"
                         >
-                          <Eye className="h-3 w-3 mr-0.5" />
-                          <span>VIEW</span>
+                          <Eye className="h-2.5 w-2.5" />
+                          <span>View</span>
                         </button>
                       </TableCell>
                     </TableRow>
@@ -536,7 +516,7 @@ function AssetsPageContent() {
                 <div
                   key={asset.id}
                   ref={index === filteredAssets.length - 1 ? lastAssetElementRef : null}
-                  className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow"
+                  className="surface-card p-3 shadow-none transition-all hover:-translate-y-0.5"
                 >
                   <div className="flex items-start gap-3 mb-2">
                     <div className="flex-shrink-0">
@@ -544,7 +524,7 @@ function AssetsPageContent() {
                         <img
                           src={asset.imageUrl}
                           alt={asset.name}
-                          className="w-12 h-12 rounded-lg border border-gray-200 object-cover"
+                          className="w-12 h-12 rounded-2xl border border-surface-border object-cover"
                           onError={(e) => {
                             e.currentTarget.style.display = 'none'
                             const fallback = e.currentTarget.parentElement?.querySelector('[data-placeholder]') as HTMLElement | null
@@ -561,10 +541,11 @@ function AssetsPageContent() {
                     </div>
                     <div className="flex-1 min-w-0 pr-2">
                       <div className="flex justify-between items-start gap-2">
-                        <h3 className="font-bold text-sm text-gray-900 break-words leading-tight">
+                        <h3 className="font-semibold text-sm text-foreground break-words leading-tight">
                           {asset.name}
                         </h3>
-                        <span className={`inline-flex items-center px-2 py-1 text-xs font-bold border ${getStatusColor(asset.status)} whitespace-nowrap flex-shrink-0`}>
+                        <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-[0.7rem] font-semibold ${getStatusColor(asset.status)} flex-shrink-0`}>
+                          <span className="h-2 w-2 rounded-full bg-current opacity-60" />
                           {asset.status}
                         </span>
                       </div>
@@ -573,24 +554,24 @@ function AssetsPageContent() {
 
                   <div className="space-y-1 text-xs">
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-600 font-medium">No. Asset:</span>
-                      <span className="font-mono text-foreground break-all ml-2">{asset.noAsset}</span>
+                      <span className="text-text-muted font-medium uppercase tracking-[0.3em]">No Asset</span>
+                      <span className="font-mono text-primary break-all ml-2">{asset.noAsset}</span>
                     </div>
 
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-600 font-medium">Category:</span>
+                      <span className="text-text-muted font-medium uppercase tracking-[0.3em]">Category</span>
                       <span className="text-foreground break-all ml-2">{asset.category?.name}</span>
                     </div>
 
                     {(asset.pic || asset.employee) && (
                       <div className="flex justify-between items-center">
-                        <span className="text-gray-600 font-medium">PIC:</span>
-                        <span className="text-foreground break-all ml-2">
+                        <span className="text-text-muted font-medium uppercase tracking-[0.3em]">PIC</span>
+                        <span className="text-foreground break-all ml-2 text-right">
                           {asset.employee ? (
-                            <div>
-                              <div>{asset.employee.name} ({asset.employee.employeeId})</div>
+                            <div className="space-y-0.5 text-right">
+                              <div className="font-semibold">{asset.employee.name} ({asset.employee.employeeId})</div>
                               {asset.employee.position && (
-                                <div className="text-xs text-gray-500">{asset.employee.position}</div>
+                                <div className="text-[0.65rem] uppercase tracking-[0.3em] text-text-muted">{asset.employee.position}</div>
                               )}
                             </div>
                           ) : (
@@ -601,16 +582,16 @@ function AssetsPageContent() {
                     )}
                   </div>
 
-                  <div className="mt-3 pt-2 border-t border-gray-100">
+                  <div className="mt-3 pt-2 border-t border-surface-border">
                     <button
                       onClick={() => {
                         setSelectedAsset(asset)
                         setShowDetailModal(true)
                       }}
-                      className="w-full flex items-center justify-center px-3 py-2 bg-blue-600 text-white border border-blue-700 hover:bg-blue-700 font-medium text-xs rounded"
+                      className="w-full sneat-btn sneat-btn-outlined justify-center text-xs font-semibold uppercase tracking-[0.3em]"
                     >
-                      <Eye className="h-3 w-3 mr-1" />
-                      VIEW DETAILS
+                      <Eye className="h-4 w-4" />
+                      View Details
                     </button>
                   </div>
                 </div>
@@ -623,24 +604,34 @@ function AssetsPageContent() {
         {loadingMore && (
           <>
             {/* Desktop/Table Loading Skeleton */}
-            <div className="hidden sm:block p-3 sm:p-4">
+            <div className="hidden sm:block p-3">
               <Table>
                 <TableBody>
                   {[1, 2, 3].map((i) => (
-                    <TableRow key={i} className="border-b border-gray-200">
-                      <TableCell className="py-2 px-3 sm:px-4 w-[45%] min-w-[200px]">
-                        <div className="h-3 bg-gray-200 rounded w-3/4 mb-2"></div>
-                        <div className="h-2 bg-gray-200 rounded w-1/2 mb-1"></div>
-                        <div className="h-2 bg-gray-200 rounded w-2/3"></div>
+                    <TableRow key={i} className="border-b border-surface-border/60">
+                      <TableCell className="py-3 px-3 align-top">
+                        <div className="flex items-start gap-2">
+                          <div className="w-8 h-8 rounded-lg bg-surface-border/40 flex-shrink-0"></div>
+                          <div className="min-w-0 flex-1">
+                            <div className="h-3 bg-surface-border/40 rounded w-3/4 mb-2"></div>
+                            <div className="h-2.5 bg-surface-border/40 rounded w-2/3"></div>
+                          </div>
+                        </div>
                       </TableCell>
-                      <TableCell className="py-2 px-3 sm:px-4 w-[25%] min-w-[100px]">
-                        <div className="h-3 bg-gray-200 rounded w-12"></div>
+                      <TableCell className="py-3 px-3">
+                        <div className="h-3 bg-surface-border/40 rounded w-14"></div>
                       </TableCell>
-                      <TableCell className="py-2 px-3 sm:px-4 w-[15%] min-w-[80px] hidden md:table-cell">
-                        <div className="h-5 bg-gray-200 rounded w-16"></div>
+                      <TableCell className="py-3 px-3">
+                        <div className="h-4 bg-surface-border/40 rounded w-10"></div>
                       </TableCell>
-                      <TableCell className="py-2 px-3 sm:px-4 w-[15%] min-w-[80px] text-center">
-                        <div className="h-6 bg-gray-200 rounded w-12 mx-auto"></div>
+                      <TableCell className="py-3 px-3">
+                        <div className="h-3 bg-surface-border/40 rounded w-10"></div>
+                      </TableCell>
+                      <TableCell className="py-3 px-3">
+                        <div className="h-4 bg-surface-border/40 rounded w-10"></div>
+                      </TableCell>
+                      <TableCell className="py-3 px-3 text-center">
+                        <div className="h-5 bg-surface-border/40 rounded w-10 mx-auto"></div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -680,19 +671,19 @@ function AssetsPageContent() {
 
         {/* No More Assets */}
         {!hasMore && filteredAssets.length > 0 && (
-          <div className="p-3 sm:p-4 text-center text-xs text-gray-500 bg-gray-50 border-t border-gray-200">
-            END OF LIST • {filteredAssets.length} ASSETS LOADED
+          <div className="border-t border-surface-border bg-surface px-4 py-3 text-center text-xs uppercase tracking-[0.35em] text-text-muted">
+            END OF LIST -- {filteredAssets.length} ASSETS LOADED
           </div>
         )}
 
         {/* Empty State */}
         {filteredAssets.length === 0 && (
-          <div className="p-6 sm:p-12 text-center">
-            <Package className="h-12 w-12 sm:h-12 sm:w-12 mx-auto mb-4 text-gray-400 flex-shrink-0" />
-            <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-2 break-words px-4">
-              {searchQuery.trim() !== '' ? 'NO ASSETS FOUND' : 'NO ASSETS REGISTERED'}
+          <div className="surface-card text-center">
+            <Package className="mx-auto mb-4 h-12 w-12 text-primary" />
+            <h3 className="mb-2 text-lg font-semibold text-foreground">
+              {searchQuery.trim() !== '' ? 'No assets found' : 'Belum ada asset terdaftar'}
             </h3>
-            <p className="text-sm sm:text-sm text-gray-600 mb-6 break-words max-w-sm sm:max-w-md mx-auto px-4">
+            <p className="mx-auto mb-6 max-w-md text-sm text-text-muted">
               {searchQuery.trim() !== ''
                 ? `No assets match "${searchQuery}"`
                 : 'Start by adding your first asset to the system'
@@ -702,22 +693,24 @@ function AssetsPageContent() {
               <RoleBasedAccess allowedRoles={['ADMIN']}>
                 <button
                   onClick={() => setShowAddModal(true)}
-                  className="inline-flex items-center px-6 py-3 bg-blue-600 text-white border border-blue-700 hover:bg-blue-700 font-medium text-sm rounded min-w-[140px]"
+                  className="sneat-btn sneat-btn-primary inline-flex min-w-[180px] justify-center"
                 >
-                  <Plus className="h-4 w-4 mr-2 flex-shrink-0" />
-                  <span>ADD FIRST ASSET</span>
+                  <Plus className="h-4 w-4" />
+                  <span>Tambah asset pertama</span>
                 </button>
               </RoleBasedAccess>
             ) : (
               <button
                 onClick={() => setSearchQuery('')}
-                className="inline-flex items-center px-6 py-3 bg-gray-600 text-white border border-gray-700 hover:bg-gray-700 font-medium text-sm rounded min-w-[120px]"
+                className="sneat-btn sneat-btn-outlined inline-flex min-w-[160px] justify-center"
               >
-                CLEAR SEARCH
+                Clear search
               </button>
             )}
           </div>
         )}
+      </div>
+
       </div>
 
       {/* Asset Detail Modal */}
@@ -767,3 +760,4 @@ export default function AssetsPage() {
     </ProtectedRoute>
   )
 }
+

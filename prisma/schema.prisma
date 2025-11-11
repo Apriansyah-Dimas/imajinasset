@@ -8,42 +8,43 @@ datasource db {
 }
 
 model Asset {
-  id             String            @id @default(cuid())
+  id             String             @id @default(cuid())
   name           String
-  noAsset        String            @unique @map("no_asset")
-  status         String            @default("Unidentified")
-  serialNo       String?           @map("serial_no")
-  purchaseDate   DateTime?         @map("purchase_date")
+  noAsset        String             @unique @map("no_asset")
+  status         String             @default("Unidentified")
+  serialNo       String?            @map("serial_no")
+  purchaseDate   DateTime?          @map("purchase_date")
   cost           Decimal?
   brand          String?
   model          String?
-  siteId         String?           @map("site_id")
-  categoryId     String?           @map("category_id")
-  departmentId   String?           @map("department_id")
-  picId          String?           @map("pic_id")
+  siteId         String?            @map("site_id")
+  categoryId     String?            @map("category_id")
+  departmentId   String?            @map("department_id")
+  picId          String?            @map("pic_id")
   pic            String?
-  imageUrl       String?           @map("image_url")
+  imageUrl       String?            @map("image_url")
   notes          String?
-  dateCreated    DateTime          @default(now()) @map("date_created")
-  createdAt      DateTime          @default(now()) @map("createdat")
-  updatedAt      DateTime          @updatedAt @map("updatedat")
-  soAssetEntries SOAssetEntry[]
+  dateCreated    DateTime           @default(now()) @map("date_created")
+  createdAt      DateTime           @default(now()) @map("createdat")
+  updatedAt      DateTime           @updatedAt @map("updatedat")
   customValues   AssetCustomValue[]
-  site           Site?             @relation(fields: [siteId], references: [id])
-  category       Category?         @relation(fields: [categoryId], references: [id])
-  department     Department?       @relation(fields: [departmentId], references: [id])
-  employee       Employee?         @relation(fields: [picId], references: [id])
+  employee       Employee?          @relation(fields: [picId], references: [id])
+  department     Department?        @relation(fields: [departmentId], references: [id])
+  category       Category?          @relation(fields: [categoryId], references: [id])
+  site           Site?              @relation(fields: [siteId], references: [id])
+  soAssetEntries SOAssetEntry[]
 
-  @@map("assets")
   @@index([siteId])
   @@index([categoryId])
   @@index([departmentId])
   @@index([picId])
+  @@map("assets")
 }
 
 model Site {
   id         String   @id @default(cuid())
   name       String   @unique
+  sortOrder  Int      @default(0) @map("sort_order")
   address    String?
   city       String?
   province   String?
@@ -59,12 +60,13 @@ model Site {
 }
 
 model Category {
-  id         String   @id @default(cuid())
-  name       String   @unique
+  id          String   @id @default(cuid())
+  name        String   @unique
+  sortOrder   Int      @default(0) @map("sort_order")
   description String?
-  createdAt  DateTime @default(now()) @map("createdat")
-  updatedAt  DateTime @updatedAt @map("updatedat")
-  assets     Asset[]
+  createdAt   DateTime @default(now()) @map("createdat")
+  updatedAt   DateTime @updatedAt @map("updatedat")
+  assets      Asset[]
 
   @@map("categories")
 }
@@ -72,6 +74,7 @@ model Category {
 model Department {
   id          String   @id @default(cuid())
   name        String   @unique
+  sortOrder   Int      @default(0) @map("sort_order")
   description String?
   createdAt   DateTime @default(now()) @map("createdat")
   updatedAt   DateTime @updatedAt @map("updatedat")
@@ -81,33 +84,33 @@ model Department {
 }
 
 model Employee {
-  id         String   @id @default(cuid())
-  employeeId String   @unique @map("employee_id")
+  id         String    @id @default(cuid())
+  employeeId String    @unique @map("employee_id")
   name       String
-  email      String?  @unique
+  email      String?   @unique
   department String?
   position   String?
   joinDate   DateTime? @map("join_date")
-  isActive   Boolean  @default(true) @map("isactive")
-  createdAt  DateTime @default(now()) @map("createdat")
-  updatedAt  DateTime @updatedAt @map("updatedat")
+  isActive   Boolean   @default(true) @map("isactive")
+  createdAt  DateTime  @default(now()) @map("createdat")
+  updatedAt  DateTime  @updatedAt @map("updatedat")
   assets     Asset[]
 
   @@map("employees")
 }
 
 model SOSession {
-  id             String          @id @default(cuid())
+  id             String         @id @default(cuid())
   name           String
   year           Int
   description    String?
-  status         String          @default("Active")
-  totalAssets    Int             @default(0) @map("total_assets")
-  scannedAssets  Int             @default(0) @map("scanned_assets")
-  createdAt      DateTime        @default(now()) @map("createdat")
-  updatedAt      DateTime        @updatedAt @map("updatedat")
-  startedAt      DateTime?       @map("started_at")
-  completedAt    DateTime?       @map("completed_at")
+  status         String         @default("Active")
+  totalAssets    Int            @default(0) @map("total_assets")
+  scannedAssets  Int            @default(0) @map("scanned_assets")
+  createdAt      DateTime       @default(now()) @map("createdat")
+  updatedAt      DateTime       @updatedAt @map("updatedat")
+  startedAt      DateTime?      @map("started_at")
+  completedAt    DateTime?      @map("completed_at")
   soAssetEntries SOAssetEntry[]
 
   @@map("so_sessions")
@@ -130,81 +133,81 @@ model SOAssetEntry {
   tempCost     Decimal?  @map("temp_cost")
   createdAt    DateTime  @default(now()) @map("createdat")
   updatedAt    DateTime  @updatedAt @map("updatedat")
-  soSession    SOSession @relation(fields: [soSessionId], references: [id])
   asset        Asset     @relation(fields: [assetId], references: [id])
+  soSession    SOSession @relation(fields: [soSessionId], references: [id])
 
-  @@map("so_asset_entries")
   @@index([soSessionId])
   @@index([assetId])
+  @@map("so_asset_entries")
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String
-  password  String
-  role      String   @default("VIEWER")
-  isActive  Boolean  @default(true) @map("isactive")
-  createdAt DateTime @default(now()) @map("createdat")
-  updatedAt DateTime @updatedAt @map("updatedat")
-  createdBy String?  @map("createdby")
-  createdUsers User[] @relation("UserCreator")
-  creator      User?  @relation("UserCreator", fields: [createdBy], references: [id])
-  logs        Log[]    @relation("UserLogs")
-  backups     Backup[] @relation("UserBackups")
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  password     String
+  role         String   @default("VIEWER")
+  isActive     Boolean  @default(true) @map("isactive")
+  createdAt    DateTime @default(now()) @map("createdat")
+  updatedAt    DateTime @updatedAt @map("updatedat")
+  createdBy    String?  @map("createdby")
+  backups      Backup[] @relation("UserBackups")
+  logs         Log[]    @relation("UserLogs")
+  creator      User?    @relation("UserCreator", fields: [createdBy], references: [id])
+  createdUsers User[]   @relation("UserCreator")
 
   @@map("users")
 }
 
 model AssetCustomField {
-  id           String   @id @default(cuid())
-  name         String   @unique
-  label        String
-  fieldType    String   @map("field_type")
-  required     Boolean  @default(false)
-  isActive     Boolean  @default(true) @map("isactive")
-  showCondition String? @map("show_condition")
-  options      String?
-  defaultValue String?  @map("default_value")
-  description  String?
-  createdAt    DateTime @default(now()) @map("createdat")
-  updatedAt    DateTime @updatedAt @map("updatedat")
-  customValues AssetCustomValue[]
+  id            String             @id @default(cuid())
+  name          String             @unique
+  label         String
+  fieldType     String             @map("field_type")
+  required      Boolean            @default(false)
+  isActive      Boolean            @default(true) @map("isactive")
+  showCondition String?            @map("show_condition")
+  options       String?
+  defaultValue  String?            @map("default_value")
+  description   String?
+  createdAt     DateTime           @default(now()) @map("createdat")
+  updatedAt     DateTime           @updatedAt @map("updatedat")
+  customValues  AssetCustomValue[]
 
   @@map("asset_custom_fields")
 }
 
 model AssetCustomValue {
-  id            String   @id @default(cuid())
-  assetId       String   @map("asset_id")
-  customFieldId String   @map("custom_field_id")
-  stringValue   String?  @map("string_value")
-  numberValue   Decimal? @map("number_value")
-  dateValue     DateTime? @map("date_value")
-  booleanValue  Boolean? @map("boolean_value")
-  createdAt     DateTime @default(now()) @map("createdat")
-  updatedAt     DateTime @updatedAt @map("updatedat")
-  asset         Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  id            String           @id @default(cuid())
+  assetId       String           @map("asset_id")
+  customFieldId String           @map("custom_field_id")
+  stringValue   String?          @map("string_value")
+  numberValue   Decimal?         @map("number_value")
+  dateValue     DateTime?        @map("date_value")
+  booleanValue  Boolean?         @map("boolean_value")
+  createdAt     DateTime         @default(now()) @map("createdat")
+  updatedAt     DateTime         @updatedAt @map("updatedat")
   customField   AssetCustomField @relation(fields: [customFieldId], references: [id], onDelete: Cascade)
+  asset         Asset            @relation(fields: [assetId], references: [id], onDelete: Cascade)
 
   @@unique([assetId, customFieldId])
   @@map("asset_custom_values")
 }
 
 model Log {
-  id         String   @id @default(cuid())
-  level      String
-  message    String
-  data       String?
-  userId     String?  @map("user_id")
-  ipAddress  String?  @map("ip_address")
-  userAgent  String?  @map("user_agent")
-  createdAt  DateTime @default(now()) @map("createdat")
-  updatedAt  DateTime @updatedAt @map("updatedat")
-  user       User?    @relation("UserLogs", fields: [userId], references: [id])
+  id        String   @id @default(cuid())
+  level     String
+  message   String
+  data      String?
+  userId    String?  @map("user_id")
+  ipAddress String?  @map("ip_address")
+  userAgent String?  @map("user_agent")
+  createdAt DateTime @default(now()) @map("createdat")
+  updatedAt DateTime @updatedAt @map("updatedat")
+  user      User?    @relation("UserLogs", fields: [userId], references: [id])
 
-  @@map("logs")
   @@index([userId])
+  @@map("logs")
 }
 
 model Backup {
@@ -217,6 +220,6 @@ model Backup {
   createdBy String?  @map("createdby")
   creator   User?    @relation("UserBackups", fields: [createdBy], references: [id])
 
-  @@map("backups")
   @@index([createdBy])
+  @@map("backups")
 }

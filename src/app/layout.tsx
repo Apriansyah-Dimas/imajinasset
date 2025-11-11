@@ -1,13 +1,16 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Public_Sans, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
-import Navbar from "@/components/navbar";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { SidebarProvider } from "@/contexts/SidebarContext";
+import { LayoutShell } from "@/components/LayoutShell";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const publicSans = Public_Sans({
+  variable: "--font-public-sans",
   subsets: ["latin"],
+  display: "swap",
+  weight: ["400", "500", "600", "700"],
 });
 
 const geistMono = Geist_Mono({
@@ -41,16 +44,14 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        data-force-motion="true"
+        className={`${publicSans.variable} ${geistMono.variable} antialiased`}
       >
         <AuthProvider>
-          <div className="flex">
-            <Navbar />
-            <main className="flex-1 lg:ml-64 min-h-screen pt-16 lg:pt-0">
-              {children}
-            </main>
-          </div>
-          <Toaster />
+          <SidebarProvider>
+            <LayoutShell>{children}</LayoutShell>
+            <Toaster />
+          </SidebarProvider>
         </AuthProvider>
       </body>
     </html>

@@ -16,7 +16,7 @@ type BackupManagerPanelProps = {
 export function BackupManagerPanel({
   className,
   title = 'Full Backup Export & Restore',
-  description = 'Satu klik backup & restore untuk data Assets, Employees, SO Sessions, serta User Management (database-only).',
+  description = 'One-click backup & restore for Assets, Employees, SO Sessions, and User Management (database only).',
   hideMetadataPreview = false
 }: BackupManagerPanelProps) {
   const [isExporting, setIsExporting] = useState(false)
@@ -102,7 +102,7 @@ export function BackupManagerPanel({
 
       const filename =
         extractFilename(response.headers.get('Content-Disposition')) ??
-        `assetso-backup-${new Date().toISOString().replace(/[:.]/g, '-')}.zip`
+        `asset-management-backup-${new Date().toISOString().replace(/[:.]/g, '-')}.zip`
 
       const downloadUrl = window.URL.createObjectURL(blob)
       const anchor = document.createElement('a')
@@ -205,7 +205,7 @@ export function BackupManagerPanel({
     if (isCleaning) return
     if (typeof window !== 'undefined') {
       const confirmed = window.confirm(
-        'Tindakan ini akan menghapus seluruh data Assets, Employees, SO Sessions, dan User non-admin.\nPastikan Anda sudah melakukan backup terlebih dahulu.\nLanjutkan?'
+        'This action will delete all Assets, Employees, SO Sessions, and non-admin Users.\nMake sure you have created a backup first.\nContinue?'
       )
       if (!confirmed) return
     }
@@ -228,9 +228,9 @@ export function BackupManagerPanel({
 
       const summary = (payload?.summary ?? {}) as Record<string, number>
       setCleanSummary(summary)
-      setCleanStatus('Clean complete. Data tables kosong untuk pengujian restore.')
+      setCleanStatus('Clean complete. Data tables cleared for restore testing.')
       toast.success('Data cleaned successfully', {
-        description: 'Seluruh data non-admin telah dibersihkan.'
+        description: 'All non-admin data has been removed.'
       })
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to clean data.'
@@ -259,7 +259,7 @@ export function BackupManagerPanel({
                   <div>
                     <h3 className="text-sm sm:text-base font-semibold text-blue-900">Export Backup</h3>
                     <p className="text-xs sm:text-sm text-blue-700/80">
-                      Download zip berisi database.json dan metadata lengkap siap import.
+                      Download a zip containing database.json and complete metadata ready to import.
                     </p>
                   </div>
                   <Button
@@ -295,7 +295,7 @@ export function BackupManagerPanel({
                   <div>
                     <h3 className="text-sm sm:text-base font-semibold text-emerald-900">Import Backup</h3>
                     <p className="text-xs sm:text-sm text-emerald-700/80">
-                      Upload zip dari export untuk restore seluruh data database secara atomic.
+                      Upload the exported zip to restore the entire database in a single step.
                     </p>
                   </div>
                   <Button
@@ -340,7 +340,7 @@ export function BackupManagerPanel({
                     </div>
                     {!hideMetadataPreview && (
                       <p className="mt-1 text-xs text-emerald-700/80">
-                        Detail per tabel berdasarkan metadata backup.
+                        Per-table detail displayed from the backup metadata.
                       </p>
                     )}
                     <div className="mt-2 grid grid-cols-1 gap-1 sm:grid-cols-2">
@@ -364,7 +364,7 @@ export function BackupManagerPanel({
               <div>
                 <h3 className="text-sm sm:text-base font-semibold text-red-900">Clean Data Sandbox</h3>
                 <p className="text-xs sm:text-sm text-red-700/80">
-                  Hapus seluruh data Assets, Employees, SO Sessions, dan Users non-admin untuk pengujian backup/restore.
+                  Delete all Assets, Employees, SO Sessions, and non-admin Users to validate backup and restore flows.
                 </p>
               </div>
               <Button

@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Trash2, Plus } from 'lucide-react'
+import { Trash2, Plus, ArrowUp, ArrowDown } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface EditDropdownsModalProps {
@@ -18,6 +18,7 @@ interface EditDropdownsModalProps {
 interface MasterDataItem {
   id: string
   name: string
+  sortOrder?: number | null
 }
 
 export default function EditDropdownsModal({ open, onOpenChange }: EditDropdownsModalProps) {
@@ -36,6 +37,14 @@ export default function EditDropdownsModal({ open, onOpenChange }: EditDropdowns
     }
   }, [open])
 
+  const sortByOrder = (items: MasterDataItem[]) => {
+    return [...items].sort((a, b) => {
+      const orderA = typeof a.sortOrder === 'number' ? a.sortOrder : Number.MAX_SAFE_INTEGER
+      const orderB = typeof b.sortOrder === 'number' ? b.sortOrder : Number.MAX_SAFE_INTEGER
+      return orderA - orderB || a.name.localeCompare(b.name)
+    })
+  }
+
   const fetchMasterData = async () => {
     try {
       const [sitesRes, categoriesRes, departmentsRes] = await Promise.all([
@@ -47,21 +56,21 @@ export default function EditDropdownsModal({ open, onOpenChange }: EditDropdowns
       // Handle each response separately to prevent one failure from affecting others
       if (sitesRes.ok) {
         const sitesData = await sitesRes.json()
-        setSites(Array.isArray(sitesData) ? sitesData : [])
+        setSites(Array.isArray(sitesData) ? sortByOrder(sitesData) : [])
       } else {
         setSites([])
       }
 
       if (categoriesRes.ok) {
         const categoriesData = await categoriesRes.json()
-        setCategories(Array.isArray(categoriesData) ? categoriesData : [])
+        setCategories(Array.isArray(categoriesData) ? sortByOrder(categoriesData) : [])
       } else {
         setCategories([])
       }
 
       if (departmentsRes.ok) {
         const departmentsData = await departmentsRes.json()
-        setDepartments(Array.isArray(departmentsData) ? departmentsData : [])
+        setDepartments(Array.isArray(departmentsData) ? sortByOrder(departmentsData) : [])
       } else {
         setDepartments([])
       }
@@ -89,7 +98,7 @@ export default function EditDropdownsModal({ open, onOpenChange }: EditDropdowns
 
       if (response.ok) {
         const site = await response.json()
-        setSites([...sites, site])
+        setSites(prev => sortByOrder([...prev, site]))
         setNewSite('')
         toast.success('Site added successfully')
       } else {
@@ -140,7 +149,7 @@ export default function EditDropdownsModal({ open, onOpenChange }: EditDropdowns
 
       if (response.ok) {
         const category = await response.json()
-        setCategories([...categories, category])
+        setCategories(prev => sortByOrder([...prev, category]))
         setNewCategory('')
         toast.success('Category added successfully')
       } else {
@@ -191,7 +200,7 @@ export default function EditDropdownsModal({ open, onOpenChange }: EditDropdowns
 
       if (response.ok) {
         const department = await response.json()
-        setDepartments([...departments, department])
+        setDepartments(prev => sortByOrder([...prev, department]))
         setNewDepartment('')
         toast.success('Department added successfully')
       } else {
@@ -222,6 +231,67 @@ export default function EditDropdownsModal({ open, onOpenChange }: EditDropdowns
     } catch (error) {
       console.error('Failed to delete department:', error)
       toast.error('Failed to delete department')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const reorderListLocally = (
+    list: MasterDataItem[],
+    id: string,
+    direction: 'up' | 'down'
+  ) => {
+    const currentIndex = list.findIndex(item => item.id === id)
+    if (currentIndex === -1) return list
+
+    const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1
+    if (targetIndex < 0 || targetIndex >= list.length) return list
+
+    const updated = [...list]
+    const currentItem = updated[currentIndex]
+    const targetItem = updated[targetIndex]
+
+    if (typeof currentItem.sortOrder === 'number' && typeof targetItem.sortOrder === 'number') {
+      const tempOrder = currentItem.sortOrder
+      currentItem.sortOrder = targetItem.sortOrder
+      targetItem.sortOrder = tempOrder
+    }
+
+    updated[currentIndex] = targetItem
+    updated[targetIndex] = currentItem
+    return updated
+  }
+
+  const moveItem = async (
+    entity: 'sites' | 'categories' | 'departments',
+    id: string,
+    direction: 'up' | 'down'
+  ) => {
+    setLoading(true)
+    try {
+      const response = await fetch(`/api/${entity}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, direction }),
+      })
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}))
+        throw new Error(error.error || 'Failed to reorder')
+      }
+
+      if (entity === 'sites') {
+        setSites(prev => reorderListLocally(prev, id, direction))
+      } else if (entity === 'categories') {
+        setCategories(prev => reorderListLocally(prev, id, direction))
+      } else {
+        setDepartments(prev => reorderListLocally(prev, id, direction))
+      }
+
+      toast.success('Urutan berhasil diperbarui')
+    } catch (error) {
+      console.error('Failed to reorder:', error)
+      toast.error(error instanceof Error ? error.message : 'Failed to reorder')
     } finally {
       setLoading(false)
     }
@@ -267,20 +337,52 @@ export default function EditDropdownsModal({ open, onOpenChange }: EditDropdowns
               </CardHeader>
               <CardContent>
                 <div className="space-y-2 max-h-64 overflow-y-auto">
-                  {sites.map((site) => (
-                    <div key={site.id} className="flex items-center justify-between p-3 bg-white border hover:bg-gray-50 rounded-lg transition-colors">
-                      <span className="font-medium text-gray-900">{site.name}</span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => deleteSite(site.id)}
-                        disabled={loading}
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
+                  {sites.map((site, index) => {
+                    const isFirst = index === 0
+                    const isLast = index === sites.length - 1
+                    return (
+                      <div key={site.id} className="flex items-center justify-between gap-3 p-3 bg-white border hover:bg-gray-50 rounded-lg transition-colors">
+                        <div className="flex items-center gap-3">
+                          <span className="w-6 text-center text-xs font-semibold text-gray-400">
+                            {index + 1}
+                          </span>
+                          <span className="font-medium text-gray-900">{site.name}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => moveItem('sites', site.id, 'up')}
+                            disabled={loading || isFirst}
+                            className="text-gray-500 hover:text-primary hover:bg-primary/10"
+                            aria-label="Move up"
+                          >
+                            <ArrowUp className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => moveItem('sites', site.id, 'down')}
+                            disabled={loading || isLast}
+                            className="text-gray-500 hover:text-primary hover:bg-primary/10"
+                            aria-label="Move down"
+                          >
+                            <ArrowDown className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => deleteSite(site.id)}
+                            disabled={loading}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            aria-label="Delete site"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
               </CardContent>
             </Card>
@@ -312,20 +414,52 @@ export default function EditDropdownsModal({ open, onOpenChange }: EditDropdowns
               </CardHeader>
               <CardContent>
                 <div className="space-y-2 max-h-64 overflow-y-auto">
-                  {categories.map((category) => (
-                    <div key={category.id} className="flex items-center justify-between p-3 bg-white border hover:bg-gray-50 rounded-lg transition-colors">
-                      <span className="font-medium text-gray-900">{category.name}</span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => deleteCategory(category.id)}
-                        disabled={loading}
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
+                  {categories.map((category, index) => {
+                    const isFirst = index === 0
+                    const isLast = index === categories.length - 1
+                    return (
+                      <div key={category.id} className="flex items-center justify-between gap-3 p-3 bg-white border hover:bg-gray-50 rounded-lg transition-colors">
+                        <div className="flex items-center gap-3">
+                          <span className="w-6 text-center text-xs font-semibold text-gray-400">
+                            {index + 1}
+                          </span>
+                          <span className="font-medium text-gray-900">{category.name}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => moveItem('categories', category.id, 'up')}
+                            disabled={loading || isFirst}
+                            className="text-gray-500 hover:text-primary hover:bg-primary/10"
+                            aria-label="Move up"
+                          >
+                            <ArrowUp className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => moveItem('categories', category.id, 'down')}
+                            disabled={loading || isLast}
+                            className="text-gray-500 hover:text-primary hover:bg-primary/10"
+                            aria-label="Move down"
+                          >
+                            <ArrowDown className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => deleteCategory(category.id)}
+                            disabled={loading}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            aria-label="Delete category"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
               </CardContent>
             </Card>
@@ -357,20 +491,52 @@ export default function EditDropdownsModal({ open, onOpenChange }: EditDropdowns
               </CardHeader>
               <CardContent>
                 <div className="space-y-2 max-h-64 overflow-y-auto">
-                  {departments.map((department) => (
-                    <div key={department.id} className="flex items-center justify-between p-3 bg-white border hover:bg-gray-50 rounded-lg transition-colors">
-                      <span className="font-medium text-gray-900">{department.name}</span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => deleteDepartment(department.id)}
-                        disabled={loading}
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
+                  {departments.map((department, index) => {
+                    const isFirst = index === 0
+                    const isLast = index === departments.length - 1
+                    return (
+                      <div key={department.id} className="flex items-center justify-between gap-3 p-3 bg-white border hover:bg-gray-50 rounded-lg transition-colors">
+                        <div className="flex items-center gap-3">
+                          <span className="w-6 text-center text-xs font-semibold text-gray-400">
+                            {index + 1}
+                          </span>
+                          <span className="font-medium text-gray-900">{department.name}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => moveItem('departments', department.id, 'up')}
+                            disabled={loading || isFirst}
+                            className="text-gray-500 hover:text-primary hover:bg-primary/10"
+                            aria-label="Move up"
+                          >
+                            <ArrowUp className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => moveItem('departments', department.id, 'down')}
+                            disabled={loading || isLast}
+                            className="text-gray-500 hover:text-primary hover:bg-primary/10"
+                            aria-label="Move down"
+                          >
+                            <ArrowDown className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => deleteDepartment(department.id)}
+                            disabled={loading}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            aria-label="Delete department"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
               </CardContent>
             </Card>

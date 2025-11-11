@@ -81,7 +81,7 @@ export default function LoginPage() {
             Sign in to your account
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
-            Hubungi administrator Anda untuk mendapatkan akses akun.
+            Contact your administrator to obtain account access.
           </p>
         </div>
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
