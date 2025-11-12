@@ -7,7 +7,14 @@ import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Plus, Settings, Eye, Package, Upload, Download, Search, Trash2, ChevronUp } from 'lucide-react'
+import { Plus, Settings, Eye, Package, Upload, Download, Search, Trash2, ChevronUp, Filter } from 'lucide-react'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu'
 import ImportAssetsModal from '@/components/import-assets-modal'
 import AssetDetailModal from '@/components/asset-detail-modal'
 import AddAssetModal from '@/components/add-asset-modal'
@@ -136,6 +143,12 @@ function AssetsPageContent() {
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [showScrollTop, setShowScrollTop] = useState(false)
+  const [filters, setFilters] = useState({
+    status: 'all',
+    category: 'all',
+    site: 'all'
+  })
+  const [sortOption, setSortOption] = useState<'name-asc' | 'name-desc' | 'created-newest' | 'created-oldest'>('name-asc')
 
   const observer = useRef<IntersectionObserver | null>(null)
   const lastAssetElementRef = useCallback((node: HTMLTableRowElement | null) => {
@@ -153,6 +166,86 @@ function AssetsPageContent() {
     () => assets.map(asset => ({ asset, tokens: buildAssetSearchTokens(asset) })),
     [assets]
   )
+
+  const statusOptions = useMemo(
+    () =>
+      Array.from(new Set(assets.map(asset => asset.status).filter(Boolean))).sort((a, b) =>
+        a.localeCompare(b)
+      ),
+    [assets]
+  )
+
+  const categoryOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          assets
+            .map(asset => asset.category?.name)
+            .filter((name): name is string => Boolean(name))
+        )
+      ).sort((a, b) => a.localeCompare(b)),
+    [assets]
+  )
+
+  const siteOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          assets
+            .map(asset => asset.site?.name)
+            .filter((name): name is string => Boolean(name))
+        )
+      ).sort((a, b) => a.localeCompare(b)),
+    [assets]
+  )
+
+  const hasActiveFilters = filters.status !== 'all' || filters.category !== 'all' || filters.site !== 'all'
+  const showActiveFilterDot = hasActiveFilters || sortOption !== 'name-asc'
+
+  const handleFilterChange = (type: 'status' | 'category' | 'site', value: string) => {
+    setFilters(prev => ({
+      ...prev,
+      [type]: value
+    }))
+  }
+
+  const resetFilters = () => {
+    setFilters({
+      status: 'all',
+      category: 'all',
+      site: 'all'
+    })
+  }
+
+  const resetFiltersAndSort = () => {
+    resetFilters()
+    setSortOption('name-asc')
+  }
+
+  const filterChipClass = (active: boolean) =>
+    `rounded-full border px-3 py-1 text-xs font-semibold transition ${
+      active
+        ? 'border-primary bg-primary/10 text-primary shadow-[0_6px_18px_rgba(62,82,160,0.18)]'
+        : 'border-surface-border text-text-muted hover:border-primary/40 hover:text-primary'
+    }`
+
+  const sortTileClass = (active: boolean) =>
+    `rounded-lg border px-3 py-2 text-left text-xs font-semibold transition ${
+      active
+        ? 'border-primary bg-primary/10 text-primary shadow-[0_6px_18px_rgba(62,82,160,0.18)]'
+        : 'border-surface-border text-text-muted hover:border-primary/40 hover:text-primary'
+    }`
+
+  const sortOptionsList: Array<{
+    value: typeof sortOption
+    label: string
+    description: string
+  }> = [
+    { value: 'name-asc', label: 'Nama (A-Z)', description: 'Urut berdasarkan nama aset' },
+    { value: 'name-desc', label: 'Nama (Z-A)', description: 'Nama aset dari Z ke A' },
+    { value: 'created-newest', label: 'Terbaru', description: 'Aset dengan tanggal dibuat terbaru' },
+    { value: 'created-oldest', label: 'Terlama', description: 'Aset paling lama dibuat' }
+  ]
 
   const loadAssets = async (pageNum: number = 1, append: boolean = false) => {
     if (!append) setLoading(true)
@@ -253,17 +346,42 @@ function AssetsPageContent() {
   useEffect(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase()
 
-    if (normalizedQuery === '') {
-      setFilteredAssets(assets)
-      return
+    let workingAssets: Asset[] =
+      normalizedQuery === ''
+        ? assets
+        : assetSearchIndex
+            .filter(entry => entry.tokens.some(token => token.includes(normalizedQuery)))
+            .map(entry => entry.asset)
+
+    if (filters.status !== 'all') {
+      workingAssets = workingAssets.filter(asset => asset.status === filters.status)
     }
 
-    const filtered = assetSearchIndex
-      .filter(entry => entry.tokens.some(token => token.includes(normalizedQuery)))
-      .map(entry => entry.asset)
+    if (filters.category !== 'all') {
+      workingAssets = workingAssets.filter(asset => asset.category?.name === filters.category)
+    }
 
-    setFilteredAssets(filtered)
-  }, [searchQuery, assets, assetSearchIndex])
+    if (filters.site !== 'all') {
+      workingAssets = workingAssets.filter(asset => asset.site?.name === filters.site)
+    }
+
+    const sortedAssets = [...workingAssets].sort((a, b) => {
+      switch (sortOption) {
+        case 'name-asc':
+          return a.name.localeCompare(b.name)
+        case 'name-desc':
+          return b.name.localeCompare(a.name)
+        case 'created-newest':
+          return new Date(b.dateCreated).getTime() - new Date(a.dateCreated).getTime()
+        case 'created-oldest':
+          return new Date(a.dateCreated).getTime() - new Date(b.dateCreated).getTime()
+        default:
+          return 0
+      }
+    })
+
+    setFilteredAssets(sortedAssets)
+  }, [searchQuery, assets, assetSearchIndex, filters, sortOption])
 
   useEffect(() => {
     const handleScroll = () => {
@@ -418,15 +536,130 @@ function AssetsPageContent() {
 
       {/* Search Bar */}
       <div className="surface-card">
-        <div className="relative">
-          <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
-          <input
-            type="text"
-            placeholder="Cari aset (nama, nomor aset, PIC, status, dsb)"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="sneat-input w-full pl-12 text-sm"
-          />
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
+            <input
+              className="sneat-input h-12 w-full pl-12 text-sm"
+              type="text"
+              placeholder="Cari aset (nama, nomor aset, PIC, status, dsb)"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                aria-label="Filter dan urutkan aset"
+                className="relative inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-surface-border bg-background text-sm font-semibold text-foreground shadow-sm transition hover:border-primary/40 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2"
+              >
+                <Filter className="h-4 w-4" />
+                <span className="sr-only">Filter & Sort</span>
+                {showActiveFilterDot ? (
+                  <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-primary shadow-[0_0_0_3px_rgba(255,255,255,0.9)]" />
+                ) : null}
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-80 p-0">
+              <div className="space-y-4 p-3">
+                <div className="flex items-center justify-between">
+                  <DropdownMenuLabel className="p-0 text-[0.6rem] uppercase tracking-[0.3em] text-text-muted">
+                    Filter & Sort
+                  </DropdownMenuLabel>
+                  {showActiveFilterDot ? (
+                    <button
+                      type="button"
+                      onClick={resetFiltersAndSort}
+                      className="text-[0.7rem] font-semibold text-primary hover:text-primary/80"
+                    >
+                      Reset
+                    </button>
+                  ) : null}
+                </div>
+
+                <div>
+                  <p className="text-[0.65rem] uppercase tracking-[0.25em] text-text-muted">
+                    Filter status
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {['all', ...statusOptions].map(status => (
+                      <button
+                        key={status || 'all-status'}
+                        type="button"
+                        onClick={() => handleFilterChange('status', status || 'all')}
+                        className={filterChipClass(filters.status === (status || 'all'))}
+                      >
+                        {status === 'all' ? 'Semua status' : status}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {categoryOptions.length > 0 && (
+                  <div>
+                    <p className="text-[0.65rem] uppercase tracking-[0.25em] text-text-muted">
+                      Filter kategori
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {['all', ...categoryOptions].map(category => (
+                        <button
+                          key={category || 'all-category'}
+                          type="button"
+                          onClick={() => handleFilterChange('category', category || 'all')}
+                          className={filterChipClass(filters.category === (category || 'all'))}
+                        >
+                          {category === 'all' ? 'Semua kategori' : category}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {siteOptions.length > 0 && (
+                  <div>
+                    <p className="text-[0.65rem] uppercase tracking-[0.25em] text-text-muted">
+                      Filter lokasi
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {['all', ...siteOptions].map(site => (
+                        <button
+                          key={site || 'all-site'}
+                          type="button"
+                          onClick={() => handleFilterChange('site', site || 'all')}
+                          className={filterChipClass(filters.site === (site || 'all'))}
+                        >
+                          {site === 'all' ? 'Semua lokasi' : site}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <p className="text-[0.65rem] uppercase tracking-[0.25em] text-text-muted">
+                    Urutkan
+                  </p>
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    {sortOptionsList.map(option => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => setSortOption(option.value)}
+                        className={sortTileClass(sortOption === option.value)}
+                      >
+                        <span className="text-[0.75rem]">{option.label}</span>
+                        <p className="mt-1 text-[0.65rem] font-normal text-text-muted">
+                          {option.description}
+                        </p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <DropdownMenuSeparator className="mt-0" />
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
