@@ -21,12 +21,9 @@ const assetRelations = {
 
 const formatEmployeeLabel = (employee: {
   name: string | null
-  employeeId: string | null
 }) => {
   if (!employee?.name) return null
-  return employee.employeeId
-    ? `${employee.name} (${employee.employeeId})`
-    : employee.name
+  return employee.name
 }
 
 export async function POST(
@@ -148,8 +145,7 @@ export async function POST(
     // Create SO asset entry
     const employeeLabel = asset.employee
       ? formatEmployeeLabel({
-          name: asset.employee.name,
-          employeeId: asset.employee.employeeId ?? null
+          name: asset.employee.name
         })
       : null
 
@@ -208,4 +204,3 @@ export async function POST(
     )
   }
 }
-

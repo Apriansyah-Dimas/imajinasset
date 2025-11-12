@@ -66,7 +66,6 @@ export default function Navbar() {
         children: [
           { name: "User Management", href: "/admin/users", icon: Users },
           { name: "SO Asset Management", href: "/admin/sessions", icon: Search },
-          { name: "Employee Management", href: "/admin/employees", icon: User },
           { name: "Backup & Restore", href: "/admin/backup", icon: Database },
         ],
       });
@@ -172,11 +171,11 @@ export default function Navbar() {
   const collapsedToggleClasses = useMemo(
     () =>
       cn(
-        "relative flex h-screen w-8 flex-col items-center justify-center gap-3 rounded-r-3xl border border-white/35 bg-[var(--background)]/95 text-primary shadow-[0_18px_45px_rgba(15,18,63,0.22)]",
+        "flex h-14 w-8 items-center justify-center rounded-r-full bg-primary text-primary-foreground shadow-[0_12px_30px_rgba(15,18,63,0.24)] ring-1 ring-primary/40",
         reduceMotion
           ? "transition-opacity duration-150"
-          : "transition-all duration-400 ease-[cubic-bezier(0.22,1,0.36,1)] hover:translate-x-1 hover:shadow-[0_24px_65px_rgba(15,18,63,0.25)] active:scale-95",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
+          : "transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:translate-x-1 hover:shadow-[0_18px_45px_rgba(15,18,63,0.3)] active:scale-95",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
       ),
     [reduceMotion]
   );
@@ -442,19 +441,16 @@ export default function Navbar() {
       {!isMobile && !isSidebarOpen && (
         <button
           onClick={() => setIsSidebarOpen(true)}
-          className={cn("fixed left-0 top-0 z-[60]", collapsedToggleClasses)}
+          className={cn(
+            "fixed left-0 top-1/2 z-[60] -translate-x-1/3 -translate-y-1/2 transform-gpu sm:-translate-x-1/3",
+            collapsedToggleClasses
+          )}
           title="Tampilkan sidebar"
           aria-label="Tampilkan sidebar"
         >
           <span className="sr-only">Tampilkan sidebar</span>
-          <span
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-y-0 left-0 w-px bg-primary/20"
-          />
-          <div className="relative z-10 flex flex-col items-center gap-3">
-            <ChevronRight aria-hidden="true" className="h-4 w-4 drop-shadow-sm" />
-            <span aria-hidden="true" className="h-8 w-px rounded-full bg-primary/30" />
-          </div>
+          <span className="sr-only">Tampilkan sidebar</span>
+          <ChevronRight aria-hidden="true" className="h-4 w-4 text-white drop-shadow-sm" />
         </button>
       )}
     </>

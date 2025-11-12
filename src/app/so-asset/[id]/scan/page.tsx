@@ -92,10 +92,9 @@ interface SOSession {
 
 const formatEmployeeLabel = (employee?: {
   name?: string | null
-  employeeId?: string | null
 }) => {
   if (!employee?.name) return ''
-  return employee.employeeId ? `${employee.name} (${employee.employeeId})` : employee.name
+  return employee.name
 }
 
 function ScanPageContent() {
@@ -147,16 +146,6 @@ function ScanPageContent() {
   const totalAssets = session?.totalAssets ?? 0
   const scannedCount = session?.scannedAssets ?? 0
   const remainingAssets = Math.max(totalAssets - scannedCount, 0)
-
-  const formatEmployeeLabel = (employee?: {
-    name?: string | null
-    employeeId?: string | null
-  }) => {
-    if (!employee?.name) return ''
-    return employee.employeeId
-      ? `${employee.name} (${employee.employeeId})`
-      : employee.name
-  }
 
   useEffect(() => {
     if (params.id) {

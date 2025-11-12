@@ -23,7 +23,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Users,
@@ -37,7 +36,6 @@ import {
   UserPlus,
   RefreshCw,
   AlertCircle,
-  CheckCircle,
   Shield,
   User,
   Archive,
@@ -87,7 +85,6 @@ export default function UserManagementPage() {
     name: "",
     email: "",
     role: "VIEWER" as "ADMIN" | "SO_ASSET_USER" | "VIEWER",
-    isActive: true,
   });
 
   const [passwordForm, setPasswordForm] = useState({
@@ -182,7 +179,11 @@ export default function UserManagementPage() {
       const response = await fetch(`/api/admin/users/${selectedUser.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(editForm),
+        body: JSON.stringify({
+          name: editForm.name,
+          email: editForm.email,
+          role: editForm.role,
+        }),
       });
 
       if (response.ok) {
@@ -267,7 +268,6 @@ export default function UserManagementPage() {
       name: user.name,
       email: user.email,
       role: user.role,
-      isActive: user.isActive,
     });
     setShowEditDialog(true);
   };
@@ -419,9 +419,6 @@ export default function UserManagementPage() {
                               Role
                             </th>
                             <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Status
-                            </th>
-                            <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                               Created
                             </th>
                             <th className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -448,15 +445,6 @@ export default function UserManagementPage() {
                                     {getRoleIcon(user.role)}
                                     {user.role.replace("_", " ")}
                                   </span>
-                                </Badge>
-                              </td>
-                              <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
-                                <Badge
-                                  variant={
-                                    user.isActive ? "default" : "secondary"
-                                  }
-                                >
-                                  {user.isActive ? "Active" : "Inactive"}
                                 </Badge>
                               </td>
                               <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-xs text-gray-500">
@@ -520,14 +508,6 @@ export default function UserManagementPage() {
                                     {getRoleIcon(user.role)}
                                     {user.role.replace("_", " ")}
                                   </span>
-                                </Badge>
-                                <Badge
-                                  variant={
-                                    user.isActive ? "default" : "secondary"
-                                  }
-                                  className="text-xs px-2 py-1"
-                                >
-                                  {user.isActive ? "Active" : "Inactive"}
                                 </Badge>
                               </div>
                               <div className="text-xs text-gray-400">
@@ -766,19 +746,6 @@ export default function UserManagementPage() {
                         </SelectItem>
                       </SelectContent>
                     </Select>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="isActive"
-                      checked={editForm.isActive}
-                      onCheckedChange={(checked) =>
-                        setEditForm({
-                          ...editForm,
-                          isActive: checked as boolean,
-                        })
-                      }
-                    />
-                    <Label htmlFor="isActive">User is active</Label>
                   </div>
                 </div>
                 <div className="flex justify-end gap-2 mt-6">

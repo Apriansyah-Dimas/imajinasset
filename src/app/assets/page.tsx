@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Plus, Settings, Eye, Package, Upload, Download, Search, Trash2 } from 'lucide-react'
+import { Plus, Settings, Eye, Package, Upload, Download, Search, Trash2, ChevronUp } from 'lucide-react'
 import ImportAssetsModal from '@/components/import-assets-modal'
 import AssetDetailModal from '@/components/asset-detail-modal'
 import AddAssetModal from '@/components/add-asset-modal'
@@ -135,6 +135,7 @@ function AssetsPageContent() {
   const [showImportModal, setShowImportModal] = useState(false)
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [showScrollTop, setShowScrollTop] = useState(false)
 
   const observer = useRef<IntersectionObserver | null>(null)
   const lastAssetElementRef = useCallback((node: HTMLTableRowElement | null) => {
@@ -200,6 +201,13 @@ function AssetsPageContent() {
     loadAssets(1, false)
   }
 
+  const handleDetailModalOpenChange = (isOpen: boolean) => {
+    setShowDetailModal(isOpen)
+    if (!isOpen) {
+      setSelectedAsset(null)
+    }
+  }
+
   const handleExport = async () => {
     setIsExporting(true)
     try {
@@ -256,6 +264,21 @@ function AssetsPageContent() {
 
     setFilteredAssets(filtered)
   }, [searchQuery, assets, assetSearchIndex])
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowScrollTop(window.scrollY > 400)
+    }
+
+    handleScroll()
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
+
+  const scrollToTop = useCallback(() => {
+    if (typeof window === 'undefined') return
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [])
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -431,7 +454,7 @@ function AssetsPageContent() {
                     <TableHead className="py-2 px-3 font-semibold text-text-muted">Category</TableHead>
                     <TableHead className="py-2 px-3 font-semibold text-text-muted">Site</TableHead>
                     <TableHead className="py-2 px-3 font-semibold text-text-muted">Status</TableHead>
-                    <TableHead className="py-2 px-3 font-semibold text-text-muted text-center">Detail</TableHead>
+                    <TableHead className="py-2 px-3 font-semibold text-text-muted text-center w-[110px]">Detail</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -465,7 +488,7 @@ function AssetsPageContent() {
                               {asset.name}
                             </p>
                             <p className="mt-1 text-[0.7rem] text-text-muted lg:block whitespace-normal break-words">
-                              PIC: {asset.employee ? `${asset.employee.name} (${asset.employee.employeeId})` : (asset.pic || 'N/A')}
+                              PIC: {asset.employee ? asset.employee.name : (asset.pic || 'N/A')}
                             </p>
                           </div>
                         </div>
@@ -476,8 +499,7 @@ function AssetsPageContent() {
                         </div>
                       </TableCell>
                       <TableCell className="px-3 py-3">
-                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[0.7rem] font-semibold ${getStatusColor(asset.status)}`}>
-                          <span className="h-1 w-1 rounded-full bg-current opacity-60" />
+                        <span className="text-xs text-foreground break-all">
                           {asset.category?.name}
                         </span>
                       </TableCell>
@@ -492,7 +514,7 @@ function AssetsPageContent() {
                           {asset.status}
                         </span>
                       </TableCell>
-                      <TableCell className="px-3 py-3 text-center">
+                      <TableCell className="px-3 py-3 text-center w-[110px]">
                         <button
                           onClick={() => {
                             setSelectedAsset(asset)
@@ -569,7 +591,7 @@ function AssetsPageContent() {
                         <span className="text-foreground break-all ml-2 text-right">
                           {asset.employee ? (
                             <div className="space-y-0.5 text-right">
-                              <div className="font-semibold">{asset.employee.name} ({asset.employee.employeeId})</div>
+                              <div className="font-semibold">{asset.employee.name}</div>
                               {asset.employee.position && (
                                 <div className="text-[0.65rem] uppercase tracking-[0.3em] text-text-muted">{asset.employee.position}</div>
                               )}
@@ -713,11 +735,29 @@ function AssetsPageContent() {
 
       </div>
 
+      <button
+        type="button"
+        onClick={scrollToTop}
+        aria-label="Kembali ke atas"
+        aria-hidden={!showScrollTop}
+        className={`group fixed bottom-6 right-6 z-40 inline-flex h-12 w-12 items-center justify-center rounded-full bg-primary text-white shadow-[0_12px_30px_rgba(99,101,185,0.35)] transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background active:scale-95 ${
+          showScrollTop
+            ? 'opacity-100 translate-y-0 pointer-events-auto hover:-translate-y-1 hover:bg-primary/90'
+            : 'opacity-0 translate-y-4 pointer-events-none'
+        }`}
+      >
+        <ChevronUp
+          className={`h-5 w-5 transition-transform duration-200 ${
+            showScrollTop ? 'animate-bounce group-hover:-translate-y-1' : ''
+          }`}
+        />
+      </button>
+
       {/* Asset Detail Modal */}
       <AssetDetailModal
         asset={selectedAsset}
         open={showDetailModal}
-        onOpenChange={setShowDetailModal}
+        onOpenChange={handleDetailModalOpenChange}
         onUpdate={refreshAssets}
       />
 
@@ -760,4 +800,3 @@ export default function AssetsPage() {
     </ProtectedRoute>
   )
 }
-

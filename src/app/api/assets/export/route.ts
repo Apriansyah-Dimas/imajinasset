@@ -82,7 +82,7 @@ export async function GET(
           `"${(asset.site?.name || '').replace(/"/g, '""')}"`,
           `"${(asset.category?.name || '').replace(/"/g, '""')}"`,
           `"${(asset.department?.name || '').replace(/"/g, '""')}"`,
-          `"${(asset.employee?.name ? `${asset.employee.name} (${asset.employee.employeeId || ''})` : (asset.pic || '')).replace(/"/g, '""')}"`,
+          `"${(asset.employee?.name ? asset.employee.name : (asset.pic || '')).replace(/"/g, '""')}"`,
           `"${asset.dateCreated.toISOString().split('T')[0]}"`
         ]
 

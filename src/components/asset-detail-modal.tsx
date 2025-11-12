@@ -33,7 +33,7 @@ interface Asset {
   notes?: string | null
   employee?: {
     id: string
-    employeeId: string
+    employeeId?: string | null
     name: string
     email?: string
     department?: string
@@ -74,14 +74,12 @@ export default function AssetDetailModal({ asset, open, onOpenChange, onUpdate }
   const [sites, setSites] = useState<Array<{ id: string; name: string }>>([])
   const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([])
   const [departments, setDepartments] = useState<Array<{ id: string; name: string }>>([])
-  const [employees, setEmployees] = useState<Array<{
+  const [pics, setPics] = useState<Array<{
     id: string
     name: string
-    employeeId: string
     email?: string
     department?: string
     position?: string
-    isActive: boolean
   }>>([])
   const [additionalFields, setAdditionalFields] = useState<Array<{ id: string; name: string; value: string }>>([])
   const [assetPrefix, setAssetPrefix] = useState('FA001')
@@ -151,25 +149,25 @@ export default function AssetDetailModal({ asset, open, onOpenChange, onUpdate }
   const fetchMasterData = async () => {
     setMasterDataLoading(true);
     try {
-      const [sitesRes, categoriesRes, departmentsRes, employeesRes] = await Promise.all([
+      const [sitesRes, categoriesRes, departmentsRes, picsRes] = await Promise.all([
         fetch('/api/sites'),
         fetch('/api/categories'),
         fetch('/api/departments'),
-        fetch('/api/employees')
+        fetch('/api/pics')
       ])
 
       const sitesData = await sitesRes.json()
       const categoriesData = await categoriesRes.json()
       const departmentsData = await departmentsRes.json()
-      const employeesData = await employeesRes.json()
+      const picsData = await picsRes.json()
 
       setSites(sitesData)
       setCategories(categoriesData)
       setDepartments(departmentsData)
-      setEmployees(Array.isArray(employeesData) ? employeesData : [])
+      setPics(Array.isArray(picsData) ? picsData : [])
     } catch (error) {
       console.error('Failed to fetch master data:', error)
-      setEmployees([])
+      setPics([])
     } finally {
       setMasterDataLoading(false);
     }
@@ -654,45 +652,44 @@ export default function AssetDetailModal({ asset, open, onOpenChange, onUpdate }
                 <Select
                   value={formData.picId || ''}
                   onValueChange={(value) => {
-                    const selectedEmployee = employees.find(employee => employee.id === value)
-                    if (selectedEmployee) {
+                    const selectedPic = pics.find(pic => pic.id === value)
+                    if (selectedPic) {
                       setFormData({
                         ...formData,
-                        picId: selectedEmployee.id,
+                        picId: selectedPic.id,
                         pic: null,
                         employee: {
-                          id: selectedEmployee.id,
-                          employeeId: selectedEmployee.employeeId,
-                          name: selectedEmployee.name,
-                          email: selectedEmployee.email,
-                          department: selectedEmployee.department,
-                          position: selectedEmployee.position,
-                          isActive: selectedEmployee.isActive
+                          id: selectedPic.id,
+                          employeeId: null,
+                          name: selectedPic.name,
+                          email: selectedPic.email,
+                          department: selectedPic.department,
+                          position: selectedPic.position,
+                          isActive: true
                         }
                       })
                     }
                   }}
-                  disabled={employees.length === 0}
+                  disabled={pics.length === 0}
                 >
                   <SelectTrigger className="mt-1 text-sm">
-                    <SelectValue placeholder={employees.length === 0 ? 'No employees available' : 'Select PIC'} />
+                    <SelectValue placeholder={pics.length === 0 ? 'No PIC available' : 'Select PIC'} />
                   </SelectTrigger>
                   <SelectContent>
-                    {employees.length > 0 ? (
-                      employees.map((employee) => (
-                        <SelectItem key={employee.id} value={employee.id} className="text-sm">
+                    {pics.length > 0 ? (
+                      pics.map((pic) => (
+                        <SelectItem key={pic.id} value={pic.id} className="text-sm">
                           <div className="flex flex-col">
-                            <span>{employee.name}</span>
-                            <span className="text-xs text-muted-foreground">
-                              {employee.employeeId}
-                              {employee.position ? ` • ${employee.position}` : ''}
-                            </span>
+                            <span>{pic.name}</span>
+                            {pic.position && (
+                              <span className="text-xs text-muted-foreground">{pic.position}</span>
+                            )}
                           </div>
                         </SelectItem>
                       ))
                     ) : (
-                      <SelectItem value="no-employees" disabled>
-                        No employees available
+                      <SelectItem value="no-pics" disabled>
+                        No PIC available
                       </SelectItem>
                     )}
                   </SelectContent>
@@ -718,14 +715,14 @@ export default function AssetDetailModal({ asset, open, onOpenChange, onUpdate }
             ) : (
               <div className="mt-1 h-9 flex items-center border rounded-md bg-muted px-3 text-sm text-gray-700">
                 {formData.employee
-                  ? `${formData.employee.name} (${formData.employee.employeeId})`
+                  ? formData.employee.name
                   : formData.pic
                     ? formData.pic
                     : 'No PIC assigned'}
               </div>
             )}
-            {!masterDataLoading && employees.length === 0 && (
-              <p className="text-xs text-red-500 mt-1">No employees available</p>
+            {!masterDataLoading && pics.length === 0 && (
+              <p className="text-xs text-red-500 mt-1">No PIC available</p>
             )}
           </div>
 

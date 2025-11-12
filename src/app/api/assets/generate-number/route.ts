@@ -40,11 +40,17 @@ export async function GET(request: NextRequest) {
     const [categories, sites, assetCount] = await Promise.all([
       db.category.findMany({
         select: { id: true },
-        orderBy: { name: "asc" }
+        orderBy: [
+          { sortOrder: "asc" },
+          { name: "asc" }
+        ],
       }),
       db.site.findMany({
         select: { id: true },
-        orderBy: { name: "asc" }
+        orderBy: [
+          { sortOrder: "asc" },
+          { name: "asc" }
+        ],
       }),
       db.asset.count()
     ]);

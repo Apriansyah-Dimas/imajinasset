@@ -52,14 +52,12 @@ export default function AddAssetModal({ open, onOpenChange, onSuccess }: AddAsse
   const [sites, setSites] = useState<Array<{ id: string; name: string }>>([])
   const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([])
   const [departments, setDepartments] = useState<Array<{ id: string; name: string }>>([])
-  const [employees, setEmployees] = useState<Array<{
+  const [pics, setPics] = useState<Array<{
     id: string
     name: string
-    employeeId: string
     email?: string
     department?: string
     position?: string
-    isActive: boolean
   }>>([])
   const [additionalFields, setAdditionalFields] = useState<Array<{ id: string; name: string; value: string }>>([])
   const [assetPrefix, setAssetPrefix] = useState('FA001')
@@ -75,11 +73,11 @@ export default function AddAssetModal({ open, onOpenChange, onSuccess }: AddAsse
 
   const fetchMasterData = async () => {
     try {
-      const [sitesRes, categoriesRes, departmentsRes, employeesRes] = await Promise.all([
+      const [sitesRes, categoriesRes, departmentsRes, picsRes] = await Promise.all([
         fetch('/api/sites'),
         fetch('/api/categories'),
         fetch('/api/departments'),
-        fetch('/api/employees')
+        fetch('/api/pics')
       ])
 
       // Handle each response separately to prevent one failure from affecting others
@@ -104,32 +102,30 @@ export default function AddAssetModal({ open, onOpenChange, onSuccess }: AddAsse
         setDepartments([])
       }
 
-      if (employeesRes.ok) {
-        const employeesData = await employeesRes.json()
-        if (Array.isArray(employeesData)) {
-          setEmployees(
-            employeesData.map((employee: any) => ({
-              id: employee.id,
-              name: employee.name,
-              employeeId: employee.employeeId,
-              email: employee.email || undefined,
-              department: employee.department || undefined,
-              position: employee.position || undefined,
-              isActive: employee.isActive ?? true
+      if (picsRes.ok) {
+        const picsData = await picsRes.json()
+        if (Array.isArray(picsData)) {
+          setPics(
+            picsData.map((pic: any) => ({
+              id: pic.id,
+              name: pic.name,
+              email: pic.email || undefined,
+              department: pic.department || undefined,
+              position: pic.position || undefined,
             }))
           )
         } else {
-          setEmployees([])
+          setPics([])
         }
       } else {
-        setEmployees([])
+        setPics([])
       }
     } catch (error) {
       // Set all to empty arrays on any error
       setSites([])
       setCategories([])
       setDepartments([])
-      setEmployees([])
+      setPics([])
     }
   }
 
@@ -197,7 +193,7 @@ export default function AddAssetModal({ open, onOpenChange, onSuccess }: AddAsse
       'Department': formData.departmentId,
     }
 
-    if (employees.length > 0) {
+    if (pics.length > 0) {
       requiredFields['PIC'] = formData.picId
     }
 
@@ -483,38 +479,39 @@ export default function AddAssetModal({ open, onOpenChange, onSuccess }: AddAsse
           </div>
 
           <div>
-            <Label htmlFor="picId">PIC{employees.length > 0 ? ' *' : ''}</Label>
+            <Label htmlFor="picId">PIC{pics.length > 0 ? ' *' : ''}</Label>
             <Select
               value={formData.picId}
               onValueChange={(value) => setFormData({ ...formData, picId: value })}
-              required={employees.length > 0}
-              disabled={employees.length === 0}
+              required={pics.length > 0}
+              disabled={pics.length === 0}
             >
               <SelectTrigger>
-                <SelectValue placeholder={employees.length === 0 ? 'No employees available' : 'Select PIC'} />
+                <SelectValue placeholder={pics.length === 0 ? 'No PIC available' : 'Select PIC'} />
               </SelectTrigger>
               <SelectContent>
-                {employees.length > 0 ? (
-                  employees.map((employee) => (
-                    <SelectItem key={employee.id} value={employee.id}>
+                {pics.length > 0 ? (
+                  pics.map((pic) => (
+                    <SelectItem key={pic.id} value={pic.id}>
                       <div className="flex flex-col">
-                        <span>{employee.name}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {employee.employeeId}
-                          {employee.position ? ` • ${employee.position}` : ''}
-                        </span>
+                        <span>{pic.name}</span>
+                        {pic.position && (
+                          <span className="text-xs text-muted-foreground">{pic.position}</span>
+                        )}
                       </div>
                     </SelectItem>
                   ))
                 ) : (
-                  <SelectItem value="no-employees" disabled>
-                    No employees available
+                  <SelectItem value="no-pics" disabled>
+                    No PIC available
                   </SelectItem>
                 )}
               </SelectContent>
             </Select>
-            {employees.length === 0 && (
-              <p className="text-xs text-red-500 mt-1">Add employees via Admin &gt; Employee Management first.</p>
+            {pics.length === 0 && (
+              <p className="text-xs text-red-500 mt-1">
+                Tambah PIC terlebih dahulu melalui Settings &gt; Manage Master Data &gt; PIC.
+              </p>
             )}
           </div>
         </div>

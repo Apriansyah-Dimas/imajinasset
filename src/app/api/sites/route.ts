@@ -63,6 +63,40 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json()
+    const orderedIds = Array.isArray(body.orderedIds) ? body.orderedIds.filter((id: unknown): id is string => typeof id === 'string') : []
+
+    if (orderedIds.length > 0) {
+      const existing = await db.site.findMany({
+        select: { id: true },
+        orderBy: { sortOrder: 'asc' }
+      })
+
+      const existingIds = new Set(existing.map(item => item.id))
+      const sanitizedOrder = orderedIds.filter(id => existingIds.has(id))
+      if (sanitizedOrder.length === 0) {
+        return NextResponse.json(
+          { error: 'No valid site ids provided' },
+          { status: 400 }
+        )
+      }
+
+      const remaining = existing
+        .map(item => item.id)
+        .filter(id => !sanitizedOrder.includes(id))
+
+      const finalOrder = [...sanitizedOrder, ...remaining]
+      await db.$transaction(
+        finalOrder.map((siteId, index) =>
+          db.site.update({
+            where: { id: siteId },
+            data: { sortOrder: index }
+          })
+        )
+      )
+
+      return NextResponse.json({ success: true, reordered: finalOrder.length })
+    }
+
     const { id, direction } = body as { id?: string; direction?: 'up' | 'down' }
 
     if (!id || (direction !== 'up' && direction !== 'down')) {
