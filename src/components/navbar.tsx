@@ -9,6 +9,7 @@ import {
   ChevronRight,
   Database,
   LayoutDashboard,
+  LogIn,
   LogOut,
   Package,
   Search,
@@ -52,10 +53,14 @@ export default function Navbar() {
 
     if (
       user &&
-      (user.role === "ADMIN" ||
-        user.role === "SO_ASSET_USER" ||
-        user.role === "VIEWER")
+      (user.role === "ADMIN" || user.role === "SO_ASSET_USER" || user.role === "VIEWER")
     ) {
+      if (user.role === "ADMIN" || user.role === "SO_ASSET_USER") {
+        baseNav.push(
+          { name: "Check Out", href: "/check-out", icon: LogOut },
+          { name: "Check In", href: "/check-in", icon: LogIn }
+        );
+      }
       baseNav.push({ name: "SO Asset", href: "/so-asset", icon: Search });
     }
 
@@ -65,7 +70,6 @@ export default function Navbar() {
         icon: Users,
         children: [
           { name: "User Management", href: "/admin/users", icon: Users },
-          { name: "SO Asset Management", href: "/admin/sessions", icon: Search },
           { name: "Backup & Restore", href: "/admin/backup", icon: Database },
         ],
       });
@@ -140,17 +144,6 @@ export default function Navbar() {
         reduceMotion
           ? "transition-opacity duration-150"
           : "transition-all duration-300 ease-[cubic-bezier(0.25,0.46,0.45,0.94)] hover:-translate-y-0.5 hover:shadow-lg hover:scale-105 active:scale-95"
-      ),
-    [reduceMotion]
-  );
-
-  const sidebarToggleClasses = useMemo(
-    () =>
-      cn(
-        "flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-white shadow-md hover:bg-gray-50",
-        reduceMotion
-          ? "transition-opacity duration-150"
-          : "transition-all duration-300 ease-[cubic-bezier(0.25,0.46,0.45,0.94)] hover:shadow-lg hover:scale-105 active:scale-95"
       ),
     [reduceMotion]
   );
@@ -254,16 +247,6 @@ export default function Navbar() {
               </div>
             </Link>
 
-            {/* Toggle button inside sidebar */}
-            {!isMobile && (
-              <button
-                onClick={() => setIsSidebarOpen(false)}
-                className={sidebarToggleClasses}
-                title="Sembunyikan sidebar"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-            )}
           </div>
 
           <nav className="flex-1 overflow-y-auto pr-1">
@@ -437,21 +420,26 @@ export default function Navbar() {
         />
       )}
 
-      {/* Desktop slim toggle when sidebar hidden */}
-      {!isMobile && !isSidebarOpen && (
-        <button
-          onClick={() => setIsSidebarOpen(true)}
+      {!isMobile && (
+        <div
           className={cn(
-            "fixed left-0 top-1/2 z-[60] -translate-x-1/3 -translate-y-1/2 transform-gpu sm:-translate-x-1/3",
-            collapsedToggleClasses
+            "fixed top-1/2 z-[60] -translate-y-1/2 transform-gpu transition-all duration-300",
+            isSidebarOpen ? "left-[16rem] -translate-x-1/2" : "left-0"
           )}
-          title="Tampilkan sidebar"
-          aria-label="Tampilkan sidebar"
         >
-          <span className="sr-only">Tampilkan sidebar</span>
-          <span className="sr-only">Tampilkan sidebar</span>
-          <ChevronRight aria-hidden="true" className="h-4 w-4 text-white drop-shadow-sm" />
-        </button>
+          <button
+            onClick={() => setIsSidebarOpen((prev) => !prev)}
+            className={collapsedToggleClasses}
+            title={isSidebarOpen ? "Sembunyikan sidebar" : "Tampilkan sidebar"}
+            aria-label={isSidebarOpen ? "Sembunyikan sidebar" : "Tampilkan sidebar"}
+          >
+            {isSidebarOpen ? (
+              <ChevronLeft aria-hidden="true" className="h-4 w-4 text-white drop-shadow-sm" />
+            ) : (
+              <ChevronRight aria-hidden="true" className="h-4 w-4 text-white drop-shadow-sm" />
+            )}
+          </button>
+        </div>
       )}
     </>
   );

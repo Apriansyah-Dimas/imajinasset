@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -146,7 +146,8 @@ function AssetsPageContent() {
   const [filters, setFilters] = useState({
     status: 'all',
     category: 'all',
-    site: 'all'
+    site: 'all',
+    department: 'all'
   })
   const [sortOption, setSortOption] = useState<'name-asc' | 'name-desc' | 'created-newest' | 'created-oldest'>('name-asc')
 
@@ -199,10 +200,26 @@ function AssetsPageContent() {
     [assets]
   )
 
-  const hasActiveFilters = filters.status !== 'all' || filters.category !== 'all' || filters.site !== 'all'
+  const departmentOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          assets
+            .map(asset => asset.department?.name)
+            .filter((name): name is string => Boolean(name))
+        )
+      ).sort((a, b) => a.localeCompare(b)),
+    [assets]
+  )
+
+  const hasActiveFilters =
+    filters.status !== 'all' ||
+    filters.category !== 'all' ||
+    filters.site !== 'all' ||
+    filters.department !== 'all'
   const showActiveFilterDot = hasActiveFilters || sortOption !== 'name-asc'
 
-  const handleFilterChange = (type: 'status' | 'category' | 'site', value: string) => {
+  const handleFilterChange = (type: 'status' | 'category' | 'site' | 'department', value: string) => {
     setFilters(prev => ({
       ...prev,
       [type]: value
@@ -213,7 +230,8 @@ function AssetsPageContent() {
     setFilters({
       status: 'all',
       category: 'all',
-      site: 'all'
+      site: 'all',
+      department: 'all'
     })
   }
 
@@ -365,6 +383,10 @@ function AssetsPageContent() {
       workingAssets = workingAssets.filter(asset => asset.site?.name === filters.site)
     }
 
+    if (filters.department !== 'all') {
+      workingAssets = workingAssets.filter(asset => asset.department?.name === filters.department)
+    }
+
     const sortedAssets = [...workingAssets].sort((a, b) => {
       switch (sortOption) {
         case 'name-asc':
@@ -485,7 +507,7 @@ function AssetsPageContent() {
                   className="sneat-btn sneat-btn-primary min-w-[140px] justify-center"
                 >
                   <Plus className="h-4 w-4" />
-                  <span>Tambah Asset</span>
+                  <span>Add Asset</span>
                 </button>
                 <button
                   onClick={() => setShowImportModal(true)}
@@ -579,7 +601,7 @@ function AssetsPageContent() {
                 </div>
 
                 <div>
-                  <p className="text-[0.65rem] uppercase tracking-[0.25em] text-text-muted">
+                  <p className="text-[0.65rem] uppercase text-text-muted">
                     Filter status
                   </p>
                   <div className="mt-2 flex flex-wrap gap-2">
@@ -598,7 +620,7 @@ function AssetsPageContent() {
 
                 {categoryOptions.length > 0 && (
                   <div>
-                    <p className="text-[0.65rem] uppercase tracking-[0.25em] text-text-muted">
+                    <p className="text-[0.65rem] uppercase text-text-muted">
                       Filter kategori
                     </p>
                     <div className="mt-2 flex flex-wrap gap-2">
@@ -618,7 +640,7 @@ function AssetsPageContent() {
 
                 {siteOptions.length > 0 && (
                   <div>
-                    <p className="text-[0.65rem] uppercase tracking-[0.25em] text-text-muted">
+                    <p className="text-[0.65rem] uppercase text-text-muted">
                       Filter lokasi
                     </p>
                     <div className="mt-2 flex flex-wrap gap-2">
@@ -636,8 +658,28 @@ function AssetsPageContent() {
                   </div>
                 )}
 
+                {departmentOptions.length > 0 && (
+                  <div>
+                    <p className="text-[0.65rem] uppercase text-text-muted">
+                      Filter department
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {['all', ...departmentOptions].map(dept => (
+                        <button
+                          key={dept || 'all-dept'}
+                          type="button"
+                          onClick={() => handleFilterChange('department', dept || 'all')}
+                          className={filterChipClass(filters.department === (dept || 'all'))}
+                        >
+                          {dept === 'all' ? 'Semua department' : dept}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div>
-                  <p className="text-[0.65rem] uppercase tracking-[0.25em] text-text-muted">
+                  <p className="text-[0.65rem] uppercase text-text-muted">
                     Urutkan
                   </p>
                   <div className="mt-2 grid grid-cols-2 gap-2">
@@ -667,8 +709,7 @@ function AssetsPageContent() {
       <div className="surface-card min-w-0 p-0">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-surface-border px-4 py-4">
           <div>
-            <p className="text-[0.6rem] uppercase tracking-[0.45em] text-text-muted">Daftar aset</p>
-            <h2 className="text-lg font-semibold text-foreground">Inventaris Lengkap</h2>
+            <h2 className="text-xl font-bold text-foreground">ASSET LIST</h2>
           </div>
           <span className="sneat-chip bg-primary/10 text-primary">
             {filteredAssets.length} item
@@ -681,7 +722,7 @@ function AssetsPageContent() {
             <div className="hidden sm:block">
               <Table className="sneat-table w-full text-xs">
                 <TableHeader>
-                  <TableRow className="bg-secondary/60 text-[0.65rem] uppercase tracking-[0.25em] text-text-muted">
+                  <TableRow className="bg-secondary/60 text-[0.65rem] uppercase text-text-muted">
                     <TableHead className="py-2 px-3 font-semibold text-text-muted">Asset Name</TableHead>
                     <TableHead className="py-2 px-3 font-semibold text-text-muted">No Asset</TableHead>
                     <TableHead className="py-2 px-3 font-semibold text-text-muted">Category</TableHead>

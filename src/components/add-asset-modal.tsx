@@ -326,10 +326,7 @@ export default function AddAssetModal({ open, onOpenChange, onSuccess }: AddAsse
                 /{assetSuffix.categoryRoman}/{assetSuffix.siteNumber}
               </div>
             </div>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Edit the prefix on the left (supports decimals like FA040.1). Category and site portions update automatically.
-            </p>
-          </div>
+            </div>
 
           <div>
             <Label htmlFor="status">Status *</Label>

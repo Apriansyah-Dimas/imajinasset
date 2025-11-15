@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -85,6 +86,7 @@ export default function UserManagementPage() {
     name: "",
     email: "",
     role: "VIEWER" as "ADMIN" | "SO_ASSET_USER" | "VIEWER",
+    isActive: true,
   });
 
   const [passwordForm, setPasswordForm] = useState({
@@ -183,6 +185,7 @@ export default function UserManagementPage() {
           name: editForm.name,
           email: editForm.email,
           role: editForm.role,
+          isActive: editForm.isActive,
         }),
       });
 
@@ -268,6 +271,7 @@ export default function UserManagementPage() {
       name: user.name,
       email: user.email,
       role: user.role,
+      isActive: user.isActive,
     });
     setShowEditDialog(true);
   };
@@ -302,6 +306,11 @@ export default function UserManagementPage() {
         return <Eye className="h-3 w-3" />;
     }
   };
+
+  const getStatusBadgeClasses = (active: boolean) =>
+    active
+      ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
+      : "bg-gray-100 text-gray-500 border border-gray-200";
 
   return (
     <>
@@ -419,6 +428,9 @@ export default function UserManagementPage() {
                               Role
                             </th>
                             <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Status
+                            </th>
+                            <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                               Created
                             </th>
                             <th className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -445,6 +457,11 @@ export default function UserManagementPage() {
                                     {getRoleIcon(user.role)}
                                     {user.role.replace("_", " ")}
                                   </span>
+                                </Badge>
+                              </td>
+                              <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
+                                <Badge className={getStatusBadgeClasses(user.isActive)}>
+                                  {user.isActive ? "Active" : "Inactive"}
                                 </Badge>
                               </td>
                               <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-xs text-gray-500">
@@ -508,6 +525,13 @@ export default function UserManagementPage() {
                                     {getRoleIcon(user.role)}
                                     {user.role.replace("_", " ")}
                                   </span>
+                                </Badge>
+                                <Badge
+                                  className={`${getStatusBadgeClasses(
+                                    user.isActive
+                                  )} text-xs px-2 py-1`}
+                                >
+                                  {user.isActive ? "Active" : "Inactive"}
                                 </Badge>
                               </div>
                               <div className="text-xs text-gray-400">
@@ -746,6 +770,28 @@ export default function UserManagementPage() {
                         </SelectItem>
                       </SelectContent>
                     </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="editStatus">Status</Label>
+                    <div className="mt-2 flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2">
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">
+                          {editForm.isActive ? "Active" : "Inactive"}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {editForm.isActive
+                            ? "User can sign in to the system."
+                            : "User is blocked from signing in."}
+                        </p>
+                      </div>
+                      <Switch
+                        id="editStatus"
+                        checked={editForm.isActive}
+                        onCheckedChange={(checked) =>
+                          setEditForm({ ...editForm, isActive: checked })
+                        }
+                      />
+                    </div>
                   </div>
                 </div>
                 <div className="flex justify-end gap-2 mt-6">

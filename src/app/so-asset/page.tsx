@@ -38,10 +38,6 @@ import {
   Eye,
   Scan,
   MoreHorizontal,
-  ArrowUpCircle,
-  ArrowDownCircle,
-  ClipboardCheck,
-  ShieldCheck,
 } from "lucide-react";
 import Link from "next/link";
 import ProtectedRoute from "@/components/ProtectedRoute";
@@ -294,70 +290,6 @@ function SOAssetPageContent() {
     Cancelled: "bg-red-50 text-red-700 border border-red-100",
   };
 
-  const checkFlowNav = [
-    {
-      id: "check-in",
-      title: "Check In",
-      subtitle: "Peminjaman Aset",
-      accent: "bg-blue-100 text-blue-700",
-    },
-    {
-      id: "check-out",
-      title: "Check Out",
-      subtitle: "Pengembalian Aset",
-      accent: "bg-emerald-100 text-emerald-700",
-    },
-  ];
-
-  const checkFlows = [
-    {
-      id: "check-in",
-      title: "Check In (Peminjaman Aset)",
-      definition:
-        "Proses pencatatan saat aset keluar dari storage dan dipinjamkan kepada individu atau departemen tertentu.",
-      purpose:
-        "Memberikan visibilitas penuh mengenai siapa yang bertanggung jawab atas aset dan untuk tujuan apa aset digunakan.",
-      icon: ArrowUpCircle,
-      accent: "text-blue-600 bg-blue-100",
-      infoLabel: "Catatan yang wajib diisi",
-      info: [
-        "Tanggal & waktu peminjaman",
-        "Identitas peminjam (nama, departemen, ID karyawan)",
-        "Kondisi aset saat dipinjam",
-        "Tujuan penggunaan aset",
-        "Estimasi tanggal pengembalian",
-      ],
-      reminder:
-        "Pastikan peminjam menandatangani form digital/berita acara sebagai bukti serah terima.",
-    },
-    {
-      id: "check-out",
-      title: "Check Out (Pengembalian Aset)",
-      definition:
-        "Pencatatan saat aset kembali ke storage setelah digunakan, lengkap dengan kondisi mutakhirnya.",
-      purpose:
-        "Menjamin aset tersedia kembali dan mendeteksi kerusakan atau komponen yang hilang setelah pemakaian.",
-      icon: ArrowDownCircle,
-      accent: "text-emerald-600 bg-emerald-100",
-      infoLabel: "Validasi saat pengembalian",
-      info: [
-        "Tanggal & waktu pengembalian",
-        "Kondisi aset setelah dipakai",
-        "Catatan kerusakan / kebutuhan perbaikan",
-        "Verifikasi kelengkapan komponen",
-      ],
-      reminder:
-        "Dokumentasikan foto kondisi aset bila ditemukan kerusakan untuk mempercepat klaim biaya atau maintenance.",
-    },
-  ];
-
-  const checkFlowBenefits = [
-    "Akuntabilitas: setiap aset selalu memiliki penanggung jawab yang jelas.",
-    "Audit Trail: histori lengkap memudahkan investigasi dan compliance.",
-    "Preventive Maintenance: jadwalkan servis berdasarkan frekuensi pemakaian.",
-    "Optimisasi utilisasi: identifikasi aset yang paling sering atau jarang dipakai.",
-    "Pencegahan kehilangan: pengembalian terlambat langsung terdeteksi.",
-  ];
 
   const renderSessionCard = (session: SOSession) => {
     const progress = getProgressPercentage(
@@ -560,114 +492,6 @@ function SOAssetPageContent() {
             </Button>
           </RoleBasedAccess>
         </div>
-
-        <nav className="rounded-2xl border border-surface-border/80 bg-white/90 shadow-sm backdrop-blur">
-          <div className="flex flex-wrap items-stretch divide-y divide-surface-border/60 sm:divide-y-0 sm:divide-x">
-            {checkFlowNav.map((item) => (
-              <a
-                key={item.id}
-                href={`#${item.id}`}
-                className="flex-1 min-w-[200px] px-5 py-4 transition hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-              >
-                <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">
-                  {item.title}
-                </p>
-                <div className="mt-2 flex items-center gap-2">
-                  <span
-                    className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium ${item.accent}`}
-                  >
-                    {item.subtitle}
-                  </span>
-                  <span className="text-[11px] text-text-muted">
-                    Klik untuk detail & SOP
-                  </span>
-                </div>
-              </a>
-            ))}
-          </div>
-        </nav>
-
-        <div className="grid gap-4 lg:grid-cols-2" id="check-in-and-out">
-          {checkFlows.map((flow) => {
-            const Icon = flow.icon;
-            return (
-              <Card
-                key={flow.id}
-                id={flow.id}
-                className="border border-surface-border/80 shadow-sm"
-              >
-                <CardHeader className="space-y-2">
-                  <div className="flex items-center gap-3">
-                    <span
-                      className={`flex h-10 w-10 items-center justify-center rounded-full ${flow.accent}`}
-                    >
-                      <Icon className="h-5 w-5" />
-                    </span>
-                    <div>
-                      <CardTitle className="text-base">
-                        {flow.title}
-                      </CardTitle>
-                      <CardDescription>{flow.definition}</CardDescription>
-                    </div>
-                  </div>
-                  <Alert className="border-none bg-primary/5 text-sm text-foreground">
-                    <ShieldCheck className="mr-2 h-4 w-4 text-primary" />
-                    <AlertDescription>{flow.purpose}</AlertDescription>
-                  </Alert>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">
-                      {flow.infoLabel}
-                    </p>
-                    <ul className="mt-2 space-y-1.5 text-sm text-text-muted">
-                      {flow.info.map((item) => (
-                        <li
-                          key={item}
-                          className="flex items-start gap-2 rounded-lg border border-surface-border/60 bg-surface/80 px-3 py-2"
-                        >
-                          <span className="mt-0.5 h-1.5 w-1.5 rounded-full bg-primary" />
-                          <span className="text-foreground">{item}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                  <div className="rounded-xl border border-dashed border-primary/40 bg-primary/5 px-3 py-2 text-sm text-primary">
-                    {flow.reminder}
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-
-        <Card className="border border-surface-border/80 shadow-sm">
-          <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <CardTitle className="text-base flex items-center gap-2">
-                <ClipboardCheck className="h-5 w-5 text-primary" />
-                Manfaat Check In / Check Out
-              </CardTitle>
-              <CardDescription>
-                Penerapan SOP ini menjaga sinkronisasi data aset dan mendukung
-                proses audit maupun maintenance.
-              </CardDescription>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-              {checkFlowBenefits.map((benefit) => (
-                <div
-                  key={benefit}
-                  className="flex items-start gap-3 rounded-xl border border-surface-border/60 bg-surface px-3 py-2 text-sm text-foreground"
-                >
-                  <span className="mt-1 h-2 w-2 rounded-full bg-primary" />
-                  <span>{benefit}</span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Card>

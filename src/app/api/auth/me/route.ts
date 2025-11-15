@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import jwt from 'jsonwebtoken';
 import { db } from '@/lib/db';
 
-const jwtSecret = process.env.JWT_SECRET!;
+const jwtSecret = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,6 +12,7 @@ export async function GET(request: NextRequest) {
     const authHeader = request.headers.get('authorization');
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.log("No Bearer token found in header");
       return NextResponse.json(
         { error: "No authentication token found" },
         { status: 401 }
@@ -19,11 +20,35 @@ export async function GET(request: NextRequest) {
     }
 
     const token = authHeader.substring(7); // Remove 'Bearer ' prefix
+    console.log("Token extracted, attempting verification...");
 
-    // Verify JWT token
-    const decoded = jwt.verify(token, jwtSecret) as any;
+    // Verify JWT token with proper error handling
+    let decoded;
+    try {
+      decoded = jwt.verify(token, jwtSecret) as any;
+      console.log("Token verified successfully");
+    } catch (jwtError) {
+      console.log("JWT verification failed:", jwtError instanceof Error ? jwtError.message : jwtError);
+      if (jwtError instanceof jwt.TokenExpiredError) {
+        return NextResponse.json(
+          { error: "Token expired" },
+          { status: 401 }
+        );
+      }
+      if (jwtError instanceof jwt.JsonWebTokenError) {
+        return NextResponse.json(
+          { error: "Invalid token" },
+          { status: 401 }
+        );
+      }
+      return NextResponse.json(
+        { error: "Token verification failed" },
+        { status: 401 }
+      );
+    }
 
     if (!decoded || !decoded.userId) {
+      console.log("Invalid token payload");
       return NextResponse.json(
         { error: "Invalid or expired token" },
         { status: 401 }

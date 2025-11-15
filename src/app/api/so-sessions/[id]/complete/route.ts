@@ -68,7 +68,7 @@ export async function POST(
       data: {
         status: 'Completed',
         completedAt: new Date(),
-        totalAssets: session._count.soAssetEntries
+        scannedAssets: session._count.soAssetEntries
       }
     })
 
@@ -97,6 +97,7 @@ export async function POST(
             brand: entry.tempBrand || entry.asset.brand,
             model: entry.tempModel || entry.asset.model,
             cost: entry.tempCost || entry.asset.cost,
+            notes: entry.tempNotes ?? entry.asset.notes,
             updatedAt: new Date()
           }
         })

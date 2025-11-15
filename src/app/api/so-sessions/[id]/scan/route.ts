@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { verifyToken, canScanInSOSession } from '@/lib/auth'
 
-const assetRelations = {
+const assetInclude = {
   site: { select: { id: true, name: true } },
   category: { select: { id: true, name: true } },
   department: { select: { id: true, name: true } },
@@ -19,11 +19,81 @@ const assetRelations = {
   }
 }
 
-const formatEmployeeLabel = (employee: {
-  name: string | null
-}) => {
-  if (!employee?.name) return null
-  return employee.name
+const transformEntry = (entry: any) => ({
+  ...entry,
+  soSessionId: entry.soSessionId,
+  assetId: entry.assetId,
+  scannedAt: entry.scannedAt,
+  isIdentified: entry.isIdentified,
+  tempName: entry.tempName,
+  tempStatus: entry.tempStatus,
+  tempSerialNo: entry.tempSerialNo,
+  tempPic: entry.tempPic,
+  tempBrand: entry.tempBrand,
+  tempModel: entry.tempModel,
+  tempCost: entry.tempCost,
+  asset: entry.asset
+    ? {
+        ...entry.asset,
+        noAsset: entry.asset.noAsset
+      }
+    : null
+})
+
+const safeDecode = (value: string) => {
+  if (!value) return ''
+  try {
+    return decodeURIComponent(value)
+  } catch (error) {
+    console.warn('[scan-route] Failed to decode asset number, using raw value.', error)
+    return value
+  }
+}
+
+const normalizeAssetNumber = async (number: string) => {
+  if (!number) return null
+  const decoded = safeDecode(number).trim()
+
+  const normalize = (value: string) => value.trim()
+  const attempts = Array.from(
+    new Set(
+      [
+        decoded,
+        decoded.toUpperCase(),
+        decoded.toLowerCase(),
+        decoded.replace(/\./g, ''),
+        decoded.replace(/-/g, ''),
+        decoded.replace(/\s+/g, '')
+      ]
+        .filter(Boolean)
+        .map(normalize)
+    )
+  )
+
+  for (const attempt of attempts) {
+    const asset = await db.asset.findFirst({
+      where: { noAsset: attempt },
+      include: assetInclude
+    })
+    if (asset) return asset
+  }
+
+  // fallback contains
+  const variations = Array.from(new Set([decoded, decoded.toLowerCase(), decoded.toUpperCase()].filter(Boolean)))
+  if (variations.length > 0) {
+    const fallback = await db.asset.findFirst({
+      where: {
+        OR: variations.map(value => ({
+          noAsset: { contains: value }
+        }))
+      },
+      include: assetInclude
+    })
+
+    if (fallback) return fallback
+  }
+
+  return null
 }
 
 export async function POST(
@@ -31,7 +101,6 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Check authentication
     const authHeader = request.headers.get('authorization')
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return NextResponse.json(
@@ -42,7 +111,7 @@ export async function POST(
 
     const token = authHeader.substring(7)
     const user = verifyToken(token)
-    
+
     if (!user) {
       return NextResponse.json(
         { error: 'Invalid or expired token' },
@@ -50,7 +119,6 @@ export async function POST(
       )
     }
 
-    // Check if user has permission to scan in SO session
     if (!canScanInSOSession(user.role)) {
       return NextResponse.json(
         { error: 'Insufficient permissions to scan assets' },
@@ -58,27 +126,17 @@ export async function POST(
       )
     }
 
-    const { assetId, assetNumber } = await request.json()
     const { id: sessionId } = await params
+    const body = await request.json()
+    const { assetNumber, assetId, source = 'camera' } = body
 
-    if (!sessionId) {
+    if (!assetNumber && !assetId) {
       return NextResponse.json(
-        { error: 'Session ID is required' },
+        { error: 'Asset number or ID is required' },
         { status: 400 }
       )
     }
 
-    if (!assetId && !assetNumber) {
-      return NextResponse.json(
-        { error: 'Either Asset ID or Asset Number is required' },
-        { status: 400 }
-      )
-    }
-
-    const normalizedAssetNumber =
-      typeof assetNumber === 'string' ? assetNumber.trim() : ''
-
-    // Check if session exists and is active
     const session = await db.sOSession.findUnique({
       where: { id: sessionId }
     })
@@ -97,18 +155,14 @@ export async function POST(
       )
     }
 
-    // Resolve asset (by ID or number)
-    let asset: any = null
+    let asset
     if (assetId) {
       asset = await db.asset.findUnique({
         where: { id: assetId },
-        include: assetRelations
+        include: assetInclude
       })
-    } else if (normalizedAssetNumber) {
-      asset = await db.asset.findUnique({
-        where: { noAsset: normalizedAssetNumber },
-        include: assetRelations
-      })
+    } else {
+      asset = await normalizeAssetNumber(String(assetNumber))
     }
 
     if (!asset) {
@@ -118,88 +172,60 @@ export async function POST(
       )
     }
 
-    const resolvedAssetId = asset.id
-
-    // Check if already scanned in this session
     const existingEntry = await db.sOAssetEntry.findFirst({
-      where: {
-        soSessionId: sessionId,
-        assetId: resolvedAssetId
-      },
-      include: {
-        asset: {
-          include: assetRelations
-        }
-      }
+      where: { soSessionId: sessionId, assetId: asset.id },
+      include: { asset: { include: assetInclude } }
     })
 
     if (existingEntry) {
       return NextResponse.json({
-        success: false,
+        success: true,
+        alreadyScanned: true,
         message: 'Asset already scanned in this session',
-        entry: existingEntry,
-        assetNumber: asset.noAsset
+        entry: transformEntry(existingEntry),
+        asset: existingEntry.asset
       })
     }
 
-    // Create SO asset entry
-    const employeeLabel = asset.employee
-      ? formatEmployeeLabel({
-          name: asset.employee.name
-        })
-      : null
-
-    const entry = await db.sOAssetEntry.create({
+    const newEntry = await db.sOAssetEntry.create({
       data: {
         soSessionId: sessionId,
-        assetId: resolvedAssetId,
-        status: 'Scanned',
-        isIdentified: true,
+        assetId: asset.id,
         tempName: asset.name,
         tempStatus: asset.status,
         tempSerialNo: asset.serialNo,
-        tempPic: employeeLabel ?? asset.pic ?? null,
+        tempPic: asset.pic,
         tempBrand: asset.brand,
         tempModel: asset.model,
-        tempCost: asset.cost
+        tempCost: asset.cost,
+        status: 'Scanned',
+        isIdentified: false
       },
       include: {
-        asset: {
-          include: assetRelations
-        }
+        asset: { include: assetInclude }
       }
     })
 
-    // Update session scanned count
     await db.sOSession.update({
       where: { id: sessionId },
       data: {
-        scannedAssets: {
-          increment: 1
-        }
+        scannedAssets: { increment: 1 },
+        startedAt: session.startedAt ?? new Date()
       }
     })
 
-    // Return asset data with noAsset field
     return NextResponse.json({
       success: true,
+      alreadyScanned: false,
       message: 'Asset scanned successfully',
-      entry: {
-        ...entry,
-        tempPicId: entry.asset?.employee?.id ?? null,
-        asset: {
-          ...entry.asset,
-          noAsset: asset.noAsset,
-          employee: entry.asset?.employee ?? null
-        }
-      },
-      assetNumber: asset.noAsset
+      entry: transformEntry(newEntry),
+      asset: newEntry.asset,
+      source
     })
   } catch (error) {
     console.error('Scan asset error:', error)
-    const message = error instanceof Error ? error.message : 'Internal server error'
     return NextResponse.json(
-      { error: 'Internal server error', details: message },
+      { error: 'Failed to process scan' },
       { status: 500 }
     )
   }

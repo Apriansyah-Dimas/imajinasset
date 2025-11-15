@@ -293,7 +293,7 @@
 
   .sneat-btn-primary {
     background: linear-gradient(120deg, #706df5, #5c61d4);
-    color: white;
+    color: white !important;
     box-shadow: var(--shadow-soft);
   }
 

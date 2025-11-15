@@ -27,6 +27,7 @@ model Asset {
   dateCreated    DateTime           @default(now()) @map("date_created")
   createdAt      DateTime           @default(now()) @map("createdat")
   updatedAt      DateTime           @updatedAt @map("updatedat")
+  checkouts      AssetCheckout[]
   customValues   AssetCustomValue[]
   employee       Employee?          @relation(fields: [picId], references: [id])
   department     Department?        @relation(fields: [departmentId], references: [id])
@@ -72,29 +73,32 @@ model Category {
 }
 
 model Department {
-  id          String   @id @default(cuid())
-  name        String   @unique
-  sortOrder   Int      @default(0) @map("sort_order")
+  id          String          @id @default(cuid())
+  name        String          @unique
+  sortOrder   Int             @default(0) @map("sort_order")
   description String?
-  createdAt   DateTime @default(now()) @map("createdat")
-  updatedAt   DateTime @updatedAt @map("updatedat")
+  createdAt   DateTime        @default(now()) @map("createdat")
+  updatedAt   DateTime        @updatedAt @map("updatedat")
+  checkouts   AssetCheckout[]
   assets      Asset[]
 
   @@map("departments")
 }
 
 model Employee {
-  id         String    @id @default(cuid())
-  employeeId String    @unique @map("employee_id")
-  name       String
-  email      String?   @unique
-  department String?
-  position   String?
-  joinDate   DateTime? @map("join_date")
-  isActive   Boolean   @default(true) @map("isactive")
-  createdAt  DateTime  @default(now()) @map("createdat")
-  updatedAt  DateTime  @updatedAt @map("updatedat")
-  assets     Asset[]
+  id                String          @id @default(cuid())
+  employeeId        String          @unique @map("employee_id")
+  name              String
+  email             String?         @unique
+  department        String?
+  position          String?
+  joinDate          DateTime?       @map("join_date")
+  isActive          Boolean         @default(true) @map("isactive")
+  createdAt         DateTime        @default(now()) @map("createdat")
+  updatedAt         DateTime        @updatedAt @map("updatedat")
+  receivedCheckouts AssetCheckout[] @relation("EmployeeCheckoutReceivedBy")
+  assignedCheckouts AssetCheckout[] @relation("EmployeeCheckoutAssignments")
+  assets            Asset[]
 
   @@map("employees")
 }
@@ -222,4 +226,31 @@ model Backup {
 
   @@index([createdBy])
   @@map("backups")
+}
+
+model AssetCheckout {
+  id            String      @id @default(cuid())
+  assetId       String      @map("asset_id")
+  assignToId    String      @map("assign_to_id")
+  departmentId  String?     @map("department_id")
+  checkoutDate  DateTime    @map("checkout_date")
+  dueDate       DateTime?   @map("due_date")
+  notes         String?
+  signatureData String?     @map("signature_data")
+  status        String      @default("OUT")
+  returnedAt    DateTime?   @map("returned_at")
+  returnNotes   String?     @map("return_notes")
+  receivedById  String?     @map("received_by_id")
+  createdAt     DateTime    @default(now()) @map("createdat")
+  updatedAt     DateTime    @updatedAt @map("updatedat")
+  receivedBy    Employee?   @relation("EmployeeCheckoutReceivedBy", fields: [receivedById], references: [id])
+  department    Department? @relation(fields: [departmentId], references: [id])
+  assignTo      Employee    @relation("EmployeeCheckoutAssignments", fields: [assignToId], references: [id])
+  asset         Asset       @relation(fields: [assetId], references: [id])
+
+  @@index([assetId])
+  @@index([assignToId])
+  @@index([departmentId])
+  @@index([status])
+  @@map("asset_checkouts")
 }

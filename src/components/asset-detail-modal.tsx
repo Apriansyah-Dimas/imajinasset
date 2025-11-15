@@ -13,6 +13,7 @@ import RoleBasedAccess from '@/components/RoleBasedAccess'
 import AdditionalInformation from '@/components/additional-information'
 import ImageUpload from '@/components/image-upload'
 import AssetImagePlaceholder from '@/components/asset-image-placeholder'
+import { getClientAuthToken } from '@/lib/client-auth'
 
 interface Asset {
   id: string
@@ -48,6 +49,12 @@ interface AssetDetailModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onUpdate: () => void
+  startInEditMode?: boolean
+  forceReadOnly?: boolean
+  sessionContext?: {
+    sessionId: string
+    entryId: string
+  }
 }
 
 // Helper function to format currency with thousand separators
@@ -63,7 +70,15 @@ const parseCurrency = (value: string): number | undefined => {
   return isNaN(parsed) ? undefined : parsed
 }
 
-export default function AssetDetailModal({ asset, open, onOpenChange, onUpdate }: AssetDetailModalProps) {
+export default function AssetDetailModal({
+  asset,
+  open,
+  onOpenChange,
+  onUpdate,
+  startInEditMode = false,
+  forceReadOnly = false,
+  sessionContext
+}: AssetDetailModalProps) {
   const { user } = useAuth()
   const [formData, setFormData] = useState<Asset | null>(null)
   const [originalData, setOriginalData] = useState<Asset | null>(null)
@@ -84,6 +99,12 @@ export default function AssetDetailModal({ asset, open, onOpenChange, onUpdate }
   const [additionalFields, setAdditionalFields] = useState<Array<{ id: string; name: string; value: string }>>([])
   const [assetPrefix, setAssetPrefix] = useState('FA001')
   const [assetSuffix, setAssetSuffix] = useState({ categoryRoman: 'I', siteNumber: '01' })
+  const isSessionContext = Boolean(sessionContext)
+  const sanitizeString = (value?: string | null) => {
+    if (value === undefined || value === null) return null
+    const trimmed = value.trim()
+    return trimmed === '' ? null : trimmed
+  }
 
   useEffect(() => {
     if (asset) {
@@ -102,7 +123,7 @@ export default function AssetDetailModal({ asset, open, onOpenChange, onUpdate }
           // Asset exists, proceed with setting form data
           setFormData({ ...asset })
           setOriginalData({ ...asset })
-          setIsEditing(false)
+          setIsEditing(startInEditMode && !forceReadOnly)
 
           // Parse additional information from notes field
           if (asset.notes) {
@@ -132,13 +153,23 @@ export default function AssetDetailModal({ asset, open, onOpenChange, onUpdate }
           console.error('Error verifying asset:', error)
           setFormData({ ...asset })
           setOriginalData({ ...asset })
-          setIsEditing(false)
+          setIsEditing(startInEditMode && !forceReadOnly)
         }
       }
 
       verifyAsset();
     }
-  }, [asset]);
+  }, [asset, startInEditMode, forceReadOnly]);
+
+  useEffect(() => {
+    if (forceReadOnly) {
+      setIsEditing(false)
+      return
+    }
+    if (open && startInEditMode) {
+      setIsEditing(true)
+    }
+  }, [open, startInEditMode, forceReadOnly])
 
   useEffect(() => {
     if (open) {
@@ -224,7 +255,7 @@ export default function AssetDetailModal({ asset, open, onOpenChange, onUpdate }
     try {
       const combinedAssetNumber = `${assetPrefix}/${assetSuffix.categoryRoman}/${assetSuffix.siteNumber}`
       // Convert objects to IDs for API
-      const payload = {
+      const basePayload = {
         ...formData,
         noAsset: combinedAssetNumber,
         siteId: formData.site?.id || null,
@@ -237,64 +268,72 @@ export default function AssetDetailModal({ asset, open, onOpenChange, onUpdate }
         employee: undefined,
       }
 
-      // Update asset basic info
-      const response = await fetch(`/api/assets/${formData.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to update asset')
-      }
-
-      // Update additional information
+      // Prepare additional information
       const validAdditionalFields = additionalFields.filter(field =>
         field.name.trim() !== ''
       )
 
+      let notesValue: string | null = null
       if (validAdditionalFields.length > 0) {
         const additionalInfo = validAdditionalFields.reduce((acc, field) => {
           acc[field.name] = field.value
           return acc
         }, {} as Record<string, string>)
 
-        const payloadWithNotes = {
-          ...payload,
-          notes: JSON.stringify(additionalInfo)
+        notesValue = JSON.stringify(additionalInfo)
+      }
+
+      const payload = {
+        ...basePayload,
+        notes: notesValue
+      }
+
+      if (isSessionContext && sessionContext) {
+        const token = getClientAuthToken()
+        if (!token) {
+          throw new Error('Sesi login berakhir, silakan login ulang.')
         }
 
-        const updateResponse = await fetch(`/api/assets/${formData.id}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(payloadWithNotes),
-        })
+        const sessionPayload = {
+          tempName: payload.name,
+          tempStatus: payload.status,
+          tempSerialNo: sanitizeString(payload.serialNo),
+          tempPic: sanitizeString(formData.employee?.name || formData.pic || null),
+          tempBrand: sanitizeString(payload.brand),
+          tempModel: sanitizeString(payload.model),
+          tempCost: payload.cost ?? null,
+          tempNotes: payload.notes ?? null,
+          isIdentified: true
+        }
 
-        if (!updateResponse.ok) {
-          console.warn('Failed to update additional information, but basic asset info was saved')
+        const response = await fetch(
+          `/api/so-sessions/${sessionContext.sessionId}/entries/${sessionContext.entryId}`,
+          {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`
+            },
+            body: JSON.stringify(sessionPayload)
+          }
+        )
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.error || 'Gagal menyimpan perubahan sesi')
         }
       } else {
-        // Clear notes if no additional fields
-        const payloadWithNotes = {
-          ...payload,
-          notes: null
-        }
-
-        const updateResponse = await fetch(`/api/assets/${formData.id}`, {
+        const response = await fetch(`/api/assets/${formData.id}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify(payloadWithNotes),
+          body: JSON.stringify(payload),
         })
 
-        if (!updateResponse.ok) {
-          console.warn('Failed to clear additional information, but basic asset info was saved')
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.error || 'Failed to update asset')
         }
       }
 
@@ -305,15 +344,21 @@ export default function AssetDetailModal({ asset, open, onOpenChange, onUpdate }
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
 
       // If asset is not found, refresh the assets list and close modal
-      if (errorMessage.includes('Asset not found') || errorMessage.includes('404')) {
+      if (
+        !isSessionContext &&
+        (errorMessage.includes('Asset not found') || errorMessage.includes('404'))
+      ) {
         alert('Asset not found. The asset may have been deleted by another user.')
         onUpdate() // Refresh the assets list
         onOpenChange(false)
         setIsEditing(false)
-      } else if (errorMessage.includes('not found') || errorMessage.includes('Invalid reference')) {
+      } else if (
+        !isSessionContext &&
+        (errorMessage.includes('not found') || errorMessage.includes('Invalid reference'))
+      ) {
         alert(`Failed to update asset: ${errorMessage}. Please check if the selected items still exist.`)
       } else {
-        alert(`Failed to update asset: ${errorMessage}`)
+        alert(`Failed to save changes: ${errorMessage}`)
       }
     } finally {
       setLoading(false)
@@ -344,6 +389,7 @@ export default function AssetDetailModal({ asset, open, onOpenChange, onUpdate }
   }
 
   const handleEdit = () => {
+    if (forceReadOnly) return
     setIsEditing(true)
   }
 
@@ -361,6 +407,11 @@ export default function AssetDetailModal({ asset, open, onOpenChange, onUpdate }
       <DialogContent className="max-w-2xl w-[95vw] sm:w-full max-h-[90vh] overflow-y-auto mx-auto">
         <DialogHeader className="pb-4 sm:pb-6">
           <DialogTitle className="text-lg sm:text-xl">Asset Details</DialogTitle>
+          {isSessionContext && (
+            <p className="text-xs text-primary mt-1">
+              Perubahan disimpan pada sesi ini dan baru akan diterapkan ke master asset setelah sesi selesai.
+            </p>
+          )}
         </DialogHeader>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
@@ -434,10 +485,7 @@ export default function AssetDetailModal({ asset, open, onOpenChange, onUpdate }
                     </span>
                   </div>
                 </div>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Edit the prefix on the left. Category and site suffix update automatically.
-                </p>
-              </>
+                </>
             ) : (
               // View mode: Normal single input
               <Input
@@ -742,72 +790,80 @@ export default function AssetDetailModal({ asset, open, onOpenChange, onUpdate }
             <AdditionalInformation
               fields={additionalFields}
               onChange={setAdditionalFields}
-              readOnly={!isEditing}
+              readOnly={!isEditing || forceReadOnly}
               mode="edit"
             />
           </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:space-x-2 space-y-3 sm:space-y-0 mt-6">
-          <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
-            <RoleBasedAccess allowedRoles={['ADMIN']}>
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button
-                    variant="destructive"
-                    disabled={loading || deleteLoading}
-                    className="bg-red-600 hover:bg-red-700 text-white border-2 border-red-800 font-bold w-full sm:w-auto"
-                    size="sm"
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    DELETE
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent className="mx-4 max-w-sm">
-                  <AlertDialogHeader>
-                    <AlertDialogTitle className="text-lg">Are you absolutely sure?</AlertDialogTitle>
-                    <AlertDialogDescription className="text-sm">
-                      This action cannot be undone. This will permanently delete the asset "{formData.name}" ({formData.noAsset}) from the database.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter className="flex-col sm:flex-row gap-2">
-                    <AlertDialogCancel className="w-full sm:w-auto">Cancel</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={handleDelete}
-                      className="bg-red-600 hover:bg-red-700 w-full sm:w-auto"
-                    >
-                      {deleteLoading ? 'Deleting...' : 'Delete Asset'}
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </RoleBasedAccess>
-          </div>
-
-          <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
-            <RoleBasedAccess allowedRoles={['ADMIN']}>
-              {!isEditing ? (
-                <Button onClick={handleEdit} disabled={deleteLoading} className="w-full sm:w-auto" size="sm">
-                  EDIT
-                </Button>
-              ) : (
-                <>
-                  <Button variant="outline" onClick={handleCancelEdit} disabled={loading || deleteLoading} className="w-full sm:w-auto" size="sm">
-                    CANCEL
-                  </Button>
-                  <Button onClick={handleSave} disabled={loading || deleteLoading} className="w-full sm:w-auto" size="sm">
-                    {loading ? 'Saving...' : 'SAVE CHANGES'}
-                  </Button>
-                </>
+        {!forceReadOnly ? (
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:space-x-2 space-y-3 sm:space-y-0 mt-6">
+            <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
+              {!isSessionContext && (
+                <RoleBasedAccess allowedRoles={['ADMIN']}>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="destructive"
+                        disabled={loading || deleteLoading}
+                        className="bg-red-600 hover:bg-red-700 text-white border-2 border-red-800 font-bold w-full sm:w-auto"
+                        size="sm"
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        DELETE
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent className="mx-4 max-w-sm">
+                      <AlertDialogHeader>
+                        <AlertDialogTitle className="text-lg">Are you absolutely sure?</AlertDialogTitle>
+                        <AlertDialogDescription className="text-sm">
+                          This action cannot be undone. This will permanently delete the asset "{formData.name}" ({formData.noAsset}) from the database.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+                        <AlertDialogCancel className="w-full sm:w-auto">Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={handleDelete}
+                          className="bg-red-600 hover:bg-red-700 w-full sm:w-auto"
+                        >
+                          {deleteLoading ? 'Deleting...' : 'Delete Asset'}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </RoleBasedAccess>
               )}
-            </RoleBasedAccess>
-            {user && user.role === 'SO_ASSET_USER' && (
-              <div className="w-full text-center text-xs text-muted-foreground sm:text-sm">
-                Read-only access - Contact admin to modify asset details
-              </div>
-            )}
+            </div>
+
+            <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
+              <RoleBasedAccess allowedRoles={['ADMIN']}>
+                {!isEditing ? (
+                  <Button onClick={handleEdit} disabled={deleteLoading} className="w-full sm:w-auto" size="sm">
+                    EDIT
+                  </Button>
+                ) : (
+                  <>
+                    <Button variant="outline" onClick={handleCancelEdit} disabled={loading || deleteLoading} className="w-full sm:w-auto" size="sm">
+                      CANCEL
+                    </Button>
+                    <Button onClick={handleSave} disabled={loading || deleteLoading} className="w-full sm:w-auto" size="sm">
+                      {loading ? 'Saving...' : 'SAVE CHANGES'}
+                    </Button>
+                  </>
+                )}
+              </RoleBasedAccess>
+              {user && user.role === 'SO_ASSET_USER' && (
+                <div className="w-full text-center text-xs text-muted-foreground sm:text-sm">
+                  Read-only access - Contact admin to modify asset details
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="mt-6 rounded-xl border border-dashed border-surface-border bg-surface/40 p-4 text-center text-xs text-text-muted">
+            Detail aset hanya untuk dibaca pada daftar Remaining.
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   )

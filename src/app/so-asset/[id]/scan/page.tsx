@@ -1,1498 +1,993 @@
-'use client'
+"use client";
 
-import { useState, useEffect, useRef } from 'react'
-import { useParams, useRouter } from 'next/navigation'
-import { Html5QrcodeScanner, Html5QrcodeScanType, Html5Qrcode } from 'html5-qrcode'
-import { toast } from 'sonner'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Progress } from '@/components/ui/progress'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Textarea } from '@/components/ui/textarea'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Checkbox } from '@/components/ui/checkbox'
 import {
-  QrCode,
-  Camera,
-  CameraOff,
-  CheckCircle,
-  Clock,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState
+} from "react";
+import { useParams, useRouter } from "next/navigation";
+import { toast } from "sonner";
+import ProtectedRoute from "@/components/ProtectedRoute";
+import AssetDetailModal from "@/components/asset-detail-modal";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle
+} from "@/components/ui/alert-dialog";
+import {
+  Tabs,
+  TabsList,
+  TabsTrigger
+} from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
+import { getClientAuthToken } from "@/lib/client-auth";
+import {
   AlertCircle,
-  Edit,
-  Save,
-  X,
   ArrowLeft,
-  Package,
-  Flag,
-  RefreshCw,
-  Upload,
-  Smartphone,
-  XCircle,
-  CheckCheck
-} from 'lucide-react'
-import Link from 'next/link'
-import ProtectedRoute from '@/components/ProtectedRoute'
-import RoleBasedAccess from '@/components/RoleBasedAccess'
-import { useAuth } from '@/contexts/AuthContext'
+  CheckCircle,
+  Eye,
+  Filter,
+  Search,
+  Trash2,
+  XCircle
+} from "lucide-react";
+import { AssetScanPanel } from "@/components/asset-scan-panel";
 
-interface SOAssetEntry {
-  id: string
-  assetId: string
-  scannedAt: string
-  status: string
-  isIdentified: boolean
-  tempName?: string
-  tempStatus?: string
-  tempSerialNo?: string
-  tempPic?: string
-  tempPicId?: string
-  tempNotes?: string
-  tempBrand?: string
-  tempModel?: string
-  tempCost?: number
-  asset: {
-    id: string
-    noAsset: string
-    name: string
-    status: string
-    serialNo?: string
-    pic?: string
-    brand?: string
-    model?: string
-    cost?: number
-    dateCreated?: string
-    site?: { id: string; name: string }
-    category?: { id: string; name: string }
-    department?: { id: string; name: string }
-    employee?: {
-      id: string
-      employeeId: string | null
-      name: string | null
-      email?: string | null
-      department?: string | null
-      position?: string | null
-      isActive?: boolean | null
-    }
+interface Asset {
+  id: string;
+  name: string;
+  noAsset: string;
+  status: string;
+  serialNo?: string | null;
+  brand?: string | null;
+  model?: string | null;
+  cost?: number | null;
+  site?: { id: string; name: string } | null;
+  category?: { id: string; name: string } | null;
+  department?: { id: string; name: string } | null;
+  pic?: string | null;
+  picId?: string | null;
+  imageUrl?: string | null;
+  notes?: string | null;
+  employee?: {
+    id: string;
+    name: string;
+    email?: string | null;
+    department?: string | null;
+    position?: string | null;
+  } | null;
+  dateCreated?: string;
+}
+
+interface ScannedEntry {
+  id: string;
+  assetId: string;
+  soSessionId: string;
+  scannedAt: string;
+  status: string;
+  isIdentified: boolean;
+  tempName?: string | null;
+  tempStatus?: string | null;
+  tempSerialNo?: string | null;
+  tempPic?: string | null;
+  tempNotes?: string | null;
+  tempBrand?: string | null;
+  tempModel?: string | null;
+  tempCost?: number | string | null;
+  asset: Asset;
+}
+
+interface SessionOverview {
+  id: string;
+  name: string;
+  year: number;
+  status: string;
+  totalAssets: number;
+  scannedAssets: number;
+}
+
+interface UnidentifiedResponse {
+  session: SessionOverview;
+  missingAssets: Asset[];
+  scannedEntries: ScannedEntry[];
+}
+
+const normalizeCostValue = (value: number | string | null | undefined) => {
+  if (value === null || value === undefined || value === "") return null;
+  const parsed =
+    typeof value === "string" ? parseFloat(value) : Number(value);
+  return Number.isNaN(parsed) ? null : parsed;
+};
+
+const getEntryDisplayAsset = (entry: ScannedEntry): Asset => {
+  const base = entry.asset;
+  if (!base) {
+    return {
+      id: entry.assetId,
+      name: entry.tempName || "Aset tanpa nama",
+      noAsset: "-",
+      status: entry.tempStatus || "Unidentified"
+    } as Asset;
   }
-}
 
-interface SOSession {
-  id: string
-  name: string
-  year: number
-  status: string
-  totalAssets: number
-  scannedAssets: number
-}
+  return {
+    ...base,
+    name: entry.tempName || base.name,
+    status: entry.tempStatus || base.status,
+    serialNo: entry.tempSerialNo ?? base.serialNo,
+    pic: entry.tempPic ?? base.pic,
+    brand: entry.tempBrand ?? base.brand,
+    model: entry.tempModel ?? base.model,
+    cost: normalizeCostValue(entry.tempCost ?? base.cost) ?? null,
+    notes: entry.tempNotes ?? base.notes
+  };
+};
 
-const formatEmployeeLabel = (employee?: {
-  name?: string | null
-}) => {
-  if (!employee?.name) return ''
-  return employee.name
-}
+type ModalOptions = {
+  readOnly?: boolean;
+  startEdit?: boolean;
+  entry?: ScannedEntry | null;
+};
 
+const filterChipClass = (active: boolean) =>
+  `rounded-full border px-3 py-1 text-xs font-semibold transition ${
+    active
+      ? "border-primary bg-primary/10 text-primary shadow-[0_6px_18px_rgba(62,82,160,0.18)]"
+      : "border-surface-border text-text-muted hover:border-primary/40 hover:text-primary"
+  }`;
+
+const sortTileClass = (active: boolean) =>
+  `rounded-lg border px-3 py-2 text-left text-xs font-semibold transition ${
+    active
+      ? "border-primary bg-primary/10 text-primary shadow-[0_6px_18px_rgba(62,82,160,0.18)]"
+      : "border-surface-border text-text-muted hover:border-primary/40 hover:text-primary"
+  }`;
+
+const sortOptionsList: Array<{
+  value: "name-asc" | "name-desc" | "created-newest" | "created-oldest";
+  label: string;
+  description: string;
+}> = [
+  { value: "name-asc", label: "Nama (A-Z)", description: "Urut berdasarkan nama aset" },
+  { value: "name-desc", label: "Nama (Z-A)", description: "Nama aset dari Z ke A" },
+  { value: "created-newest", label: "Terbaru", description: "Aset dengan tanggal dibuat terbaru" },
+  { value: "created-oldest", label: "Terlama", description: "Aset paling lama dibuat" }
+];
+
+const getStatusColor = (status: string) => {
+  switch (status) {
+    case "Active":
+      return "bg-[#ecfdf3] text-[#1a7f5a] border border-[#9ce8c4]";
+    case "Broken":
+      return "bg-[#fff5f5] text-[#c53030] border border-[#ffc9c9]";
+    case "Maintenance Process":
+      return "bg-[#fff8e6] text-[#b7791f] border border-[#ffe0a6]";
+    case "Lost/Missing":
+      return "bg-[#fff1ed] text-[#c2410c] border border-[#ffc9b0]";
+    case "Sell":
+      return "bg-[#eef4ff] text-[#314299] border border-[#c7d6ff]";
+    default:
+      return "bg-surface text-text-muted border border-surface-border";
+  }
+};
+
+const formatDate = (value?: string) => {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleString();
+};
+
+type FilterState = {
+  status: string;
+  category: string;
+  site: string;
+  department: string;
+};
 function ScanPageContent() {
-  const params = useParams()
-  const router = useRouter()
-  const [session, setSession] = useState<SOSession | null>(null)
-  const [scannedAssets, setScannedAssets] = useState<SOAssetEntry[]>([])
-  const [loading, setLoading] = useState(true)
-  const [scanning, setScanning] = useState(false)
-  const [manualAssetNumber, setManualAssetNumber] = useState('')
-  const [showEditDialog, setShowEditDialog] = useState(false)
-  const [selectedAsset, setSelectedAsset] = useState<SOAssetEntry | null>(null)
-  const [editForm, setEditForm] = useState({
-    tempName: '',
-    tempStatus: '',
-    tempSerialNo: '',
-    tempPic: '',
-    tempPicId: '',
-    tempNotes: '',
-    tempBrand: '',
-    tempModel: '',
-    tempCost: '',
-    tempPurchaseDate: '',
-    tempSiteId: '',
-    tempCategoryId: '',
-    tempDepartmentId: '',
-    isIdentified: false,
-    assetNumber: ''
-  })
-  const [searchQuery, setSearchQuery] = useState('')
-  const [sites, setSites] = useState([])
-  const [categories, setCategories] = useState([])
-  const [departments, setDepartments] = useState([])
-  const [pics, setPics] = useState<any[]>([])
-  const [scanError, setScanError] = useState('')
-  const [showCompleteDialog, setShowCompleteDialog] = useState(false)
-  const [completing, setCompleting] = useState(false)
-  const [showCancelDialog, setShowCancelDialog] = useState(false)
-  const [cancelling, setCancelling] = useState(false)
-  
-  // QR Scanner states
-  const [isQRScanning, setIsQRScanning] = useState(false)
-  const [devices, setDevices] = useState<any[]>([])
-  const [selectedDevice, setSelectedDevice] = useState<string>('')
-  const scannerRef = useRef<Html5Qrcode | null>(null)
-  const scanRegionId = 'qr-reader-so'
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const params = useParams();
+  const router = useRouter();
+  const sessionId = params.id as string;
 
-  const totalAssets = session?.totalAssets ?? 0
-  const scannedCount = session?.scannedAssets ?? 0
-  const remainingAssets = Math.max(totalAssets - scannedCount, 0)
+  const [session, setSession] = useState<SessionOverview | null>(null);
+  const [scannedEntries, setScannedEntries] = useState<ScannedEntry[]>([]);
+  const [remainingAssets, setRemainingAssets] = useState<Asset[]>([]);
+  const [loadingData, setLoadingData] = useState(true);
+
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filters, setFilters] = useState<FilterState>({
+    status: "all",
+    category: "all",
+    site: "all",
+    department: "all"
+  });
+  const [sortOption, setSortOption] =
+    useState<"name-asc" | "name-desc" | "created-newest" | "created-oldest">(
+      "name-asc"
+    );
+  const [activeList, setActiveList] = useState<"scanned" | "remaining">("scanned");
+
+  const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
+  const [selectedEntry, setSelectedEntry] = useState<ScannedEntry | null>(null);
+  const [showAssetModal, setShowAssetModal] = useState(false);
+  const [startInEditMode, setStartInEditMode] = useState(false);
+  const [modalReadOnly, setModalReadOnly] = useState(false);
+  const [pendingSessionAction, setPendingSessionAction] = useState<"cancel" | "complete" | "delete" | null>(null);
+  const [sessionActionLoading, setSessionActionLoading] = useState(false);
+  const sessionActionDialog = {
+    complete: {
+      title: "Selesaikan sesi ini?",
+      description: "Semua perubahan yang sudah kamu catat akan disinkronkan ke master asset setelah proses ini.",
+      confirm: "Selesaikan Sesi",
+      destructive: false
+    },
+    cancel: {
+      title: "Batalkan sesi ini?",
+      description: "Sesi akan dihentikan dan perubahan sementara tidak akan diterapkan.",
+      confirm: "Batalkan Sesi",
+      destructive: true
+    },
+    delete: {
+      title: "Hapus sesi ini?",
+      description: "Sesi dan seluruh data hasil scan akan dihapus permanen.",
+      confirm: "Hapus Sesi",
+      destructive: true
+    }
+  } as const;
+  const actionDialogCopy =
+    pendingSessionAction ? sessionActionDialog[pendingSessionAction] : sessionActionDialog.cancel;
+
+  const combinedAssets = useMemo(
+    () => [
+      ...scannedEntries.map((entry) => getEntryDisplayAsset(entry)),
+      ...remainingAssets
+    ],
+    [scannedEntries, remainingAssets]
+  );
+  const derivedScannedCount = scannedEntries.length;
+  const derivedTotalAssets = derivedScannedCount + remainingAssets.length;
+  const displayScannedCount = loadingData
+    ? session?.scannedAssets ?? derivedScannedCount
+    : derivedScannedCount;
+  const displayTotalAssets = loadingData
+    ? session?.totalAssets ?? derivedTotalAssets
+    : derivedTotalAssets;
+
+  const statusOptions = useMemo(
+    () =>
+      Array.from(new Set(combinedAssets.map((asset) => asset.status).filter(Boolean))).sort((a, b) =>
+        a.localeCompare(b)
+      ),
+    [combinedAssets]
+  );
+
+  const categoryOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          combinedAssets
+            .map((asset) => asset.category?.name)
+            .filter((name): name is string => Boolean(name))
+        )
+      ).sort((a, b) => a.localeCompare(b)),
+    [combinedAssets]
+  );
+
+  const siteOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          combinedAssets
+            .map((asset) => asset.site?.name)
+            .filter((name): name is string => Boolean(name))
+        )
+      ).sort((a, b) => a.localeCompare(b)),
+    [combinedAssets]
+  );
+
+  const departmentOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          combinedAssets
+            .map((asset) => asset.department?.name)
+            .filter((name): name is string => Boolean(name))
+        )
+      ).sort((a, b) => a.localeCompare(b)),
+    [combinedAssets]
+  );
+
+  const hasActiveFilters =
+    filters.status !== "all" ||
+    filters.category !== "all" ||
+    filters.site !== "all" ||
+    filters.department !== "all";
+  const showActiveFilterDot = hasActiveFilters || sortOption !== "name-asc";
+  const fetchSessionData = useCallback(async () => {
+    if (!sessionId) return;
+    setLoadingData(true);
+    try {
+      const response = await fetch(
+        `/api/so-sessions/${sessionId}/unidentified-assets`
+      );
+      if (!response.ok) {
+        throw new Error("Failed to fetch session data");
+      }
+      const data: UnidentifiedResponse = await response.json();
+      setSession(data.session);
+      setScannedEntries(data.scannedEntries || []);
+      setRemainingAssets(data.missingAssets || []);
+    } catch (error) {
+      console.error("Failed to load session overview:", error);
+      toast.error("Gagal memuat data sesi");
+    } finally {
+      setLoadingData(false);
+    }
+  }, [sessionId]);
 
   useEffect(() => {
-    if (params.id) {
-      fetchSession()
-      fetchScannedAssets()
-      fetchMasterData()
-      getVideoDevices()
-    }
+    fetchSessionData();
+  }, [fetchSessionData]);
 
-    return () => {
-      cleanupScanner()
-    }
-  }, [params.id])
+  const handleFilterChange = (type: keyof FilterState, value: string) => {
+    setFilters((prev) => ({ ...prev, [type]: value }));
+  };
 
-  const fetchSession = async () => {
-    try {
-      // Get token from localStorage
-      const token = localStorage.getItem('auth_token')
-      if (!token) {
-        console.error('No auth token found')
-        return
+  const resetFiltersAndSort = () => {
+    setFilters({ status: "all", category: "all", site: "all" });
+    setSortOption("name-asc");
+  };
+
+  const matchesSearch = (asset: Asset, query: string) => {
+    if (!query.trim()) return true;
+    const normalized = query.trim().toLowerCase();
+    const fields = [
+      asset.name,
+      asset.noAsset,
+      asset.status,
+      asset.serialNo,
+      asset.brand,
+      asset.model,
+      asset.pic,
+      asset.site?.name,
+      asset.category?.name,
+      asset.department?.name
+    ]
+      .filter(Boolean)
+      .map((field) => String(field).toLowerCase());
+    return fields.some((field) => field.includes(normalized));
+  };
+
+  const matchesFilters = (asset: Asset) => {
+    if (filters.status !== "all" && asset.status !== filters.status) return false;
+    if (filters.category !== "all" && asset.category?.name !== filters.category)
+      return false;
+    if (filters.site !== "all" && asset.site?.name !== filters.site) return false;
+    if (filters.department !== "all" && asset.department?.name !== filters.department)
+      return false;
+    return true;
+  };
+
+  const sortRows = <T extends { asset: Asset }>(rows: T[]) => {
+    return [...rows].sort((a, b) => {
+      switch (sortOption) {
+        case "name-asc":
+          return a.asset.name.localeCompare(b.asset.name);
+        case "name-desc":
+          return b.asset.name.localeCompare(a.asset.name);
+        case "created-newest":
+          return (
+            new Date(b.asset.dateCreated || b.asset.id).getTime() -
+            new Date(a.asset.dateCreated || a.asset.id).getTime()
+          );
+        case "created-oldest":
+          return (
+            new Date(a.asset.dateCreated || a.asset.id).getTime() -
+            new Date(b.asset.dateCreated || b.asset.id).getTime()
+          );
+        default:
+          return 0;
       }
-
-      const response = await fetch(`/api/so-sessions/${params.id}/`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+    });
+  };
+  const filteredScannedEntries = useMemo(() => {
+    const rows = scannedEntries
+      .map((entry) => {
+        const assetData = getEntryDisplayAsset(entry);
+        return { ...entry, asset: assetData };
       })
-      if (response.ok) {
-        const data = await response.json()
-        setSession(data?.session ?? data)
-      } else {
-        const errorData = await response.json()
-        console.error('Failed to fetch session:', errorData)
-      }
-    } catch (error) {
-      console.error('Error fetching session:', error)
-    }
-  }
+      .filter((entry) => entry.asset && matchesFilters(entry.asset) && matchesSearch(entry.asset, searchQuery));
+    return sortRows(rows);
+  }, [scannedEntries, filters, searchQuery, sortOption]);
 
-  const fetchScannedAssets = async () => {
-    try {
-      console.log('DEBUG: fetchScannedAssets - Starting fetch for session:', params.id)
-      
-      // Get token from localStorage
-      const token = localStorage.getItem('auth_token')
-      if (!token) {
-        console.error('No auth token found')
-        setScannedAssets([])
-        setLoading(false)
-        return
+  const filteredRemainingAssets = useMemo(() => {
+    const rows = remainingAssets
+      .filter((asset) => matchesFilters(asset) && matchesSearch(asset, searchQuery))
+      .map((asset) => ({ asset }));
+    return sortRows(rows);
+  }, [remainingAssets, filters, searchQuery, sortOption]);
+
+  const handleAssetSelection = useCallback(
+    async (value: string, source: "camera" | "manual") => {
+      const trimmed = value.trim();
+      if (!trimmed) {
+        toast.warning("Nomor aset kosong");
+        return;
       }
 
-      const response = await fetch(`/api/so-sessions/${params.id}/entries/`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+      try {
+        const token = getClientAuthToken();
+
+        const response = await fetch(`/api/so-sessions/${sessionId}/scan`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {})
+          },
+          body: JSON.stringify({ assetNumber: trimmed, source })
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || "Gagal memproses scan");
         }
-      })
+
+        const data = await response.json();
+        if (data.alreadyScanned) {
+          toast.info("Aset ini sudah tercatat di sesi ini");
+        } else {
+          toast.success("Aset berhasil ditambahkan ke sesi");
+        }
+
+        if (data.entry) {
+          openAssetModal(data.entry.asset ?? null, { startEdit: true, entry: data.entry });
+        } else if (data.asset) {
+          openAssetModal(data.asset, { startEdit: true });
+        }
+
+        fetchSessionData();
+      } catch (error) {
+        console.error("Scan error:", error);
+        toast.error(
+          error instanceof Error ? error.message : "Gagal memproses scan"
+        );
+      }
+    },
+    [sessionId, fetchSessionData]
+  );
+
+  const handleSessionAction = async () => {
+    if (!sessionId || !pendingSessionAction) return;
+    setSessionActionLoading(true);
+    try {
+      const token = getClientAuthToken();
+      if (!token) {
+        throw new Error("Sesi login berakhir, silakan login ulang.");
+      }
+
+      const endpointMap = {
+        complete: `/api/so-sessions/${sessionId}/complete`,
+        cancel: `/api/so-sessions/${sessionId}/cancel`,
+        delete: `/api/so-sessions/${sessionId}/delete`
+      } as const;
+
+      const successMessageMap = {
+        complete: "Sesi berhasil diselesaikan",
+        cancel: "Sesi berhasil dibatalkan",
+        delete: "Sesi berhasil dihapus"
+      } as const;
+
+      const endpoint = endpointMap[pendingSessionAction];
+
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        }
+      });
+
       if (!response.ok) {
-        const errorData = await response.json()
-        console.error('Failed to fetch scanned assets:', errorData)
-        throw new Error('Failed to fetch scanned assets')
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Gagal memproses sesi");
       }
 
-      const data = await response.json()
-      console.log('DEBUG: fetchScannedAssets - API response entries:', data.entries?.length || 0)
-
-      if (Array.isArray(data)) {
-        console.log('DEBUG: fetchScannedAssets - Setting array directly, count:', data.length)
-        console.log('DEBUG: fetchScannedAssets - First entry tempStatus:', data[0]?.tempStatus)
-        setScannedAssets(data)
-      } else if (Array.isArray(data.entries)) {
-        console.log('DEBUG: fetchScannedAssets - Setting entries array, count:', data.entries.length)
-        console.log('DEBUG: fetchScannedAssets - First entry tempStatus:', data.entries[0]?.tempStatus)
-        console.log('DEBUG: fetchScannedAssets - First entry tempName:', data.entries[0]?.tempName)
-        console.log('DEBUG: fetchScannedAssets - First entry full data:', JSON.stringify(data.entries[0], null, 2))
-        setScannedAssets(data.entries)
-      } else {
-        console.log('DEBUG: fetchScannedAssets - No array found, setting empty array')
-        setScannedAssets([])
+      toast.success(successMessageMap[pendingSessionAction]);
+      if (pendingSessionAction === "delete") {
+        router.push("/so-asset");
+        return;
       }
+      fetchSessionData();
     } catch (error) {
-      console.error('DEBUG: fetchScannedAssets - Error fetching scanned assets:', error)
-      setScannedAssets([])
+      console.error("Session action error:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Gagal memproses aksi sesi"
+      );
     } finally {
-      setLoading(false)
+      setSessionActionLoading(false);
+      setPendingSessionAction(null);
     }
-  }
+  };
+  const openAssetModal = (asset: Asset | null, options?: ModalOptions) => {
+    const readOnly = !!options?.readOnly;
+    const startEdit = !!options?.startEdit && !readOnly;
+    const entry = options?.entry ?? null;
+    const derivedAsset = entry ? getEntryDisplayAsset(entry) : asset;
 
-  const fetchMasterData = async () => {
-    try {
-      // Get token from localStorage
-      const token = localStorage.getItem('auth_token')
-      if (!token) {
-        console.error('No auth token found')
-        return
-      }
+    setModalReadOnly(readOnly);
+    setStartInEditMode(startEdit);
+    setSelectedEntry(entry);
+    setSelectedAsset(derivedAsset || asset || null);
+    setShowAssetModal(true);
+  };
 
-      const headers = {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
-
-      const [sitesRes, categoriesRes, departmentsRes, picsRes] = await Promise.all([
-        fetch('/api/sites', { headers }),
-        fetch('/api/categories', { headers }),
-        fetch('/api/departments', { headers }),
-        fetch('/api/pics', { headers })
-      ])
-
-      if (sitesRes.ok) setSites(await sitesRes.json())
-      if (categoriesRes.ok) setCategories(await categoriesRes.json())
-      if (departmentsRes.ok) setDepartments(await departmentsRes.json())
-      if (picsRes.ok) setPics(await picsRes.json())
-    } catch (error) {
-      console.error('Error fetching master data:', error)
+  const closeAssetModal = (open: boolean) => {
+    setShowAssetModal(open);
+    if (!open) {
+      setStartInEditMode(false);
+      setModalReadOnly(false);
+      setSelectedAsset(null);
+      setSelectedEntry(null);
     }
-  }
-
-  const handleManualScan = async () => {
-    if (!manualAssetNumber.trim()) return
-
-    setScanning(true)
-    setScanError('')
-
-    try {
-      // Get token from localStorage
-      const token = localStorage.getItem('auth_token')
-      if (!token) {
-        console.error('No auth token found')
-        setScanError('Authentication required')
-        setScanning(false)
-        return
-      }
-
-      const response = await fetch(`/api/so-sessions/${params.id}/scan/`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ assetNumber: manualAssetNumber.trim() })
-      })
-
-      const data = await response.json()
-
-      if (response.ok) {
-        const assetNumber = manualAssetNumber.trim()
-        setManualAssetNumber('')
-
-        // Auto-open edit dialog with API response data
-        await handleScanSuccessAndEdit({
-          assetNumber,
-          entry: data.entry
-        })
-
-        fetchScannedAssets()
-        fetchSession()
-      } else {
-        setScanError(data.error || 'Failed to scan asset')
-      }
-    } catch (error) {
-      setScanError('Network error. Please try again.')
-    } finally {
-      setScanning(false)
-    }
-  }
-  const handleEditAsset = (asset: SOAssetEntry) => {
-    setSelectedAsset(asset)
-    const employeeLabel = asset.tempPic || formatEmployeeLabel(asset.asset?.employee)
-    const employeeId = asset.asset?.employee?.id ?? ''
-    const resolvedPicId = employeeId || employeeLabel || ''
-
-    setEditForm({
-      tempName: asset.tempName || asset.asset.name || '',
-      tempStatus: asset.tempStatus || asset.asset.status || 'Unidentified',
-      tempSerialNo: asset.tempSerialNo || asset.asset.serialNo || '',
-      tempPic: employeeLabel || asset.asset.pic || '',
-      tempPicId: resolvedPicId,
-      tempNotes: asset.tempNotes || '',
-      tempBrand: asset.tempBrand || asset.asset.brand || '',
-      tempModel: asset.tempModel || asset.asset.model || '',
-      tempCost: asset.tempCost?.toString() || asset.asset.cost?.toString() || '',
-      tempPurchaseDate: asset.asset.dateCreated ? new Date(asset.asset.dateCreated).toISOString().split('T')[0] : '',
-      tempSiteId: asset.asset.site?.id || '',
-      tempCategoryId: asset.asset.category?.id || '',
-    tempDepartmentId: asset.asset.department?.id || '',
-    isIdentified: asset.isIdentified,
-    assetNumber: asset.asset.noAsset || ''
-  })
-    setShowEditDialog(true)
-  }
-
-  const handleScanSuccessAndEdit = async (assetData: any) => {
-    // Show success message
-    toast.success(`Asset scanned: ${assetData.assetNumber}`)
-
-    // If we have API response data, use it immediately
-    if (assetData.entry) {
-      console.log('Using API response entry:', assetData.entry)
-      handleEditAsset(assetData.entry)
-      return
-    }
-
-    // Wait a moment for state to update and user to see success message
-    setTimeout(async () => {
-      try {
-        // Find newly scanned asset - this should now be in scannedAssets
-        const newAsset = scannedAssets.find(entry =>
-          entry.asset.noAsset === assetData.assetNumber
-        )
-
-        if (newAsset) {
-          console.log('Found new asset:', newAsset)
-          handleEditAsset(newAsset)
-        } else {
-          // If not found in scannedAssets, try to get it directly from API
-          console.log('Asset not found in scannedAssets, fetching from API...')
-          // Get token from localStorage
-          const token = localStorage.getItem('auth_token')
-          if (token) {
-            const response = await fetch(`/api/so-sessions/${params.id}/entries/?search=${encodeURIComponent(assetData.assetNumber)}`, {
-              headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-              }
-            })
-            if (response.ok) {
-              const responseData = await response.json()
-              const entries = Array.isArray(responseData)
-                ? responseData
-                : Array.isArray(responseData.entries)
-                  ? responseData.entries
-                  : []
-              const latestEntry = entries.find((entry: any) => entry.asset?.noAsset === assetData.assetNumber)
-              if (latestEntry) {
-                console.log('Found asset from API:', latestEntry)
-                handleEditAsset(latestEntry)
-              }
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Error finding scanned asset for edit:', error)
-        toast.error('Unable to open edit dialog for scanned asset')
-      }
-    }, 1000) // Increased timeout to ensure state is updated
-  }
-
-  const handleSaveEdit = async () => {
-    if (!selectedAsset) return
-
-    try {
-      console.log('DEBUG: Frontend - editForm before sending:', editForm)
-      console.log('DEBUG: Frontend - tempStatus value:', editForm.tempStatus)
-      console.log('DEBUG: Frontend - tempPic value:', editForm.tempPic)
-
-      // Get token from localStorage
-      const token = localStorage.getItem('auth_token')
-      if (!token) {
-        console.error('No auth token found')
-        toast.error('Authentication required')
-        return
-      }
-
-      const response = await fetch(`/api/so-sessions/${params.id}/entries/${selectedAsset.id}/`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(editForm)
-      })
-
-      const data = await response.json()
-
-      if (response.ok) {
-        console.log('DEBUG: Frontend - API response successful:', data)
-        console.log('DEBUG: Frontend - Updated entry tempStatus:', data.entry?.tempStatus)
-        toast.success('Asset updated successfully!')
-        setShowEditDialog(false)
-        setSelectedAsset(null)
-        
-        // Force refresh with a small delay to ensure database is updated
-        setTimeout(() => {
-          fetchScannedAssets()
-        }, 500)
-      } else {
-        console.error('DEBUG: Frontend - Save failed:', data)
-        toast.error(data.error || 'Failed to update asset')
-      }
-    } catch (error) {
-      console.error('Error updating asset:', error)
-      toast.error('Network error. Please try again.')
-    }
-  }
-
-  const generateAssetNumber = async (siteId: string, categoryId: string) => {
-    if (!siteId || !categoryId) return ''
-
-    try {
-      // Get token from localStorage
-      const token = localStorage.getItem('auth_token')
-      if (!token) {
-        console.error('No auth token found')
-        return ''
-      }
-
-      const params = new URLSearchParams({ siteId, categoryId })
-      console.log('DEBUG: Generating asset number with params:', params.toString())
-      
-      const response = await fetch(`/api/assets/generate-number?${params}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        console.log('DEBUG: API response for asset number generation:', data)
-        console.log('DEBUG: data.assetNumber:', data.assetNumber)
-        console.log('DEBUG: data.number:', data.number)
-        
-        // Fix: Use the correct field name from API response
-        const assetNumber = data.number || data.assetNumber || ''
-        console.log('DEBUG: Final asset number to return:', assetNumber)
-        return assetNumber
-      }
-    } catch (error) {
-      console.error('Error generating asset number:', error)
-    }
-
-    return ''
-  }
-
-  const handleSiteChange = async (siteId: string) => {
-    console.log('DEBUG: handleSiteChange called with siteId:', siteId)
-    console.log('DEBUG: Current categoryId:', editForm.tempCategoryId)
-
-    setEditForm(prev => ({
-      ...prev,
-      tempSiteId: siteId
-    }))
-
-    // Auto-generate asset number if both site and category are selected
-    const categoryId = editForm.tempCategoryId
-    if (siteId && categoryId) {
-      console.log('DEBUG: Both site and category selected, generating asset number...')
-      const newAssetNumber = await generateAssetNumber(siteId, categoryId)
-      console.log('DEBUG: Generated asset number:', newAssetNumber)
-      if (newAssetNumber) {
-        setEditForm(prev => ({
-          ...prev,
-          assetNumber: newAssetNumber
-        }))
-      }
-    }
-  }
-
-  const handleCategoryChange = async (categoryId: string) => {
-    console.log('DEBUG: handleCategoryChange called with categoryId:', categoryId)
-    console.log('DEBUG: Current siteId:', editForm.tempSiteId)
-
-    setEditForm(prev => ({
-      ...prev,
-      tempCategoryId: categoryId
-    }))
-
-    // Auto-generate asset number if both site and category are selected
-    const siteId = editForm.tempSiteId
-    if (categoryId && siteId) {
-      console.log('DEBUG: Both category and site selected, generating asset number...')
-      const newAssetNumber = await generateAssetNumber(siteId, categoryId)
-      console.log('DEBUG: Generated asset number:', newAssetNumber)
-      if (newAssetNumber) {
-        setEditForm(prev => ({
-          ...prev,
-          assetNumber: newAssetNumber
-        }))
-      }
-    }
-  }
-
-  const handleCompleteSO = async () => {
-    setCompleting(true)
-    try {
-      console.log('DEBUG: Starting SO completion for session:', params.id)
-      
-      // Get token from localStorage
-      const token = localStorage.getItem('auth_token')
-      if (!token) {
-        console.error('No auth token found')
-        toast.error('Authentication required')
-        setCompleting(false)
-        return
-      }
-
-      const response = await fetch(`/api/so-sessions/${params.id}/complete/`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      })
-
-      const data = await response.json()
-      console.log('DEBUG: SO completion response:', data)
-
-      if (response.ok) {
-        console.log('DEBUG: SO completed successfully, assets updated:', data.assetsUpdated)
-        setShowCompleteDialog(false)
-        router.push('/so-asset')
-      } else {
-        console.error('DEBUG: SO completion failed:', data)
-        toast.error(data.error || 'Failed to complete session')
-      }
-    } catch (error) {
-      console.error('DEBUG: Error completing SO:', error)
-      toast.error('Network error. Please try again.')
-    } finally {
-      setCompleting(false)
-    }
-  }
-
-  const handleCancelSO = async () => {
-    setCancelling(true)
-    try {
-      // Get token from localStorage
-      const token = localStorage.getItem('auth_token')
-      if (!token) {
-        console.error('No auth token found')
-        toast.error('Authentication required')
-        setCancelling(false)
-        return
-      }
-
-      const response = await fetch(`/api/so-sessions/${params.id}/cancel/`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      })
-
-      if (response.ok) {
-        setShowCancelDialog(false)
-        router.push('/so-asset')
-      } else {
-        const errorData = await response.json()
-        toast.error(errorData.error || 'Failed to cancel session')
-      }
-    } catch (error) {
-      console.error('Error cancelling SO:', error)
-      toast.error('Network error. Please try again.')
-    } finally {
-      setCancelling(false)
-    }
-  }
-
-  
-  const getProgressPercentage = () => {
-    if (!session || totalAssets === undefined || totalAssets === null || totalAssets === 0) return 0
-    const scanned = scannedCount || 0
-    return Math.round((scanned / totalAssets) * 100)
-  }
-
-  const getIdentifiedCount = () => {
-    return scannedAssets.filter(entry => entry.isIdentified).length
-  }
-
-  const getDisplayLimit = () => 5 // Limit to 5 assets per section
-
-  const getIdentifiedPercentage = () => {
-    if (scannedAssets.length === 0) return 0
-    return Math.round((getIdentifiedCount() / scannedAssets.length) * 100)
-  }
-
-  
-  // QR Scanner functions
-  const getVideoDevices = async () => {
-    try {
-      const devices = await Html5Qrcode.getCameras()
-      setDevices(devices)
-      if (devices.length > 0) {
-        setSelectedDevice(devices[0].id)
-      }
-    } catch (error) {
-      console.error('Error getting video devices:', error)
-    }
-  }
-
-  const cleanupScanner = async () => {
-    if (scannerRef.current) {
-      try {
-        if (scannerRef.current.isScanning) {
-          await scannerRef.current.stop()
-        }
-        await scannerRef.current.clear()
-      } catch (error) {
-        console.debug('Scanner cleanup error (ignored):', error)
-      } finally {
-        scannerRef.current = null
-      }
-    }
-  }
-
-  const startQRScanning = async () => {
-    if (!selectedDevice) {
-      toast.error('No camera selected')
-      return
-    }
-
-    if (isQRScanning) {
-      await cleanupScanner()
-    }
-
-    setIsQRScanning(true)
-    setScanError('')
-
-    try {
-      const scanner = new Html5Qrcode(scanRegionId)
-      scannerRef.current = scanner
-
-      await scanner.start(
-        selectedDevice,
-        {
-          fps: 10,
-          qrbox: { width: 300, height: 300 },
-          aspectRatio: 1.0
-        },
-        (decodedText) => {
-          if (decodedText && typeof decodedText === 'string' && decodedText.trim().length > 0) {
-            handleQRScanSuccess(decodedText)
-          }
-        },
-        (errorMessage) => {
-          // Silently handle scan errors
-        }
-      )
-    } catch (error) {
-      console.error('Error starting QR scanner:', error)
-      setIsQRScanning(false)
-      scannerRef.current = null
-
-      if (error instanceof Error) {
-        if (error.message.includes('NotAllowedError')) {
-          toast.error('Camera access denied. Please allow camera permissions')
-        } else if (error.message.includes('NotFoundError')) {
-          toast.error('No camera found. Please connect a camera device')
-        } else {
-          toast.error('Failed to start camera scanner')
-        }
-      }
-    }
-  }
-
-  const stopQRScanning = async () => {
-    await cleanupScanner()
-    setIsQRScanning(false)
-  }
-
-  const handleQRScanSuccess = async (decodedText: string) => {
-    let assetNumber = decodedText.trim()
-
-    if (scanning) return // Prevent multiple simultaneous scans
-
-    setScanning(true)
-    setScanError('')
-
-    try {
-      // Get token from localStorage
-      const token = localStorage.getItem('auth_token')
-      if (!token) {
-        console.error('No auth token found')
-        setScanError('Authentication required')
-        setScanning(false)
-        return
-      }
-
-      const response = await fetch(`/api/so-sessions/${params.id}/scan/`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ assetNumber })
-      })
-
-      const data = await response.json()
-
-      if (response.ok) {
-        // Auto-open edit dialog with API response data
-        await handleScanSuccessAndEdit({
-          assetNumber,
-          entry: data.entry
-        })
-
-        fetchScannedAssets()
-        fetchSession()
-        stopQRScanning()
-      } else {
-        setScanError(data.error || 'Failed to scan asset')
-        toast.error(data.error || 'Failed to scan asset')
-      }
-    } catch (error) {
-      setScanError('Network error. Please try again.')
-      toast.error('Network error. Please try again.')
-    } finally {
-      setScanning(false)
-    }
-  }
-
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) return
-
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please select an image file')
-      return
-    }
-
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error('File size must be less than 10MB')
-      return
-    }
-
-    const scanner = new Html5Qrcode(scanRegionId)
-
-    try {
-      const result = await scanner.scanFile(file, true)
-      await handleQRScanSuccess(result)
-    } catch (error: any) {
-      if (error.message.includes('No QR code found')) {
-        toast.error('No QR code found in image')
-      } else {
-        toast.error('Failed to scan QR code from image')
-      }
-    }
-  }
-
-  const switchCamera = async () => {
-    const currentIndex = devices.findIndex((device: any) => device.id === selectedDevice)
-    const nextIndex = (currentIndex + 1) % devices.length
-    const nextDevice = devices[nextIndex]
-
-    if (nextDevice) {
-      setSelectedDevice(nextDevice.id)
-
-      if (isQRScanning && scannerRef.current) {
-        try {
-          await cleanupScanner()
-          setTimeout(() => {
-            startQRScanning()
-          }, 500)
-        } catch (error) {
-          console.error('Error switching camera:', error)
-        }
-      }
-    }
-  }
-
-  const filteredAssets = scannedAssets.filter(entry =>
-    entry.asset.noAsset?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    entry.asset.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    entry.asset.serialNo?.toLowerCase().includes(searchQuery.toLowerCase())
-  )
-
-  if (loading) {
-    return (
-      <div className="container mx-auto py-8">
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <Clock className="h-8 w-8 animate-spin mx-auto mb-4" />
-            <p>Loading session...</p>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  if (!session) {
-    return (
-      <div className="container mx-auto py-8">
-        <Alert>
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>Session not found</AlertDescription>
-        </Alert>
-      </div>
-    )
-  }
-
-
+  };
+
+  const emptyState = (
+    <div className="surface-card border border-dashed border-surface-border/80 py-10 text-center text-sm text-text-muted">
+      <AlertCircle className="mx-auto mb-3 h-5 w-5 text-primary" />
+      <p>Tidak ada aset yang sesuai dengan pencarian</p>
+    </div>
+  );
   return (
-    <div className="container mx-auto py-3 px-1.5 sm:py-6 sm:px-4 max-w-7xl min-h-screen w-full overflow-x-hidden">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6 gap-3">
-        <div className="flex items-center gap-2 sm:gap-4">
-          <Link href="/so-asset">
-            <Button variant="outline" size="sm" className="flex-shrink-0">
-              <ArrowLeft className="h-4 w-4 mr-1 sm:mr-2" />
-              <span className="hidden sm:inline">Back</span>
+    <div className="min-h-screen bg-background px-4 py-6 sm:px-6 lg:px-10">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
+        <div>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => router.push("/so-asset")}
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Kembali
             </Button>
-          </Link>
-          <div className="min-w-0 flex-1">
-            <h1 className="text-lg sm:text-2xl font-bold truncate">{session.name}</h1>
-            <p className="text-xs sm:text-sm text-muted-foreground">Stock Opname {session.year}</p>
+            <Badge
+              variant={
+                session?.status === "Active" ? "default" : "secondary"
+              }
+              className="text-xs"
+            >
+              {session?.status || "Loading"}
+            </Badge>
           </div>
-          <Badge variant={session.status === 'Active' ? 'default' : 'secondary'} className="flex-shrink-0">
-            {session.status}
-          </Badge>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex gap-2">
-          <RoleBasedAccess allowedRoles={['ADMIN']}>
-            {getIdentifiedCount() > 0 && (
-              <Button
-                onClick={() => setShowCompleteDialog(true)}
-                variant="default"
-                size="sm"
-                className="flex-shrink-0 bg-green-600 hover:bg-green-700"
-              >
-                <CheckCheck className="h-4 w-4 mr-1 sm:mr-2" />
-                <span className="hidden sm:inline">Complete</span>
-              </Button>
-            )}
-            {scannedCount > 0 && (
-              <Button
-                onClick={() => setShowCancelDialog(true)}
-                variant="outline"
-                size="sm"
-                className="flex-shrink-0"
-              >
-                <XCircle className="h-4 w-4 mr-1 sm:mr-2" />
-                <span className="hidden sm:inline">Cancel</span>
-              </Button>
-            )}
-          </RoleBasedAccess>
-        </div>
-      </div>
-
-      {/* Progress Summary */}
-      <Card className="mb-4 sm:mb-6">
-        <CardContent className="pt-4 sm:pt-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div>
-              <h3 className="font-semibold mb-1 text-sm sm:text-base">Scanning Progress</h3>
-              <p className="text-xs sm:text-sm text-muted-foreground">
-                {scannedCount} of {totalAssets} assets scanned
-              </p>
-              <p className="text-xs sm:text-sm text-green-600 font-medium">
-                ✓ {getIdentifiedCount()} assets verified
-              </p>
+          <div className="mt-4 flex flex-col gap-2">
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="text-2xl font-semibold text-foreground">
+                {session?.name || "Memuat sesi..."}
+              </h1>
+              {session?.year ? (
+                <span className="text-sm text-text-muted">
+                  Tahun {session.year}
+                </span>
+              ) : null}
             </div>
-            <div className="text-center sm:text-right">
-              <div className="text-xl sm:text-2xl font-bold">{getProgressPercentage()}%</div>
-              <div className="text-xs sm:text-sm text-muted-foreground">Complete</div>
-            </div>
+            <p className="text-sm text-text-muted">
+              Lakukan scanning barcode atau input manual untuk mencatat aset dalam sesi ini. Setiap scan akan membuka form edit aset yang sama dengan halaman utama Assets.
+            </p>
           </div>
-          <Progress value={getProgressPercentage()} className="mt-3 sm:mt-4" />
-        </CardContent>
-      </Card>
-
-      <div className="grid gap-3 sm:gap-6 lg:grid-cols-2 grid-cols-1">
-        {/* Scanner & Controls */}
-        <div className="space-y-3 sm:space-y-4">
-          <Card>
-            <CardHeader className="pb-2 sm:pb-6 px-3 sm:px-6">
-              <CardTitle className="flex items-center gap-1 sm:gap-2 text-sm sm:text-lg">
-                <QrCode className="h-3 w-3 sm:h-5 sm:w-5" />
-                <span className="hidden sm:inline">Asset Scanner</span>
-                <span className="sm:hidden">Scanner</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 sm:space-y-4 px-3 sm:px-6">
-              {/* QR Scanner */}
-              <div className="relative bg-black aspect-square sm:aspect-square rounded-lg overflow-hidden">
-                <div id={scanRegionId} className="w-full h-full" />
- 
-                {!isQRScanning && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-black bg-opacity-90 text-white px-4">
-                    <Smartphone className="h-8 w-8 sm:h-12 sm:w-12 mb-2 sm:mb-3 opacity-80" />
-                    <p className="text-xs sm:text-sm text-center">Ready to scan</p>
-                  </div>
-                )}
- 
-                {scanning && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-black bg-opacity-90 text-white px-4">
-                    <div className="animate-spin h-6 w-6 sm:h-8 sm:w-8 border-4 border-white border-t-transparent rounded-full mb-2 sm:mb-3"></div>
-                    <p className="text-xs sm:text-sm text-center">Processing...</p>
-                  </div>
-                )}
-              </div>
-
-              {/* Scanner Controls */}
-              <div className="flex gap-1 sm:gap-2">
-                {!isQRScanning ? (
-                  <Button onClick={startQRScanning} className="flex-1 px-1 sm:px-3">
-                    <Camera className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                    <span className="text-xs sm:text-sm">Camera</span>
-                  </Button>
-                ) : (
-                  <Button onClick={stopQRScanning} variant="destructive" className="flex-1 px-1 sm:px-3">
-                    <CameraOff className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                    <span className="text-xs sm:text-sm">Stop</span>
-                  </Button>
-                )}
-
-                <Button
-                  variant="outline"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isQRScanning}
-                  className="px-1 sm:px-2"
-                >
-                  <Upload className="h-3 w-3 sm:h-4 sm:w-4" />
-                </Button>
-
-                {devices.length > 1 && (
-                  <Button
-                    variant="outline"
-                    onClick={switchCamera}
-                    disabled={isQRScanning}
-                    className="px-1 sm:px-2"
-                  >
-                    <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4" />
-                  </Button>
-                )}
-              </div>
-
-              {/* Manual Input */}
-              <div className="space-y-1">
-                <Label htmlFor="assetNumber" className="text-xs font-medium">
-                  Manual Entry
-                </Label>
-                <div className="flex gap-1">
-                  <Input
-                    id="assetNumber"
-                    value={manualAssetNumber}
-                    onChange={(e) => setManualAssetNumber(e.target.value)}
-                    placeholder="e.g., FA001/I/01"
-                    onKeyPress={(e) => e.key === 'Enter' && handleManualScan()}
-                    className="flex-1 text-xs"
-                  />
-                  <Button
-                    onClick={handleManualScan}
-                    disabled={scanning || !manualAssetNumber.trim()}
-                    className="px-2"
-                  >
-                    <span className="text-xs">+</span>
-                  </Button>
-                </div>
-              </div>
-
-              {scanError && (
-                <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>{scanError}</AlertDescription>
-                </Alert>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Quick Actions */}
-          {scannedCount === totalAssets && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-green-700">Session Complete!</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <Button onClick={() => setShowCompleteDialog(true)} className="w-full">
-                  <Flag className="h-4 w-4 mr-2" />
-                  Complete Stock Opname
-                </Button>
-              </CardContent>
-            </Card>
-          )}
         </div>
 
-        {/* Asset Lists */}
-        <div className="space-y-2 sm:space-y-4">
-          {/* Recently Scanned */}
-          <Card>
-            <CardHeader className="pb-1 sm:pb-3 px-3 sm:px-6">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm sm:text-lg">Scanned</CardTitle>
-                <div className="text-xs text-muted-foreground">
-                  {scannedAssets.length}
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="px-3 sm:px-6">
-              {scannedAssets.length === 0 ? (
-                <div className="text-center py-4 sm:py-8 text-muted-foreground">
-                  <Package className="h-6 w-6 sm:h-12 sm:w-12 mx-auto mb-1 sm:mb-3 opacity-30" />
-                  <p className="text-xs sm:text-sm">No assets scanned</p>
-                </div>
-              ) : (
-                <div className="space-y-1 max-h-48 sm:max-h-96 overflow-y-auto">
-                  {scannedAssets.slice(0, 5).map((entry) => (
-                    <div
-                      key={entry.id}
-                      className={`flex items-center justify-between p-1.5 sm:p-3 rounded border ${
-                        entry.isIdentified
-                          ? 'bg-green-50 border-green-200'
-                          : 'bg-orange-50 border-orange-200'
-                      }`}
-                    >
-                      <div className="flex-1 min-w-0 pr-1">
-                        <div className="flex items-center gap-1 mb-0.5">
-                          <span className="font-medium text-xs truncate">{entry.asset.noAsset}</span>
-                          <Badge
-                            variant={entry.isIdentified ? "default" : "secondary"}
-                            className="text-xs px-1 py-0"
-                          >
-                          {entry.isIdentified ? "✓" : "?"}
-                          </Badge>
-                          <Badge
-                            variant="outline"
-                            className={`text-xs px-1 py-0 ${
-                              entry.tempStatus === 'Active' ? 'border-green-500 text-green-700' :
-                              entry.tempStatus === 'Broken' ? 'border-red-500 text-red-700' :
-                              entry.tempStatus === 'Lost/Missing' ? 'border-orange-500 text-orange-700' :
-                              'border-gray-500 text-gray-700'
-                            }`}
-                          >
-                            {entry.tempStatus}
-                          </Badge>
-                        </div>
-                        <p className="text-xs text-muted-foreground truncate">
-                          {entry.tempName || entry.asset.name}
-                        </p>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleEditAsset(entry)}
-                        className="p-0.5 sm:p-2 flex-shrink-0"
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
+          <AssetScanPanel
+            onDetected={handleAssetSelection}
+            description="Lakukan scan barcode atau input manual untuk mencatat aset dalam sesi ini."
+            manualPlaceholder="Masukkan nomor aset (contoh: FA001/I/01)"
+            manualHelperText="Gunakan input manual jika barcode sulit terbaca kamera."
+          />
+          <div className="space-y-4">
+            <Card className="surface-card border border-surface-border/70 shadow-none">
+              <CardContent className="space-y-4 pt-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
+                    <input
+                      type="text"
+                      placeholder="Cari aset (nama, nomor aset, PIC, status, dsb)"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="sneat-input h-12 w-full pl-12 text-sm"
+                    />
+                  </div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        type="button"
+                        aria-label="Filter dan urutkan aset"
+                        className="relative inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-surface-border bg-background text-sm font-semibold text-foreground shadow-sm transition hover:border-primary/40 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2"
                       >
-                        <Edit className="h-2.5 w-2.5 sm:h-4 sm:w-4" />
-                      </Button>
-                    </div>
-                  ))}
+                        <Filter className="h-4 w-4" />
+                        <span className="sr-only">Filter & Sort</span>
+                        {showActiveFilterDot ? (
+                          <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-primary shadow-[0_0_0_3px_rgba(255,255,255,0.9)]" />
+                        ) : null}
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-80 p-0">
+                      <div className="space-y-4 p-3">
+                        <div className="flex items-center justify-between">
+                          <DropdownMenuLabel className="p-0 text-[0.6rem] uppercase tracking-[0.3em] text-text-muted">
+                            Filter & Sort
+                          </DropdownMenuLabel>
+                          {showActiveFilterDot ? (
+                            <button
+                              type="button"
+                              onClick={resetFiltersAndSort}
+                              className="text-[0.7rem] font-semibold text-primary hover:text-primary/80"
+                            >
+                              Reset
+                            </button>
+                          ) : null}
+                        </div>
 
-                  {scannedAssets.length > 5 && (
-                    <div className="text-center pt-1">
-                      <Link href={`/so-asset/${params.id}/identified-assets`}>
-                        <Button variant="outline" size="sm" className="text-xs">
-                          View All ({scannedAssets.length})
-                        </Button>
-                      </Link>
+                        <div>
+                          <p className="text-[0.65rem] uppercase text-text-muted">
+                            Filter status
+                          </p>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {["all", ...statusOptions].map((status) => (
+                              <button
+                                key={status || "all-status"}
+                                type="button"
+                                onClick={() =>
+                                  handleFilterChange("status", status || "all")
+                                }
+                                className={filterChipClass(
+                                  filters.status === (status || "all")
+                                )}
+                              >
+                                {status === "all" ? "Semua status" : status}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {categoryOptions.length > 0 && (
+                          <div>
+                            <p className="text-[0.65rem] uppercase text-text-muted">
+                              Filter kategori
+                            </p>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {["all", ...categoryOptions].map((category) => (
+                                <button
+                                  key={category || "all-category"}
+                                  type="button"
+                                  onClick={() =>
+                                    handleFilterChange(
+                                      "category",
+                                      category || "all"
+                                    )
+                                  }
+                                  className={filterChipClass(
+                                    filters.category === (category || "all")
+                                  )}
+                                >
+                                  {category === "all"
+                                    ? "Semua kategori"
+                                    : category}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {siteOptions.length > 0 && (
+                          <div>
+                            <p className="text-[0.65rem] uppercase text-text-muted">
+                              Filter lokasi
+                            </p>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {["all", ...siteOptions].map((site) => (
+                                <button
+                                  key={site || "all-site"}
+                                  type="button"
+                                  onClick={() =>
+                                    handleFilterChange("site", site || "all")
+                                  }
+                                  className={filterChipClass(
+                                    filters.site === (site || "all")
+                                  )}
+                                >
+                                  {site === "all" ? "Semua lokasi" : site}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {departmentOptions.length > 0 && (
+                          <div>
+                            <p className="text-[0.65rem] uppercase text-text-muted">
+                              Filter department
+                            </p>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {["all", ...departmentOptions].map((dept) => (
+                                <button
+                                  key={dept || "all-department"}
+                                  type="button"
+                                  onClick={() =>
+                                    handleFilterChange("department", dept || "all")
+                                  }
+                                  className={filterChipClass(
+                                    filters.department === (dept || "all")
+                                  )}
+                                >
+                                  {dept === "all" ? "Semua department" : dept}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        <div>
+                          <p className="text-[0.65rem] uppercase text-text-muted">
+                            Urutkan
+                          </p>
+                          <div className="mt-2 grid grid-cols-2 gap-2">
+                            {sortOptionsList.map((option) => (
+                              <button
+                                key={option.value}
+                                type="button"
+                                onClick={() => setSortOption(option.value)}
+                                className={sortTileClass(
+                                  sortOption === option.value
+                                )}
+                              >
+                                <span className="text-[0.75rem]">
+                                  {option.label}
+                                </span>
+                                <p className="mt-1 text-[0.65rem] font-normal text-text-muted">
+                                  {option.description}
+                                </p>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                      <DropdownMenuSeparator className="mt-0" />
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+
+                <Tabs
+                  value={activeList}
+                  onValueChange={(value) =>
+                    setActiveList(value as "scanned" | "remaining")
+                  }
+                >
+                  <TabsList className="grid w-full grid-cols-2 rounded-2xl bg-surface">
+                    <TabsTrigger value="scanned" className="rounded-xl">
+                      Scanned ({filteredScannedEntries.length})
+                    </TabsTrigger>
+                    <TabsTrigger value="remaining" className="rounded-xl">
+                      Remaining ({filteredRemainingAssets.length})
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
+
+                <div className="max-h-[70vh] space-y-3 overflow-y-auto pr-1">
+                  {loadingData ? (
+                    <div className="space-y-3">
+                      {[1, 2, 3].map((item) => (
+                        <div
+                          key={item}
+                          className="h-20 rounded-2xl bg-surface-border/40 animate-pulse"
+                        />
+                      ))}
                     </div>
+                  ) : activeList === "scanned" ? (
+                    filteredScannedEntries.length === 0 ? (
+                      emptyState
+                    ) : (
+                      filteredScannedEntries.map((entry) => (
+                        <div
+                          key={entry.id}
+                          className="rounded-2xl border border-surface-border/80 bg-surface p-4 shadow-sm"
+                        >
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                            <div className="space-y-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <h3 className="text-base font-semibold text-foreground">
+                                  {entry.asset?.name}
+                                </h3>
+                                <Badge
+                                  className={`text-[0.65rem] ${getStatusColor(
+                                    entry.asset?.status || ""
+                                  )}`}
+                                >
+                                  {entry.asset?.status}
+                                </Badge>
+                              </div>
+                              <p className="font-mono text-xs text-primary">
+                                {entry.asset?.noAsset}
+                              </p>
+                              <p className="text-[0.65rem] uppercase text-text-muted">
+                                Discan pada {formatDate(entry.scannedAt)}
+                              </p>
+                              <div className="text-xs text-text-muted">
+                                <span className="mr-4">
+                                  {entry.asset?.site?.name || "Lokasi tidak ada"}
+                                </span>
+                                <span>{entry.asset?.category?.name || "Kategori tidak ada"}</span>
+                              </div>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => openAssetModal(entry.asset, { startEdit: true, entry })}
+                                className="justify-center"
+                              >
+                                <Eye className="mr-2 h-3.5 w-3.5" />
+                                Edit Asset
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )
+                  ) : filteredRemainingAssets.length === 0 ? (
+                    emptyState
+                  ) : (
+                    filteredRemainingAssets.map(({ asset }) => (
+                      <div
+                        key={asset.id}
+                        className="rounded-2xl border border-dashed border-surface-border bg-surface/40 p-4"
+                      >
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                            <h3 className="text-sm font-semibold text-foreground">
+                              {asset.name}
+                            </h3>
+                            <p className="font-mono text-xs text-primary">
+                              {asset.noAsset}
+                            </p>
+                            <p className="text-[0.65rem] text-text-muted">
+                              {asset.site?.name || "Lokasi belum diatur"}
+                            </p>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => openAssetModal(asset, { readOnly: true })}
+                            >
+                              <Eye className="mr-2 h-3.5 w-3.5" />
+                              Detail asset
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))
                   )}
                 </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Quick Stats */}
-          <div className="grid grid-cols-2 gap-2 sm:gap-4">
-            <Card>
-              <CardContent className="pt-2 sm:pt-4 px-3 sm:px-6">
-                <div className="flex items-center gap-1.5 sm:gap-2">
-                  <div className="w-5 h-5 sm:w-8 sm:h-8 bg-green-100 rounded-full flex items-center justify-center">
-                    <CheckCheck className="h-2.5 w-2.5 sm:h-4 sm:w-4 text-green-700" />
-                  </div>
-                  <div>
-                    <div className="text-base sm:text-2xl font-bold">{getIdentifiedCount()}</div>
-                    <div className="text-xs text-muted-foreground">Verified</div>
-                  </div>
-                </div>
               </CardContent>
             </Card>
-
-            <Card>
-              <CardContent className="pt-2 sm:pt-4 px-3 sm:px-6">
-                <div className="flex items-center gap-1.5 sm:gap-2">
-                  <div className="w-5 h-5 sm:w-8 sm:h-8 bg-orange-100 rounded-full flex items-center justify-center">
-                    <Package className="h-2.5 w-2.5 sm:h-4 sm:w-4 text-orange-700" />
-                  </div>
-                  <div>
-                    <div className="text-base sm:text-2xl font-bold">
-                      {remainingAssets}
-                    </div>
-                    <div className="text-xs text-muted-foreground">Left</div>
-                  </div>
+            {session?.status === "Active" && (
+              <div className="rounded-2xl border border-surface-border/70 bg-surface/70 p-5 shadow-sm sm:flex sm:items-center">
+                <div className="flex w-full flex-col gap-3 sm:flex-row">
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="lg"
+                    className="h-11 w-full justify-center sm:flex-1"
+                    onClick={() => setPendingSessionAction("delete")}
+                    disabled={sessionActionLoading}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="lg"
+                    className="h-11 w-full justify-center border-destructive/60 text-destructive hover:bg-destructive/10 sm:flex-1"
+                    onClick={() => setPendingSessionAction("cancel")}
+                    disabled={sessionActionLoading}
+                  >
+                    <XCircle className="mr-2 h-4 w-4" />
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    size="lg"
+                    className="h-11 w-full justify-center bg-primary text-white hover:bg-primary/90 sm:flex-[2]"
+                    onClick={() => setPendingSessionAction("complete")}
+                    disabled={sessionActionLoading}
+                  >
+                    <CheckCircle className="mr-2 h-4 w-4" />
+                    Complete
+                  </Button>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Navigation */}
-          <Card>
-            <CardContent className="pt-2 sm:pt-4 px-3 sm:px-6">
-              <div className="grid grid-cols-2 gap-1.5">
-                <Link href={`/so-asset/${params.id}/identified-assets`}>
-                  <Button variant="outline" className="w-full text-xs px-1 py-1">
-                    <CheckCheck className="h-2.5 w-2.5 sm:h-4 sm:w-4 mr-0.5" />
-                    <span>All</span>
-                  </Button>
-                </Link>
-                <Link href={`/so-asset/${params.id}/unidentified-assets`}>
-                  <Button variant="outline" className="w-full text-xs px-1 py-1">
-                    <Package className="h-2.5 w-2.5 sm:h-4 sm:w-4 mr-0.5" />
-                    <span>Left</span>
-                  </Button>
-                </Link>
               </div>
-            </CardContent>
-          </Card>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Complete SO Dialog */}
-      <Dialog open={showCompleteDialog} onOpenChange={setShowCompleteDialog}>
-        <DialogContent className="w-10/11 sm:w-full mx-auto max-w-md">
-          <DialogHeader className="pb-3 sm:pb-4">
-            <DialogTitle className="text-lg sm:text-xl">Complete Stock Opname</DialogTitle>
-            <DialogDescription className="text-xs sm:text-sm">
-              Are you sure you want to complete this stock opname session?
-              This will update the main asset list with all changes made during this session.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3 sm:space-y-4">
-            <div className="bg-muted p-3 sm:p-4 rounded-lg">
-              <h4 className="font-medium mb-2 text-sm sm:text-base">Session Summary:</h4>
-              <div className="text-xs sm:text-sm space-y-1">
-                <div>Session: {session?.name}</div>
-                <div>Assets Scanned: {session?.scannedAssets}</div>
-                <div>Assets Verified: {getIdentifiedCount()}</div>
-                <div>Total Assets: {session?.totalAssets}</div>
-                <div>Progress: {getProgressPercentage()}%</div>
-              </div>
-            </div>
-            <Alert>
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription className="text-xs sm:text-sm">
-                This action cannot be undone. All temporary changes will be applied to the main asset list.
-              </AlertDescription>
-            </Alert>
-            <div className="flex flex-col sm:flex-row gap-2">
-              <Button variant="outline" onClick={() => setShowCompleteDialog(false)} className="w-full sm:w-auto">
-                Cancel
-              </Button>
-              <Button onClick={handleCompleteSO} disabled={completing} className="w-full sm:w-auto">
-                {completing ? (
-                  <Clock className="h-3 w-3 sm:h-4 sm:w-4 animate-spin mr-1 sm:mr-2" />
-                ) : (
-                  <Flag className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                )}
-                Complete SO
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <AlertDialog
+        open={Boolean(pendingSessionAction)}
+        onOpenChange={(open) => {
+          if (!open && !sessionActionLoading) {
+            setPendingSessionAction(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{actionDialogCopy.title}</AlertDialogTitle>
+            <AlertDialogDescription>{actionDialogCopy.description}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={sessionActionLoading}>
+              Batal
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleSessionAction}
+              disabled={sessionActionLoading}
+              className={
+                actionDialogCopy.destructive
+                  ? "bg-destructive text-white hover:bg-destructive/90"
+                  : "bg-primary text-white hover:bg-primary/90"
+              }
+            >
+              {sessionActionLoading ? "Memproses..." : actionDialogCopy.confirm}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
-      {/* Edit Dialog */}
-      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto w-10/11 sm:w-full mx-auto">
-          <DialogHeader className="pb-2 sm:pb-4">
-            <DialogTitle className="text-lg sm:text-xl">Edit Asset Information</DialogTitle>
-            <DialogDescription className="text-xs sm:text-sm text-muted-foreground">
-              Update asset details for this stock opname session
-            </DialogDescription>
-          </DialogHeader>
-          {selectedAsset && (
-            <div className="space-y-3 sm:space-y-4">
-              {/* Asset Info Header */}
-              <div className="bg-muted/50 rounded-lg p-2 sm:p-3 mb-3 sm:mb-4">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
-                      <div className="font-semibold text-sm sm:text-lg truncate">{selectedAsset?.asset?.noAsset || ''}</div>
-                      <Badge variant="outline" className="text-xs self-start">
-                        Semi-auto
-                      </Badge>
-                    </div>
-                  </div>
-                  <Badge
-                    variant={editForm.isIdentified ? "default" : "secondary"}
-                    className={editForm.isIdentified ? "bg-green-100 text-green-800 border-green-200" : ""}
-                  >
-                    {editForm.isIdentified ? "Verified" : "Pending"}
-                  </Badge>
-                </div>
-              </div>
-
-              {/* Responsive Grid Layout */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                {/* First Row - Asset Number & Asset Name */}
-                <div className="space-y-2 sm:col-span-2">
-                  <Label htmlFor="assetNumber" className="text-xs sm:text-sm font-medium">Asset Number</Label>
-                  <Input
-                    id="assetNumber"
-                    value={editForm.assetNumber || selectedAsset?.asset?.noAsset || ''}
-                    disabled
-                    className="bg-gray-100 text-gray-700 text-xs sm:text-sm"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Asset number generated from the selected category and site
-                  </p>
-                </div>
-
-                <div className="space-y-2 sm:col-span-2">
-                  <Label htmlFor="tempName" className="text-xs sm:text-sm font-medium">Asset Name</Label>
-                  <Input
-                    id="tempName"
-                    value={editForm.tempName}
-                    onChange={(e) => setEditForm({ ...editForm, tempName: e.target.value })}
-                    placeholder="Enter asset name"
-                    className="text-xs sm:text-sm"
-                  />
-                </div>
-
-                {/* Second Row - Status */}
-                <div className="space-y-2">
-                  <Label htmlFor="tempStatus" className="text-xs sm:text-sm font-medium">Status</Label>
-                  <Select value={editForm.tempStatus} onValueChange={(value) => setEditForm({ ...editForm, tempStatus: value })}>
-                    <SelectTrigger className="text-xs sm:text-sm">
-                      <SelectValue placeholder="Select status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Unidentified">Unidentified</SelectItem>
-                      <SelectItem value="Active">Active</SelectItem>
-                      <SelectItem value="Broken">Broken</SelectItem>
-                      <SelectItem value="Lost/Missing">Lost/Missing</SelectItem>
-                      <SelectItem value="Sell">Sell</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Third Row - Site & Category */}
-                <div className="space-y-2">
-                  <Label htmlFor="tempSiteId" className="text-xs sm:text-sm font-medium">Site</Label>
-                  <Select value={editForm.tempSiteId} onValueChange={handleSiteChange}>
-                    <SelectTrigger className="text-xs sm:text-sm">
-                      <SelectValue placeholder="Select site" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {sites.map((site: any) => (
-                        <SelectItem key={site.id} value={site.id}>
-                          {site.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="tempCategoryId" className="text-xs sm:text-sm font-medium">Category</Label>
-                  <Select value={editForm.tempCategoryId} onValueChange={handleCategoryChange}>
-                    <SelectTrigger className="text-xs sm:text-sm">
-                      <SelectValue placeholder="Select category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories.map((category: any) => (
-                        <SelectItem key={category.id} value={category.id}>
-                          {category.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Third Row - Brand & Model */}
-                <div className="space-y-2">
-                  <Label htmlFor="tempBrand" className="text-xs sm:text-sm font-medium">Brand</Label>
-                  <Input
-                    id="tempBrand"
-                    value={editForm.tempBrand}
-                    onChange={(e) => setEditForm({ ...editForm, tempBrand: e.target.value })}
-                    placeholder="Enter brand"
-                    className="text-xs sm:text-sm"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="tempModel" className="text-xs sm:text-sm font-medium">Model</Label>
-                  <Input
-                    id="tempModel"
-                    value={editForm.tempModel}
-                    onChange={(e) => setEditForm({ ...editForm, tempModel: e.target.value })}
-                    placeholder="Enter model"
-                    className="text-xs sm:text-sm"
-                  />
-                </div>
-
-                {/* Fourth Row - Serial Number & PIC */}
-                <div className="space-y-2">
-                  <Label htmlFor="tempSerialNo" className="text-xs sm:text-sm font-medium">Serial Number</Label>
-                  <Input
-                    id="tempSerialNo"
-                    value={editForm.tempSerialNo}
-                    onChange={(e) => setEditForm({ ...editForm, tempSerialNo: e.target.value })}
-                    placeholder="Enter serial number"
-                    className="text-xs sm:text-sm"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Select
-                    value={editForm.tempPicId || undefined}
-                    onValueChange={(value) => {
-                      const selected = pics.find((pic: any) => pic.id === value)
-                      setEditForm({
-                        ...editForm,
-                        tempPicId: value,
-                        tempPic: selected?.name || ''
-                      })
-                    }}>
-                    <SelectTrigger className="text-xs sm:text-sm">
-                      <SelectValue placeholder="Select PIC" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {pics.map((pic: any) => (
-                        <SelectItem key={pic.id} value={pic.id}>
-                          {pic.name}
-                        </SelectItem>
-                      ))}
-                      {editForm.tempPicId &&
-                        editForm.tempPic &&
-                        !pics.some((pic: any) => pic.id === editForm.tempPicId) && (
-                          <SelectItem value={editForm.tempPicId} disabled>
-                            {editForm.tempPic}
-                          </SelectItem>
-                        )}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Notes (Full Width) */}
-                <div className="space-y-2 sm:col-span-2">
-                  <Label htmlFor="tempNotes" className="text-xs sm:text-sm font-medium">Notes</Label>
-                  <Textarea
-                    id="tempNotes"
-                    value={editForm.tempNotes}
-                    onChange={(e) => setEditForm({ ...editForm, tempNotes: e.target.value })}
-                    rows={2}
-                    placeholder="Additional notes (optional)"
-                    className="text-xs sm:text-sm"
-                  />
-                </div>
-              </div>
-
-              {/* Verification Section */}
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pt-3 sm:pt-4 border-t gap-3">
-                <div className="flex items-center space-x-2 sm:space-x-3">
-                  <Checkbox
-                    id="isIdentified"
-                    checked={editForm.isIdentified}
-                    onCheckedChange={(checked) => {
-                      console.log('Checkbox changed:', checked);
-                      setEditForm({ ...editForm, isIdentified: checked as boolean });
-                    }}
-                    className="cursor-pointer"
-                  />
-                  <Label htmlFor="isIdentified" className="text-xs sm:text-sm font-medium cursor-pointer">
-                    Asset verified and complete
-                  </Label>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex flex-col sm:flex-row sm:justify-end gap-2 sm:gap-3 pt-2 sm:pt-4 border-t">
-                <Button
-                  variant="outline"
-                  onClick={() => setShowEditDialog(false)}
-                  className="w-full sm:w-auto px-3 sm:px-6 py-1.5"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleSaveEdit}
-                  className="w-full sm:w-auto px-3 sm:px-6 py-1.5"
-                >
-                  <Save className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                  Save
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* Cancel SO Dialog */}
-      <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
-        <DialogContent className="w-10/11 sm:w-full mx-auto max-w-md">
-          <DialogHeader className="pb-3 sm:pb-4">
-            <DialogTitle className="text-lg sm:text-xl">Cancel Stock Opname</DialogTitle>
-            <DialogDescription className="text-xs sm:text-sm">
-              Are you sure you want to cancel this stock opname session?
-              This will delete all scanned assets and cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3 sm:space-y-4">
-            <div className="bg-muted p-3 sm:p-4 rounded-lg">
-              <h4 className="font-medium mb-2 text-sm sm:text-base">Session Summary:</h4>
-              <div className="text-xs sm:text-sm space-y-1">
-                <div>Session: {session?.name}</div>
-                <div>Assets Scanned: {session?.scannedAssets}</div>
-                <div>Total Assets: {session?.totalAssets}</div>
-                <div>Progress: {getProgressPercentage()}%</div>
-              </div>
-            </div>
-            <Alert variant="destructive">
-              <XCircle className="h-4 w-4" />
-              <AlertDescription className="text-xs sm:text-sm">
-                <strong>Warning:</strong> This action cannot be undone. All scanned assets will be deleted and the session will be cancelled.
-              </AlertDescription>
-            </Alert>
-            <div className="flex flex-col sm:flex-row gap-2">
-              <Button variant="outline" onClick={() => setShowCancelDialog(false)} className="w-full sm:w-auto">
-                No, Continue Scanning
-              </Button>
-              <Button variant="destructive" onClick={handleCancelSO} disabled={cancelling} className="w-full sm:w-auto">
-                {cancelling ? (
-                  <Clock className="h-3 w-3 sm:h-4 sm:w-4 animate-spin mr-1 sm:mr-2" />
-                ) : (
-                  <XCircle className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                )}
-                Yes, Cancel SO
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-  
-      {/* Hidden file input */}
-      <input
-        type="file"
-        ref={fileInputRef}
-        onChange={handleFileUpload}
-        accept="image/*"
-        className="hidden"
+      <AssetDetailModal
+        asset={selectedAsset}
+        open={showAssetModal}
+        onOpenChange={closeAssetModal}
+        onUpdate={fetchSessionData}
+        startInEditMode={startInEditMode}
+        forceReadOnly={modalReadOnly}
+        sessionContext={
+          selectedEntry
+            ? { sessionId: selectedEntry.soSessionId, entryId: selectedEntry.id }
+            : undefined
+        }
       />
+
     </div>
-  )
+  );
 }
 
 export default function ScanPage() {
   return (
-    <ProtectedRoute allowedRoles={['ADMIN', 'SO_ASSET_USER']}>
+    <ProtectedRoute allowedRoles={["ADMIN", "SO_ASSET_USER"]}>
       <ScanPageContent />
     </ProtectedRoute>
-  )
+  );
 }

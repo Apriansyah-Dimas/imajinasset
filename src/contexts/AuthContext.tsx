@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
+import { clearClientAuthToken, getClientAuthToken, setClientAuthToken } from "@/lib/client-auth";
 
 interface User {
   id: string;
@@ -27,17 +28,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       console.log("Refreshing user...");
 
-      // Check if we have a token in localStorage
-      const token = localStorage.getItem('auth_token');
+      // Check if we have a token in storage/cookie
+      const token = getClientAuthToken();
 
       if (!token) {
-        console.log("No token found in localStorage");
+        console.log("No token found in storage");
         setUser(null);
         setLoading(false);
         return;
       }
 
-      console.log("Found token in localStorage, getting user data...");
+      console.log("Found token, getting user data...");
 
       // Get user data from our API
       const response = await fetch(`/api/auth/me`, {
@@ -55,17 +56,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.log("User refreshed successfully:", data.user);
         } else {
           // Clear invalid token
-          localStorage.removeItem('auth_token');
+          clearClientAuthToken();
           setUser(null);
         }
       } else {
         console.log("Failed to get user data, clearing token and user");
-        localStorage.removeItem('auth_token');
+        clearClientAuthToken();
         setUser(null);
       }
     } catch (error) {
       console.error("Refresh user error:", error);
-      localStorage.removeItem('auth_token');
+      clearClientAuthToken();
       setUser(null);
     } finally {
       setLoading(false);
@@ -98,8 +99,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log("Login response data:", loginData);
 
       if (loginData.success && loginData.user && loginData.token) {
-        // Store token in localStorage
-        localStorage.setItem('auth_token', loginData.token);
+        // Store token for subsequent requests
+        setClientAuthToken(loginData.token);
         setUser(loginData.user);
         console.log("Login successful:", loginData.user);
         return true;
@@ -118,7 +119,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log("Logging out...");
 
       // Clear token and user
-      localStorage.removeItem('auth_token');
+      clearClientAuthToken();
       setUser(null);
       console.log("Logout successful");
     } catch (error) {
@@ -129,6 +130,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Initial check on mount
     refreshUser();
+
+    // Optional: Refresh user data periodically (every 5 minutes)
+    const interval = setInterval(() => {
+      const token = getClientAuthToken();
+      if (token) {
+        refreshUser();
+      }
+    }, 5 * 60 * 1000); // 5 minutes
+
+    return () => clearInterval(interval);
   }, []);
 
   const value: AuthContextType = {

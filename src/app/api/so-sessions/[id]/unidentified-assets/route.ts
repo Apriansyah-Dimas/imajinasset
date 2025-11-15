@@ -95,6 +95,7 @@ export async function GET(
         id: session.id,
         name: session.name,
         year: session.year,
+        description: session.description,
         status: session.status,
         totalAssets: session.totalAssets,
         scannedAssets: session.scannedAssets

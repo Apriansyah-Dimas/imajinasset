@@ -2,6 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { verifyToken, canScanInSOSession } from '@/lib/auth'
 
+const parseCostInput = (value: any) => {
+  if (value === null || value === undefined || value === '') return null
+  const parsed = typeof value === 'string' ? parseFloat(value) : Number(value)
+  return Number.isNaN(parsed) ? null : parsed
+}
+
+const pickDefined = (primary: any, secondary: any) => (primary !== undefined ? primary : secondary)
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string; entryId: string }> }
@@ -61,6 +69,7 @@ export async function GET(
       tempStatus: entry.tempStatus,
       tempSerialNo: entry.tempSerialNo,
       tempPic: entry.tempPic,
+      tempNotes: entry.tempNotes,
       tempPicId: entry.asset?.employee?.id || null,
       tempBrand: entry.tempBrand,
       tempModel: entry.tempModel,
@@ -139,15 +148,16 @@ export async function PUT(
       )
     }
 
-    // Update entry - FIX: Use correct field mapping
+    // Update entry - ensure undefined fields are ignored while null clears values
     const updateData: any = {
-      tempName: body.tempName || body.name,
-      tempStatus: body.tempStatus || body.status,
-      tempSerialNo: body.tempSerialNo || body.serialNo,
-      tempPic: body.tempPic || body.pic,
-      tempBrand: body.tempBrand || body.brand,
-      tempModel: body.tempModel || body.model,
-      tempCost: body.tempCost ? parseFloat(body.tempCost) : (body.cost ? parseFloat(body.cost) : null),
+      tempName: pickDefined(body.tempName, body.name),
+      tempStatus: pickDefined(body.tempStatus, body.status),
+      tempSerialNo: pickDefined(body.tempSerialNo, body.serialNo),
+      tempPic: pickDefined(body.tempPic, body.pic),
+      tempBrand: pickDefined(body.tempBrand, body.brand),
+      tempModel: pickDefined(body.tempModel, body.model),
+      tempCost: parseCostInput(pickDefined(body.tempCost, body.cost)),
+      tempNotes: pickDefined(body.tempNotes, body.notes),
       isIdentified: body.isIdentified !== undefined ? body.isIdentified : true,
       status: 'Updated'
     }
@@ -181,6 +191,7 @@ export async function PUT(
       tempSerialNo: updatedEntry.tempSerialNo,
       tempPic: updatedEntry.tempPic,
       tempPicId: updatedEntry.asset?.employee?.id || null,
+      tempNotes: updatedEntry.tempNotes,
       tempBrand: updatedEntry.tempBrand,
       tempModel: updatedEntry.tempModel,
       tempCost: updatedEntry.tempCost,

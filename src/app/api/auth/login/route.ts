@@ -3,7 +3,11 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { db } from '@/lib/db';
 
-const jwtSecret = process.env.JWT_SECRET!;
+const jwtSecret = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+
+if (!process.env.JWT_SECRET) {
+  console.warn('[auth/login] JWT_SECRET is not set. Falling back to development secret. Please set JWT_SECRET in your environment for better security.');
+}
 const DEFAULT_ADMIN_EMAIL = process.env.DEFAULT_ADMIN_EMAIL ?? 'admin@assetso.com';
 const DEFAULT_ADMIN_NAME = process.env.DEFAULT_ADMIN_NAME ?? 'Administrator';
 const DEFAULT_ADMIN_PASSWORD = process.env.DEFAULT_ADMIN_PASSWORD ?? 'admin123';

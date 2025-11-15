@@ -434,9 +434,8 @@ export default function EditDropdownsModal({ open, onOpenChange }: EditDropdowns
             </Card>
 
             <Card className="border-2">
-              <CardHeader className="bg-gray-50 space-y-1">
+              <CardHeader className="bg-gray-50">
                 <CardTitle className="text-base">Existing Sites</CardTitle>
-                <p className="text-xs text-gray-500">Tekan dan tarik kartu untuk mengubah urutan.</p>
               </CardHeader>
               <CardContent>
                 <Droppable droppableId="sites">
@@ -523,9 +522,8 @@ export default function EditDropdownsModal({ open, onOpenChange }: EditDropdowns
             </Card>
 
             <Card className="border-2">
-              <CardHeader className="bg-gray-50 space-y-1">
+              <CardHeader className="bg-gray-50">
                 <CardTitle className="text-base">Existing Categories</CardTitle>
-                <p className="text-xs text-gray-500">Seret kategori untuk menyusun prioritas tampilan.</p>
               </CardHeader>
               <CardContent>
                 <Droppable droppableId="categories">
@@ -612,9 +610,8 @@ export default function EditDropdownsModal({ open, onOpenChange }: EditDropdowns
             </Card>
 
             <Card className="border-2">
-              <CardHeader className="bg-gray-50 space-y-1">
+              <CardHeader className="bg-gray-50">
                 <CardTitle className="text-base">Existing Departments</CardTitle>
-                <p className="text-xs text-gray-500">Drag & drop untuk menyusun struktur departemen.</p>
               </CardHeader>
               <CardContent>
                 <Droppable droppableId="departments">
@@ -702,9 +699,8 @@ export default function EditDropdownsModal({ open, onOpenChange }: EditDropdowns
             </Card>
 
             <Card className="border-2">
-              <CardHeader className="bg-gray-50 space-y-1">
+              <CardHeader className="bg-gray-50">
                 <CardTitle className="text-base">Existing PIC</CardTitle>
-                <p className="text-xs text-gray-500">Gunakan daftar ini untuk menambah atau menghapus PIC tanpa membuka halaman lain.</p>
               </CardHeader>
               <CardContent>
                 {pics.length === 0 ? (

@@ -32,9 +32,12 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const sessions = await db.sOSession.findMany({
-      orderBy: { createdAt: 'desc' }
-    })
+    const [sessions, globalAssetCount] = await Promise.all([
+      db.sOSession.findMany({
+        orderBy: { createdAt: 'desc' }
+      }),
+      db.asset.count()
+    ])
 
     // Convert field names to camelCase for frontend compatibility
     const camelCaseSessions = sessions.map(session => ({
@@ -43,7 +46,7 @@ export async function GET(request: NextRequest) {
       year: session.year,
       description: session.description,
       status: session.status,
-      totalAssets: session.totalAssets,
+      totalAssets: globalAssetCount,
       scannedAssets: session.scannedAssets,
       startedAt: session.startedAt,
       completedAt: session.completedAt,

@@ -319,10 +319,10 @@ const transformUser = (row: Record<string, unknown>) =>
     name: stringRequired('users', row, 'name'),
     password: stringRequired('users', row, 'password'),
     role: stringRequired('users', row, 'role'),
-    isActive: booleanRequired('users', row, 'isActive', 'is_active'),
+    isActive: booleanRequired('users', row, 'isActive', 'is_active', 'isactive'),
     createdAt: dateRequired('users', row, 'createdAt', 'created_at'),
     updatedAt: dateRequired('users', row, 'updatedAt', 'updated_at'),
-    createdBy: stringOptional(row, 'createdBy', 'created_by')
+    createdBy: stringOptional(row, 'createdBy', 'created_by', 'createdby')
   })
 
 const transformAsset = (row: Record<string, unknown>) =>

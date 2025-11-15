@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { getClientAuthToken } from '@/lib/client-auth'
 
 type DataSummary = {
   assets: number
@@ -58,7 +59,7 @@ export function CleanDataSandboxPanel({ className }: CleanDataSandboxPanelProps)
     setError(null)
 
     try {
-      const token = localStorage.getItem('auth_token')
+      const token = getClientAuthToken()
 
       if (!token) {
         setError('Authentication token is missing. Please sign in again.')
@@ -104,11 +105,9 @@ export function CleanDataSandboxPanel({ className }: CleanDataSandboxPanelProps)
 
     try {
       const headers: HeadersInit = { 'Content-Type': 'application/json' }
-      if (typeof window !== 'undefined') {
-        const token = localStorage.getItem('auth_token')
-        if (token) {
-          headers.Authorization = `Bearer ${token}`
-        }
+      const token = getClientAuthToken()
+      if (token) {
+        headers.Authorization = `Bearer ${token}`
       }
 
       const response = await fetch('/api/backup/clean', {
