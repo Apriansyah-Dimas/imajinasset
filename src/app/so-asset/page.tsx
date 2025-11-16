@@ -476,7 +476,7 @@ function SOAssetPageContent() {
           <div className="space-y-1">
             <p className="text-sm text-text-muted">Stock Opname</p>
             <h1 className="text-3xl font-semibold text-foreground">
-              SO Asset Sessions
+              Stock Opname Sessions
             </h1>
             <p className="text-sm text-text-muted">
               Pantau progres dan kelola sesi pemeriksaan aset dengan cepat.
@@ -786,7 +786,7 @@ function SOAssetPageContent() {
               <span className="text-sm font-medium">Read-only Mode</span>
             </div>
             <p className="text-xs mt-1">
-              You can view SO Asset progress but cannot make changes.
+              You can view Stock Opname progress but cannot make changes.
             </p>
           </div>
         )}

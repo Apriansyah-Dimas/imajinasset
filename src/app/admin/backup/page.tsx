@@ -8,7 +8,7 @@ import BackupManagerPanel from '@/components/backup-manager-panel'
 export default function AdminBackupPage() {
   return (
     <ProtectedRoute>
-      <div className="bg-gray-50 min-h-screen w-full overflow-x-hidden p-3 sm:p-4">
+      <div className="bg-gray-50 min-h-screen w-full overflow-x-hidden p-8 sm:p-12">
         <div className="mb-4 sm:mb-6">
           <div className="mb-2 flex items-center gap-3 sm:gap-4">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-600 sm:h-10 sm:w-10">

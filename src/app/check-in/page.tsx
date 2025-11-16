@@ -404,7 +404,7 @@ function CheckInContent() {
               <div className="flex flex-col gap-3 sm:flex-row">
                 <Input
                   id="assetNumber"
-                  placeholder="Contoh: FA001-IT-0001"
+                  placeholder="masukan nomor Asset"
                   value={assetNumber}
                   onChange={(event) => setAssetNumber(event.target.value)}
                   required

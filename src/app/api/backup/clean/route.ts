@@ -196,6 +196,8 @@ async function cleanWithPostgres(): Promise<CleanResult> {
           (SELECT COUNT(*) as count FROM so_sessions) as so_sessions_count,
           (SELECT COUNT(*) as count FROM asset_custom_values) as asset_custom_values_count,
           (SELECT COUNT(*) as count FROM asset_custom_fields) as asset_custom_fields_count,
+          (SELECT COUNT(*) as count FROM asset_events) as asset_events_count,
+          (SELECT COUNT(*) as count FROM asset_checkouts) as asset_checkouts_count,
           (SELECT COUNT(*) as count FROM assets) as assets_count,
           (SELECT COUNT(*) as count FROM employees) as employees_count,
           (SELECT COUNT(*) as count FROM users) as users_count,
@@ -209,6 +211,8 @@ async function cleanWithPostgres(): Promise<CleanResult> {
         soSessions: validation.rows[0]?.so_sessions_count || 0,
         assetCustomValues: validation.rows[0]?.asset_custom_values_count || 0,
         assetCustomFields: validation.rows[0]?.asset_custom_fields_count || 0,
+        assetEvents: validation.rows[0]?.asset_events_count || 0,
+        assetCheckouts: validation.rows[0]?.asset_checkouts_count || 0,
         assets: validation.rows[0]?.assets_count || 0,
         employees: validation.rows[0]?.employees_count || 0,
         users: validation.rows[0]?.users_count || 0,
@@ -216,10 +220,12 @@ async function cleanWithPostgres(): Promise<CleanResult> {
         backups: validation.rows[0]?.backups_count || 0
       })
 
+      results.assetEvents = await safeDelete(client, 'DELETE FROM asset_events', 'asset_events')
       results.soAssetEntries = await safeDelete(client, 'DELETE FROM so_asset_entries', 'so_asset_entries')
       results.soSessions = await safeDelete(client, 'DELETE FROM so_sessions', 'so_sessions')
       results.assetCustomValues = await safeDelete(client, 'DELETE FROM asset_custom_values', 'asset_custom_values')
       results.assetCustomFields = await safeDelete(client, 'DELETE FROM asset_custom_fields', 'asset_custom_fields')
+      results.assetCheckouts = await safeDelete(client, 'DELETE FROM asset_checkouts', 'asset_checkouts')
       results.assets = await safeDelete(client, 'DELETE FROM assets', 'assets')
       results.employees = await safeDelete(client, 'DELETE FROM employees', 'employees')
       results.users = await safeDelete(client, "DELETE FROM users WHERE role <> 'ADMIN'", 'users non-admin')
@@ -239,6 +245,8 @@ async function cleanWithPostgres(): Promise<CleanResult> {
         soSessions: postValidation.rows[0]?.so_sessions_count || 0,
         assetCustomValues: postValidation.rows[0]?.asset_custom_values_count || 0,
         assetCustomFields: postValidation.rows[0]?.asset_custom_fields_count || 0,
+        assetEvents: postValidation.rows[0]?.asset_events_count || 0,
+        assetCheckouts: postValidation.rows[0]?.asset_checkouts_count || 0,
         assets: postValidation.rows[0]?.assets_count || 0,
         employees: postValidation.rows[0]?.employees_count || 0,
         users: postValidation.rows[0]?.users_count || 0,
@@ -298,6 +306,10 @@ async function cleanWithPrisma(): Promise<CleanResult> {
     const summary: CleanResult = {}
     
     try {
+      console.log('[CLEAN] Deleting asset_events...')
+      summary.assetEvents = (await tx.assetEvent.deleteMany()).count
+      console.log(`[CLEAN] Deleted ${summary.assetEvents} asset_events`)
+      
       console.log('[CLEAN] Deleting so_asset_entries...')
       summary.soAssetEntries = (await tx.sOAssetEntry.deleteMany()).count
       console.log(`[CLEAN] Deleted ${summary.soAssetEntries} so_asset_entries`)
@@ -313,6 +325,10 @@ async function cleanWithPrisma(): Promise<CleanResult> {
       console.log('[CLEAN] Deleting asset_custom_fields...')
       summary.assetCustomFields = (await tx.assetCustomField.deleteMany()).count
       console.log(`[CLEAN] Deleted ${summary.assetCustomFields} asset_custom_fields`)
+      
+      console.log('[CLEAN] Deleting asset_checkouts...')
+      summary.assetCheckouts = (await tx.assetCheckout.deleteMany()).count
+      console.log(`[CLEAN] Deleted ${summary.assetCheckouts} asset_checkouts`)
       
       console.log('[CLEAN] Deleting assets...')
       summary.assets = (await tx.asset.deleteMany()).count

@@ -113,38 +113,52 @@ export default function AdditionalInformation({
           </div>
         ))}
 
-        {/* Edit Mode: Show existing fields with name labels and value inputs */}
-        {mode === 'edit' && fields.filter(f => f.name.trim() !== '').map((field) => (
-          <div key={field.id} className="flex gap-2 items-start">
+        {/* Edit Mode: editable name + value for all fields without shuffling */}
+        {mode === 'edit' && fields.map((field) => (
+          <div
+            key={field.id}
+            className="flex gap-2 items-start"
+          >
             <div className="flex-1">
-              <Label className="text-sm font-medium text-gray-700 mb-2 block">
-                {field.name}
-              </Label>
               {readOnly ? (
-                <div
-                  className="w-full px-3 py-2 border-2 border-gray-300 rounded-md bg-gray-50 text-gray-700 text-sm select-text cursor-text"
-                  onMouseDown={(e) => {
-                    // Allow text selection when clicked
-                    e.currentTarget.focus()
-                    if (e.currentTarget.textContent) {
-                      const selection = window.getSelection()
-                      const range = document.createRange()
-                      range.selectNodeContents(e.currentTarget)
-                      selection.removeAllRanges()
-                      selection.addRange(range)
-                    }
-                  }}
-                >
-                  {field.value || <span className="text-gray-400">No value</span>}
-                </div>
+                <>
+                  <Label className="text-sm font-medium text-gray-700 mb-2 block">
+                    {field.name || 'Untitled'}
+                  </Label>
+                  <div
+                    className="w-full px-3 py-2 border-2 border-gray-300 rounded-md bg-gray-50 text-gray-700 text-sm select-text cursor-text"
+                    onMouseDown={(e) => {
+                      e.currentTarget.focus()
+                      if (e.currentTarget.textContent) {
+                        const selection = window.getSelection()
+                        const range = document.createRange()
+                        range.selectNodeContents(e.currentTarget)
+                        selection.removeAllRanges()
+                        selection.addRange(range)
+                      }
+                    }}
+                  >
+                    {field.value || <span className="text-gray-400">No value</span>}
+                  </div>
+                </>
               ) : (
-                <Input
-                  type="text"
-                  placeholder={`Enter ${field.name.toLowerCase()}`}
-                  value={field.value}
-                  onChange={(e) => updateField(field.id, 'value', e.target.value)}
-                  readOnly={readOnly}
-                />
+                <>
+                  <Input
+                    type="text"
+                    placeholder="Enter field name (e.g., Vendor, PO Number)"
+                    value={field.name}
+                    onChange={(e) => updateField(field.id, 'name', e.target.value)}
+                    readOnly={readOnly}
+                    className="mb-2"
+                  />
+                  <Input
+                    type="text"
+                    placeholder="Enter field value"
+                    value={field.value}
+                    onChange={(e) => updateField(field.id, 'value', e.target.value)}
+                    readOnly={readOnly}
+                  />
+                </>
               )}
             </div>
             {!readOnly && (
@@ -155,41 +169,6 @@ export default function AdditionalInformation({
                 onClick={() => removeField(field.id)}
                 className="text-red-600 hover:text-red-700 mt-6"
                 title="Delete this field"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
-        ))}
-
-        {/* Edit Mode: Show new fields (with empty names) as full field inputs */}
-        {mode === 'edit' && fields.filter(f => f.name.trim() === '').map((field) => (
-          <div key={field.id} className="flex gap-2 items-start border-2 border-dashed border-blue-300 rounded-lg p-3 bg-blue-50">
-            <div className="flex-1">
-              <Input
-                type="text"
-                placeholder="Enter field name (e.g., New Field)"
-                value={field.name}
-                onChange={(e) => updateField(field.id, 'name', e.target.value)}
-                readOnly={readOnly}
-                className="mb-2"
-              />
-              <Input
-                type="text"
-                placeholder="Enter field value"
-                value={field.value}
-                onChange={(e) => updateField(field.id, 'value', e.target.value)}
-                readOnly={readOnly}
-              />
-            </div>
-            {!readOnly && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => removeField(field.id)}
-                className="text-red-600 hover:text-red-700 mt-6"
-                title="Delete this new field"
               >
                 <Trash2 className="h-4 w-4" />
               </Button>

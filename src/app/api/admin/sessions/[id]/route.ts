@@ -207,7 +207,7 @@ export async function DELETE(
       )
     }
 
-    // Delete all SO Asset Entries for this session
+    // Delete all Stock Opname Entries for this session
     await db.sOAssetEntry.deleteMany({
       where: { soSessionId: id }
     })

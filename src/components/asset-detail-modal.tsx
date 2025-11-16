@@ -144,6 +144,10 @@ export default function AssetDetailModal({
     void fetchHistory()
   }
 
+  const canEdit =
+    !forceReadOnly &&
+    (user?.role === 'ADMIN' || (sessionContext && user?.role === 'SO_ASSET_USER'))
+
   const formatHistoryType = (type: HistoryEntry['type']) => {
     if (type === 'CHECK_OUT') return 'Check Out'
     if (type === 'CHECK_IN') return 'Check In'
@@ -519,7 +523,7 @@ export default function AssetDetailModal({
   }
 
   const handleEdit = () => {
-    if (forceReadOnly) return
+    if (forceReadOnly || !canEdit) return
     setIsEditing(true)
   }
 
@@ -978,8 +982,8 @@ export default function AssetDetailModal({
             </div>
 
             <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
-              <RoleBasedAccess allowedRoles={['ADMIN']}>
-                {!isEditing ? (
+              {canEdit ? (
+                !isEditing ? (
                   <Button onClick={handleEdit} disabled={deleteLoading} className="w-full sm:w-auto" size="sm">
                     EDIT
                   </Button>
@@ -992,13 +996,12 @@ export default function AssetDetailModal({
                       {loading ? 'Saving...' : 'SAVE CHANGES'}
                     </Button>
                   </>
-                )}
-              </RoleBasedAccess>
-              {user && user.role === 'SO_ASSET_USER' && (
+                )
+              ) : user && user.role === 'SO_ASSET_USER' ? (
                 <div className="w-full text-center text-xs text-muted-foreground sm:text-sm">
                   Read-only access - Contact admin to modify asset details
                 </div>
-              )}
+              ) : null}
             </div>
           </div>
         ) : (

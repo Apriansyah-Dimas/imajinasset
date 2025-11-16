@@ -59,7 +59,7 @@ export default function Navbar() {
     }
 
     if (role === "ADMIN" || role === "SO_ASSET_USER" || role === "VIEWER") {
-      baseNav.push({ name: "SO Asset", href: "/so-asset", icon: Search });
+      baseNav.push({ name: "Stock Opname", href: "/so-asset", icon: Search });
     }
 
     if (role === "ADMIN") {

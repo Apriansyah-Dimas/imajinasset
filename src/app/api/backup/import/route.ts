@@ -20,10 +20,12 @@ const DEFAULT_RESTORE_ORDER = [
   'employees',
   'users',
   'assets',
+  'asset_checkouts',
   'asset_custom_fields',
   'asset_custom_values',
   'so_sessions',
   'so_asset_entries',
+  'asset_events',
   'logs',
   'backups'
 ]
@@ -307,7 +309,7 @@ const transformEmployee = (row: Record<string, unknown>) =>
     department: stringOptional(row, 'department'),
     position: stringOptional(row, 'position'),
     joinDate: dateOptional(row, 'joinDate', 'join_date'),
-    isActive: booleanRequired('employees', row, 'isActive', 'is_active'),
+    isActive: booleanOptional(row, 'isActive', 'is_active', 'isactive') ?? true,
     createdAt: dateRequired('employees', row, 'createdAt', 'created_at'),
     updatedAt: dateRequired('employees', row, 'updatedAt', 'updated_at')
   })
@@ -346,6 +348,25 @@ const transformAsset = (row: Record<string, unknown>) =>
     dateCreated: dateOptional(row, 'dateCreated', 'date_created') || new Date(),
     createdAt: dateRequired('assets', row, 'createdAt', 'created_at'),
     updatedAt: dateRequired('assets', row, 'updatedAt', 'updated_at')
+  })
+
+const transformAssetCheckout = (row: Record<string, unknown>) =>
+  finalizeRecord({
+    id: stringRequired('asset_checkouts', row, 'id'),
+    assetId: stringRequired('asset_checkouts', row, 'assetId', 'asset_id'),
+    assignToId: stringRequired('asset_checkouts', row, 'assignToId', 'assign_to_id'),
+    departmentId: stringOptional(row, 'departmentId', 'department_id'),
+    checkoutDate: dateRequired('asset_checkouts', row, 'checkoutDate', 'checkout_date'),
+    dueDate: dateOptional(row, 'dueDate', 'due_date'),
+    notes: stringOptional(row, 'notes'),
+    signatureData: stringOptional(row, 'signatureData', 'signature_data'),
+    status: stringRequired('asset_checkouts', row, 'status'),
+    returnedAt: dateOptional(row, 'returnedAt', 'returned_at'),
+    returnNotes: stringOptional(row, 'returnNotes', 'return_notes'),
+    receivedById: stringOptional(row, 'receivedById', 'received_by_id'),
+    returnSignatureData: stringOptional(row, 'returnSignatureData', 'return_signature_data'),
+    createdAt: dateRequired('asset_checkouts', row, 'createdAt', 'created_at'),
+    updatedAt: dateRequired('asset_checkouts', row, 'updatedAt', 'updated_at')
   })
 
 type ImageManifest = {
@@ -525,6 +546,19 @@ const transformBackup = (row: Record<string, unknown>) =>
     createdBy: stringOptional(row, 'createdBy', 'createdby')
   })
 
+const transformAssetEvent = (row: Record<string, unknown>) =>
+  finalizeRecord({
+    id: stringRequired('asset_events', row, 'id'),
+    assetId: stringRequired('asset_events', row, 'assetId', 'asset_id'),
+    type: stringRequired('asset_events', row, 'type'),
+    actor: stringOptional(row, 'actor'),
+    checkoutId: stringOptional(row, 'checkoutId', 'checkout_id'),
+    soSessionId: stringOptional(row, 'soSessionId', 'so_session_id'),
+    soAssetEntryId: stringOptional(row, 'soAssetEntryId', 'so_asset_entry_id'),
+    payload: stringOptional(row, 'payload'),
+    createdAt: dateRequired('asset_events', row, 'createdAt', 'created_at')
+  })
+
 const prismaHandlers: Record<string, PrismaHandler> = {
   sites: {
     delete: async (tx) => (await tx.site.deleteMany()).count,
@@ -559,6 +593,15 @@ const prismaHandlers: Record<string, PrismaHandler> = {
       const data = records.map(transformEmployee)
       if (!data.length) return 0
       const result = await tx.employee.createMany({ data })
+      return result.count
+    }
+  },
+  asset_checkouts: {
+    delete: async (tx) => (await tx.assetCheckout.deleteMany()).count,
+    insert: async (tx, records) => {
+      const data = records.map(transformAssetCheckout)
+      if (!data.length) return 0
+      const result = await tx.assetCheckout.createMany({ data })
       return result.count
     }
   },
@@ -613,6 +656,15 @@ const prismaHandlers: Record<string, PrismaHandler> = {
       const data = records.map(transformSOAssetEntry)
       if (!data.length) return 0
       const result = await tx.sOAssetEntry.createMany({ data })
+      return result.count
+    }
+  },
+  asset_events: {
+    delete: async (tx) => (await tx.assetEvent.deleteMany()).count,
+    insert: async (tx, records) => {
+      const data = records.map(transformAssetEvent)
+      if (!data.length) return 0
+      const result = await tx.assetEvent.createMany({ data })
       return result.count
     }
   },

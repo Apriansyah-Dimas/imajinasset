@@ -474,13 +474,13 @@ function AssetsPageContent() {
         {/* Page Header */}
         <div className="space-y-3">
           <p className="text-[0.65rem] uppercase tracking-[0.6em] text-text-muted">
-            Monitor & Control
+            Asset Registry
           </p>
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
               <h1 className="text-3xl font-semibold text-foreground">Asset Management</h1>
               <p className="text-sm text-text-muted">
-                Semua aset perusahaan dalam satu dashboard modern
+                Manage and track all company assets in one centralized system
               </p>
             </div>
           </div>
@@ -980,10 +980,10 @@ function AssetsPageContent() {
               <RoleBasedAccess allowedRoles={['ADMIN']}>
                 <button
                   onClick={() => setShowAddModal(true)}
-                  className="sneat-btn sneat-btn-primary inline-flex min-w-[180px] justify-center"
+                  className="sneat-btn sneat-btn-primary inline-flex min-w-[180px] justify-center text-white"
                 >
-                  <Plus className="h-4 w-4" />
-                  <span>Tambah asset pertama</span>
+                  <Plus className="h-4 w-4 text-white" />
+                  <span className="text-white">Tambah asset pertama</span>
                 </button>
               </RoleBasedAccess>
             ) : (

@@ -42,7 +42,6 @@ import {
   Archive,
 } from "lucide-react";
 import { toast } from "sonner";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 interface User {
@@ -316,16 +315,11 @@ export default function UserManagementPage() {
     <>
       <ProtectedRoute>
         <RoleBasedAccess allowedRoles={["ADMIN"]}>
-          <div className="p-3 sm:p-4 bg-gray-50 min-h-screen w-full overflow-x-hidden">
+          <div className="p-8 sm:p-12 bg-gray-50 min-h-screen w-full overflow-x-hidden">
             {/* Header */}
             <div className="mb-4 sm:mb-6">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div className="flex items-center gap-2 sm:gap-3">
-                  <Link href="/admin">
-                    <Button variant="outline" size="sm">
-                      ← Back
-                    </Button>
-                  </Link>
                   <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-600 rounded-lg flex items-center justify-center">
                     <Users className="h-4 w-4 sm:h-6 sm:w-6 text-white" />
                   </div>
@@ -372,7 +366,7 @@ export default function UserManagementPage() {
                         <SelectItem value="all">All Roles</SelectItem>
                         <SelectItem value="ADMIN">Admin</SelectItem>
                         <SelectItem value="SO_ASSET_USER">
-                          SO Asset User
+                          Stock Opname User
                         </SelectItem>
                         <SelectItem value="VIEWER">Viewer</SelectItem>
                       </SelectContent>
@@ -654,7 +648,7 @@ export default function UserManagementPage() {
                           Viewer - Read only access
                         </SelectItem>
                         <SelectItem value="SO_ASSET_USER">
-                          SO Asset User - Can scan and edit assets
+                          Stock Opname User - Can scan and edit assets
                         </SelectItem>
                         <SelectItem value="ADMIN">
                           Admin - Full system access
@@ -763,7 +757,7 @@ export default function UserManagementPage() {
                           Viewer - Read only access
                         </SelectItem>
                         <SelectItem value="SO_ASSET_USER">
-                          SO Asset User - Can scan and edit assets
+                          Stock Opname User - Can scan and edit assets
                         </SelectItem>
                         <SelectItem value="ADMIN">
                           Admin - Full system access

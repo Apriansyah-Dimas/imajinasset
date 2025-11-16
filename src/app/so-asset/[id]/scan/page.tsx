@@ -42,6 +42,7 @@ import {
 } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { getClientAuthToken } from "@/lib/client-auth";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   AlertCircle,
   ArrowLeft,
@@ -208,6 +209,8 @@ type FilterState = {
 function ScanPageContent() {
   const params = useParams();
   const router = useRouter();
+  const { user } = useAuth();
+  const canManageSession = user?.role === "ADMIN";
   const sessionId = params.id as string;
 
   const [session, setSession] = useState<SessionOverview | null>(null);
@@ -478,6 +481,10 @@ function ScanPageContent() {
   );
 
   const handleSessionAction = async () => {
+    if (!canManageSession) {
+      toast.error("Hanya admin yang dapat mengubah status sesi.");
+      return;
+    }
     if (!sessionId || !pendingSessionAction) return;
     setSessionActionLoading(true);
     try {
@@ -892,7 +899,7 @@ function ScanPageContent() {
                 </div>
               </CardContent>
             </Card>
-            {session?.status === "Active" && (
+            {session?.status === "Active" && canManageSession && (
               <div className="rounded-2xl border border-surface-border/70 bg-surface/70 p-5 shadow-sm sm:flex sm:items-center">
                 <div className="flex w-full flex-col gap-3 sm:flex-row">
                   <Button

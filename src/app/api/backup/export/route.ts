@@ -16,11 +16,13 @@ const TABLES_TO_EXPORT = [
   'categories',
   'departments',
   'employees',
+  'asset_checkouts',
   'assets',
   'asset_custom_fields',
   'asset_custom_values',
   'so_sessions',
   'so_asset_entries',
+  'asset_events',
   'logs',
   'backups'
 ] as const
