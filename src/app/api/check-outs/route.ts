@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { recordAssetEvent } from "@/lib/asset-events";
 
 const successResponse = (data: unknown) =>
   NextResponse.json(data, { status: 200 });
@@ -224,6 +225,30 @@ export async function POST(request: NextRequest) {
         },
       },
     });
+
+    try {
+      await recordAssetEvent({
+        assetId,
+        type: "CHECK_OUT",
+        checkoutId: checkout.id,
+        payload: {
+          assignTo: {
+            id: checkout.assignTo?.id ?? assignToId,
+            name: checkout.assignTo?.name ?? assignTo?.name ?? null,
+            employeeId: checkout.assignTo?.employeeId ?? assignTo?.employeeId ?? null,
+          },
+          department: checkout.department
+            ? { id: checkout.department.id, name: checkout.department.name }
+            : null,
+          checkoutDate: parsedCheckoutDate.toISOString(),
+          dueDate: dueDate ? dueDate.toISOString() : null,
+          notes,
+          hasSignature: Boolean(signature),
+        },
+      });
+    } catch (eventError) {
+      console.error("Failed to record checkout event:", eventError);
+    }
 
     return successResponse({ success: true, checkout });
   } catch (error) {

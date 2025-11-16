@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { verifyToken, canScanInSOSession } from '@/lib/auth'
+import { buildSOChanges, recordAssetEvent } from '@/lib/asset-events'
 
 const parseCostInput = (value: any) => {
   if (value === null || value === undefined || value === '') return null
@@ -178,6 +179,49 @@ export async function PUT(
         }
       }
     })
+
+    const currentSnapshot = {
+      tempName: existingEntry.tempName,
+      tempStatus: existingEntry.tempStatus,
+      tempSerialNo: existingEntry.tempSerialNo,
+      tempPic: existingEntry.tempPic,
+      tempBrand: existingEntry.tempBrand,
+      tempModel: existingEntry.tempModel,
+      tempCost: existingEntry.tempCost,
+      tempNotes: existingEntry.tempNotes,
+      isIdentified: existingEntry.isIdentified,
+    }
+
+    const updatedSnapshot = {
+      tempName: updatedEntry.tempName,
+      tempStatus: updatedEntry.tempStatus,
+      tempSerialNo: updatedEntry.tempSerialNo,
+      tempPic: updatedEntry.tempPic,
+      tempBrand: updatedEntry.tempBrand,
+      tempModel: updatedEntry.tempModel,
+      tempCost: updatedEntry.tempCost,
+      tempNotes: updatedEntry.tempNotes,
+      isIdentified: updatedEntry.isIdentified,
+    }
+
+    const changes = buildSOChanges(currentSnapshot, updatedSnapshot)
+
+    if (changes.length > 0) {
+      try {
+        await recordAssetEvent({
+          assetId: updatedEntry.assetId,
+          type: 'SO_UPDATE',
+          soSessionId: sessionId,
+          soAssetEntryId: entryId,
+          payload: {
+            sessionName: session.name,
+            changes,
+          },
+        })
+      } catch (eventError) {
+        console.error('Failed to record SO update event:', eventError)
+      }
+    }
 
     // Transform response to match expected format
     const transformedEntry = {

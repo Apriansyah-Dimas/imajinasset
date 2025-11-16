@@ -34,6 +34,7 @@ model Asset {
   category       Category?          @relation(fields: [categoryId], references: [id])
   site           Site?              @relation(fields: [siteId], references: [id])
   soAssetEntries SOAssetEntry[]
+  events         AssetEvent[]
 
   @@index([siteId])
   @@index([categoryId])
@@ -116,6 +117,7 @@ model SOSession {
   startedAt      DateTime?      @map("started_at")
   completedAt    DateTime?      @map("completed_at")
   soAssetEntries SOAssetEntry[]
+  events         AssetEvent[]
 
   @@map("so_sessions")
 }
@@ -139,10 +141,30 @@ model SOAssetEntry {
   updatedAt    DateTime  @updatedAt @map("updatedat")
   asset        Asset     @relation(fields: [assetId], references: [id])
   soSession    SOSession @relation(fields: [soSessionId], references: [id])
+  events       AssetEvent[]
 
   @@index([soSessionId])
   @@index([assetId])
   @@map("so_asset_entries")
+}
+
+model AssetEvent {
+  id             String      @id @default(cuid())
+  assetId        String      @map("asset_id")
+  type           String
+  actor          String?
+  checkoutId     String?     @map("checkout_id")
+  soSessionId    String?     @map("so_session_id")
+  soAssetEntryId String?     @map("so_asset_entry_id")
+  payload        String?
+  createdAt      DateTime    @default(now()) @map("createdat")
+  asset          Asset       @relation(fields: [assetId], references: [id])
+  checkout       AssetCheckout? @relation(fields: [checkoutId], references: [id])
+  soSession      SOSession?  @relation(fields: [soSessionId], references: [id])
+  soAssetEntry   SOAssetEntry? @relation(fields: [soAssetEntryId], references: [id])
+
+  @@index([assetId, createdAt])
+  @@map("asset_events")
 }
 
 model User {
@@ -248,6 +270,7 @@ model AssetCheckout {
   department          Department? @relation(fields: [departmentId], references: [id])
   assignTo            Employee    @relation("EmployeeCheckoutAssignments", fields: [assignToId], references: [id])
   asset               Asset       @relation(fields: [assetId], references: [id])
+  events              AssetEvent[]
 
   @@index([assetId])
   @@index([assignToId])

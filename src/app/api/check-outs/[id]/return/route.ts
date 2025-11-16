@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { recordAssetEvent } from "@/lib/asset-events";
 import { authenticate } from "@/lib/auth";
 
 export async function POST(
@@ -90,6 +91,33 @@ export async function POST(
       where: { id: checkout.assetId },
       data: { status: "Available" },
     });
+
+    try {
+      await recordAssetEvent({
+        assetId: checkout.assetId,
+        type: "CHECK_IN",
+        checkoutId: checkout.id,
+        payload: {
+          assignTo: checkout.assignTo
+            ? {
+                id: checkout.assignTo.id,
+                name: checkout.assignTo.name,
+                employeeId: checkout.assignTo.employeeId,
+              }
+            : null,
+          department: checkout.department
+            ? { id: checkout.department.id, name: checkout.department.name }
+            : null,
+          returnedAt: (returnedAt ? new Date(returnedAt) : new Date()).toISOString(),
+          returnNotes: returnNotes ?? null,
+          receivedById,
+          receivedBy: employee.name,
+          hasSignature: Boolean(returnSignatureData),
+        },
+      });
+    } catch (eventError) {
+      console.error("Failed to record check-in event:", eventError);
+    }
 
     return NextResponse.json({
       message: "Asset returned successfully",

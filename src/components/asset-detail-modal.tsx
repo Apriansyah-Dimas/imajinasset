@@ -7,7 +7,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
-import { Trash2 } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { Trash2, History as HistoryIcon, Clock8 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import RoleBasedAccess from '@/components/RoleBasedAccess'
 import AdditionalInformation from '@/components/additional-information'
@@ -70,6 +71,15 @@ const parseCurrency = (value: string): number | undefined => {
   return isNaN(parsed) ? undefined : parsed
 }
 
+type HistoryEntry = {
+  id: string
+  type: 'CHECK_OUT' | 'CHECK_IN' | 'SO_UPDATE'
+  timestamp: string
+  summary: string
+  details?: any
+  source: 'checkout' | 'event'
+}
+
 export default function AssetDetailModal({
   asset,
   open,
@@ -86,6 +96,10 @@ export default function AssetDetailModal({
   const [loading, setLoading] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [masterDataLoading, setMasterDataLoading] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [historyError, setHistoryError] = useState<string | null>(null)
+  const [history, setHistory] = useState<HistoryEntry[]>([])
   const [sites, setSites] = useState<Array<{ id: string; name: string }>>([])
   const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([])
   const [departments, setDepartments] = useState<Array<{ id: string; name: string }>>([])
@@ -104,6 +118,122 @@ export default function AssetDetailModal({
     if (value === undefined || value === null) return null
     const trimmed = value.trim()
     return trimmed === '' ? null : trimmed
+  }
+
+  const fetchHistory = async () => {
+    if (!asset) return
+    setHistoryLoading(true)
+    setHistoryError(null)
+    try {
+      const response = await fetch(`/api/assets/${asset.id}/history?limit=50`)
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data?.error || 'Gagal memuat riwayat aset')
+      }
+      setHistory(Array.isArray(data.history) ? data.history : [])
+    } catch (error) {
+      console.error('Failed to load asset history:', error)
+      setHistoryError(error instanceof Error ? error.message : 'Tidak dapat memuat riwayat aset')
+    } finally {
+      setHistoryLoading(false)
+    }
+  }
+
+  const openHistory = () => {
+    setHistoryOpen(true)
+    void fetchHistory()
+  }
+
+  const formatHistoryType = (type: HistoryEntry['type']) => {
+    if (type === 'CHECK_OUT') return 'Check Out'
+    if (type === 'CHECK_IN') return 'Check In'
+    return 'SO Update'
+  }
+
+  const getHistoryBadgeVariant = (type: HistoryEntry['type']) => {
+    if (type === 'CHECK_OUT') return 'default'
+    if (type === 'CHECK_IN') return 'secondary'
+    return 'outline'
+  }
+
+  const renderHistoryDetails = (entry: HistoryEntry) => {
+    if (entry.type === 'SO_UPDATE' && entry.details?.changes?.length) {
+      return (
+        <div className="mt-2 space-y-2 rounded-lg border border-dashed border-gray-200 bg-gray-50 p-3 text-xs">
+          {entry.details.sessionName && (
+            <div className="font-medium text-gray-700">Session: {entry.details.sessionName}</div>
+          )}
+          <div className="space-y-1">
+            {entry.details.changes.map((change: any, idx: number) => (
+              <div key={`${entry.id}-change-${idx}`} className="flex flex-wrap gap-2">
+                <span className="rounded bg-white px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                  {change.field}
+                </span>
+                <span className="rounded bg-red-50 px-2 py-1 text-[11px] text-red-700 line-through">
+                  {change.before ?? '–'}
+                </span>
+                <span className="rounded bg-green-50 px-2 py-1 text-[11px] text-green-700">
+                  {change.after ?? '–'}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )
+    }
+
+    if (entry.type === 'CHECK_OUT') {
+      const assignTo = entry.details?.assignTo
+      return (
+        <div className="mt-2 grid grid-cols-1 gap-2 text-xs text-gray-700 sm:grid-cols-2">
+          <div>
+            <div className="text-[11px] uppercase tracking-wide text-gray-500">Assign To</div>
+            <div className="font-medium">{assignTo?.name ?? '–'}</div>
+          </div>
+          <div>
+            <div className="text-[11px] uppercase tracking-wide text-gray-500">Due Date</div>
+            <div>{entry.details?.dueDate ? new Date(entry.details.dueDate).toLocaleString() : '–'}</div>
+          </div>
+          {entry.details?.department && (
+            <div>
+              <div className="text-[11px] uppercase tracking-wide text-gray-500">Department</div>
+              <div>{entry.details.department.name}</div>
+            </div>
+          )}
+          {entry.details?.notes && (
+            <div className="sm:col-span-2">
+              <div className="text-[11px] uppercase tracking-wide text-gray-500">Notes</div>
+              <div>{entry.details.notes}</div>
+            </div>
+          )}
+        </div>
+      )
+    }
+
+    if (entry.type === 'CHECK_IN') {
+      return (
+        <div className="mt-2 grid grid-cols-1 gap-2 text-xs text-gray-700 sm:grid-cols-2">
+          <div>
+            <div className="text-[11px] uppercase tracking-wide text-gray-500">Received By</div>
+            <div className="font-medium">
+              {entry.details?.receivedBy?.name ?? entry.details?.receivedBy ?? '–'}
+            </div>
+          </div>
+          <div>
+            <div className="text-[11px] uppercase tracking-wide text-gray-500">Status</div>
+            <div>{entry.details?.status ?? '–'}</div>
+          </div>
+          {entry.details?.notes && (
+            <div className="sm:col-span-2">
+              <div className="text-[11px] uppercase tracking-wide text-gray-500">Notes</div>
+              <div>{entry.details.notes}</div>
+            </div>
+          )}
+        </div>
+      )
+    }
+
+    return null
   }
 
   useEffect(() => {
@@ -403,6 +533,7 @@ export default function AssetDetailModal({
   if (!formData) return null
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl w-[95vw] sm:w-full max-h-[90vh] overflow-y-auto mx-auto">
         <DialogHeader className="pb-4 sm:pb-6">
@@ -833,6 +964,17 @@ export default function AssetDetailModal({
                   </AlertDialog>
                 </RoleBasedAccess>
               )}
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!asset || loading || deleteLoading}
+                onClick={openHistory}
+                className="w-full sm:w-auto"
+                size="sm"
+              >
+                <HistoryIcon className="h-4 w-4 mr-2" />
+                HISTORY
+              </Button>
             </div>
 
             <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
@@ -866,5 +1008,54 @@ export default function AssetDetailModal({
         )}
       </DialogContent>
     </Dialog>
+
+      <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-lg">
+              <Clock8 className="h-4 w-4" />
+              Asset History
+            </DialogTitle>
+          </DialogHeader>
+          <div className="mt-2 space-y-3">
+            {historyLoading && (
+              <div className="rounded-lg border border-dashed border-gray-200 p-4 text-sm text-gray-600">
+                Memuat riwayat aset...
+              </div>
+            )}
+            {historyError && (
+              <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                {historyError}
+              </div>
+            )}
+            {!historyLoading && !historyError && history.length === 0 && (
+              <div className="rounded-lg border border-dashed border-gray-200 p-4 text-sm text-gray-600">
+                Belum ada riwayat untuk aset ini.
+              </div>
+            )}
+            {!historyLoading && history.length > 0 && (
+              <div className="space-y-3 max-h-[520px] overflow-y-auto pr-1">
+                {history.map((entry) => (
+                  <div key={entry.id} className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <Badge variant={getHistoryBadgeVariant(entry.type)} className="uppercase tracking-wide">
+                          {formatHistoryType(entry.type)}
+                        </Badge>
+                        <span className="text-sm font-semibold text-gray-900">{entry.summary}</span>
+                      </div>
+                      <span className="text-xs text-gray-500">
+                        {new Date(entry.timestamp).toLocaleString()}
+                      </span>
+                    </div>
+                    {renderHistoryDetails(entry)}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
