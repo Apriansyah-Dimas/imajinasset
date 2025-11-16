@@ -118,7 +118,7 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="p-4 min-h-screen bg-gray-50">
+      <div className="p-8 min-h-screen bg-gray-50 lg:p-12">
         <div className="mb-6">
           <div className="h-8 bg-muted w-48 rounded animate-pulse"></div>
           <div className="h-4 bg-muted w-64 rounded animate-pulse mt-2"></div>
@@ -133,7 +133,7 @@ export default function Dashboard() {
 
   if (!data) {
     return (
-      <div className="p-4 min-h-screen bg-gray-50">
+      <div className="p-8 min-h-screen bg-gray-50 lg:p-12">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900 mb-2">DASHBOARD</h1>
           <p className="text-gray-600 text-sm">Overview of asset management system</p>
@@ -146,7 +146,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="p-4 min-h-screen bg-gray-50">
+    <div className="p-8 min-h-screen bg-gray-50 lg:p-12">
       {/* Page Header */}
       <div className="mb-8 flex items-center gap-4">
         <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg">

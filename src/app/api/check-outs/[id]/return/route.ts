@@ -1,41 +1,42 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { prisma } from "@/lib/db";
+import { authenticate } from "@/lib/auth";
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    console.log("Check-out return POST request received");
-    console.log("Params:", params);
-
-    // Test database connection
-    try {
-      await db.$connect();
-      console.log("Database connection successful");
-    } catch (dbError) {
-      console.error("Database connection failed:", dbError);
-      return NextResponse.json(
-        { error: "Database connection failed" },
-        { status: 500 }
-      );
+    // Authenticate user
+    const authResult = await authenticate(request);
+    if (!authResult.success) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const checkoutId = params.id;
-    if (!checkoutId) {
+    // Await params as required by Next.js 15
+    const { id } = await params;
+
+    // Parse request body
+    const body = await request.json();
+    const { returnNotes, returnSignatureData, returnedAt, receivedById } = body;
+
+    // Validate required fields
+    if (!returnNotes) {
       return NextResponse.json(
-        { error: "Checkout id is required" },
+        { error: "Return notes are required" },
         { status: 400 }
       );
     }
 
-    console.log("Processing return for checkout ID:", checkoutId);
-
-    console.log("Fetching checkout record...");
-    const checkout = await db.assetCheckout.findUnique({
-      where: { id: checkoutId },
+    // Find the checkout record
+    const checkout = await prisma.assetCheckout.findUnique({
+      where: { id },
+      include: {
+        asset: true,
+        assignTo: true,
+        department: true,
+      },
     });
-    console.log("Checkout record found:", checkout ? "Yes" : "No");
 
     if (!checkout) {
       return NextResponse.json(
@@ -44,72 +45,63 @@ export async function POST(
       );
     }
 
+    // Check if the checkout is already returned
     if (checkout.status === "RETURNED") {
       return NextResponse.json(
-        { error: "Checkout already returned" },
+        { error: "Asset already returned" },
         { status: 400 }
       );
     }
 
-    const body = await request.json();
-    const returnedAtInput =
-      typeof body.returnedAt === "string" ? body.returnedAt : null;
-    const receivedById =
-      typeof body.receivedById === "string" && body.receivedById.trim().length
-        ? body.receivedById.trim()
-        : null;
-    const returnNotes =
-      typeof body.returnNotes === "string" && body.returnNotes.trim().length
-        ? body.returnNotes.trim()
-        : null;
-
-    const returnedAt = returnedAtInput ? new Date(returnedAtInput) : new Date();
-    if (Number.isNaN(returnedAt.getTime())) {
+    // Validate that receivedById exists and is an Employee
+    if (!receivedById) {
       return NextResponse.json(
-        { error: "returnedAt tidak valid" },
+        { error: "Received by ID is required" },
         { status: 400 }
       );
     }
 
-    if (receivedById) {
-      const receiver = await db.employee.findUnique({
-        where: { id: receivedById },
-      });
-      if (!receiver) {
-        return NextResponse.json(
-          { error: "PIC penerima tidak ditemukan" },
-          { status: 404 }
-        );
-      }
+    // Verify the employee exists
+    const employee = await prisma.employee.findUnique({
+      where: { id: receivedById },
+    });
+
+    if (!employee) {
+      return NextResponse.json(
+        { error: "Employee not found" },
+        { status: 404 }
+      );
     }
 
-    const updated = await db.assetCheckout.update({
-      where: { id: checkoutId },
+    // Update the checkout record with correct field names from schema
+    const updatedCheckout = await prisma.assetCheckout.update({
+      where: { id },
       data: {
         status: "RETURNED",
-        returnedAt,
-        receivedById,
-        returnNotes,
-      },
-      include: {
-        assignTo: { select: { id: true, name: true, employeeId: true } },
-        receivedBy: { select: { id: true, name: true, employeeId: true } },
-        department: { select: { id: true, name: true } },
-        asset: { select: { id: true, name: true, noAsset: true } },
+        returnedAt: returnedAt ? new Date(returnedAt) : new Date(),
+        returnNotes: returnNotes || null,
+        returnSignatureData: returnSignatureData || null,
+        receivedById: receivedById,
       },
     });
 
-    console.log("Checkout return processed successfully");
-    return NextResponse.json({ success: true, checkout: updated });
-  } catch (error) {
-    console.error("Checkout return error:", error);
-    console.error("Error details:", {
-      message: error instanceof Error ? error.message : "Unknown error",
-      stack: error instanceof Error ? error.stack : undefined,
-      name: error instanceof Error ? error.name : undefined,
+    // Also update the asset status
+    await prisma.asset.update({
+      where: { id: checkout.assetId },
+      data: { status: "Available" },
     });
+
+    return NextResponse.json({
+      message: "Asset returned successfully",
+      checkout: updatedCheckout,
+    });
+  } catch (error) {
+    console.error("Error returning asset:", error);
     return NextResponse.json(
-      { error: "Failed to process check-in" },
+      {
+        error: "Failed to return asset",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
       { status: 500 }
     );
   }

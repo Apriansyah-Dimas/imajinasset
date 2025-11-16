@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Plus, Settings, Eye, Package, Upload, Download, Search, Trash2, ChevronUp, Filter } from 'lucide-react'
+import { Plus, Settings, Eye, Package, Upload, Download, Search, ChevronUp, Filter } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,7 +19,6 @@ import ImportAssetsModal from '@/components/import-assets-modal'
 import AssetDetailModal from '@/components/asset-detail-modal'
 import AddAssetModal from '@/components/add-asset-modal'
 import EditDropdownsModal from '@/components/edit-dropdowns-modal'
-import { DeleteAllAssetsModal } from '@/components/delete-all-assets-modal'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import RoleBasedAccess from '@/components/RoleBasedAccess'
 import { useAuth } from '@/contexts/AuthContext'
@@ -140,7 +139,6 @@ function AssetsPageContent() {
   const [showDropdownsModal, setShowDropdownsModal] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
-  const [showDeleteAllModal, setShowDeleteAllModal] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [showScrollTop, setShowScrollTop] = useState(false)
   const [filters, setFilters] = useState({
@@ -504,10 +502,10 @@ function AssetsPageContent() {
               <div className="flex flex-1 flex-wrap gap-2">
                 <button
                   onClick={() => setShowAddModal(true)}
-                  className="sneat-btn sneat-btn-primary min-w-[140px] justify-center"
+                  className="sneat-btn sneat-btn-primary min-w-[140px] justify-center text-white"
                 >
-                  <Plus className="h-4 w-4" />
-                  <span>Add Asset</span>
+                  <Plus className="h-4 w-4 text-white" />
+                  <span className="text-white">Add Asset</span>
                 </button>
                 <button
                   onClick={() => setShowImportModal(true)}
@@ -516,14 +514,7 @@ function AssetsPageContent() {
                   <Upload className="h-4 w-4" />
                   <span>Import</span>
                 </button>
-                <button
-                  onClick={() => setShowDeleteAllModal(true)}
-                  className="sneat-btn justify-center border border-[#ffd4d4] bg-[#fff4f4] text-[#d23a3a]"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  <span>Delete All</span>
-                </button>
-                <button
+                  <button
                   onClick={() => setShowDropdownsModal(true)}
                   className="sneat-btn sneat-btn-outlined justify-center"
                 >
@@ -1057,13 +1048,7 @@ function AssetsPageContent() {
         onSuccess={refreshAssets}
       />
 
-      {/* Delete All Assets Modal */}
-      <DeleteAllAssetsModal
-        open={showDeleteAllModal}
-        onOpenChange={setShowDeleteAllModal}
-        onSuccess={refreshAssets}
-      />
-    </div>
+      </div>
   )
 }
 

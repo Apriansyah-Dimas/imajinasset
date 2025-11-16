@@ -51,28 +51,20 @@ export default function Navbar() {
       { name: "Assets", href: "/assets", icon: Package },
     ];
 
-    if (
-      user &&
-      (user.role === "ADMIN" || user.role === "SO_ASSET_USER" || user.role === "VIEWER")
-    ) {
-      if (user.role === "ADMIN" || user.role === "SO_ASSET_USER") {
-        baseNav.push(
-          { name: "Check Out", href: "/check-out", icon: LogOut },
-          { name: "Check In", href: "/check-in", icon: LogIn }
-        );
-      }
+    const role = user?.role;
+
+    if (role === "ADMIN" || role === "SO_ASSET_USER") {
+      baseNav.push({ name: "Check Out", href: "/check-out", icon: LogOut });
+      baseNav.push({ name: "Check In", href: "/check-in", icon: LogIn });
+    }
+
+    if (role === "ADMIN" || role === "SO_ASSET_USER" || role === "VIEWER") {
       baseNav.push({ name: "SO Asset", href: "/so-asset", icon: Search });
     }
 
-    if (user && user.role === "ADMIN") {
-      baseNav.push({
-        name: "Admin",
-        icon: Users,
-        children: [
-          { name: "User Management", href: "/admin/users", icon: Users },
-          { name: "Backup & Restore", href: "/admin/backup", icon: Database },
-        ],
-      });
+    if (role === "ADMIN") {
+      baseNav.push({ name: "User Management", href: "/admin/users", icon: Users });
+      baseNav.push({ name: "Backup & Restore", href: "/admin/backup", icon: Database });
     }
 
     return baseNav;
@@ -176,7 +168,7 @@ export default function Navbar() {
   const overlayClasses = useMemo(
     () =>
       cn(
-        "fixed inset-0 z-30 bg-[#1f2041]/20 backdrop-blur-sm transition-opacity",
+        "fixed inset-0 z-[45] bg-[#1f2041]/20 backdrop-blur-sm transition-opacity",
         isSidebarOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
       ),
     [isSidebarOpen]
@@ -185,8 +177,8 @@ export default function Navbar() {
   const navItemBaseClasses = useMemo(
     () =>
       reduceMotion
-        ? "flex min-h-[40px] items-center gap-3 rounded-2xl px-3.5 py-2.5 text-[0.7rem] font-medium transition-colors duration-150"
-        : "flex min-h-[40px] items-center gap-3 rounded-2xl px-3.5 py-2.5 text-[0.7rem] font-medium transition-all duration-200 hover:-translate-y-0.5",
+        ? "flex min-h-[40px] items-center gap-3 px-3.5 py-2.5 text-[0.7rem] font-medium transition-colors duration-150 relative"
+        : "flex min-h-[40px] items-center gap-3 px-3.5 py-2.5 text-[0.7rem] font-medium transition-all duration-200 hover:-translate-y-0.5 relative",
     [reduceMotion]
   );
 
@@ -204,7 +196,7 @@ export default function Navbar() {
       {isMobile && (
         <div
           className={cn(
-            "fixed top-4 left-4 z-[60] flex",
+            "fixed top-4 left-4 z-[40] flex",
             reduceMotion ? "transition-opacity duration-150" : "transition-all duration-300"
           )}
         >
@@ -297,10 +289,10 @@ export default function Navbar() {
                               const childActive = child.href ? isActive(child.href) : false;
                               const commonClasses = cn(
                                 childNavItemClasses,
-                                "border border-transparent",
+                                "border border-transparent relative",
                                 childActive
-                                  ? "bg-secondary text-foreground shadow-[0_12px_30px_rgba(99,101,185,0.08)]"
-                                  : "text-text-muted hover:bg-secondary/60 hover:text-foreground"
+                                  ? "text-foreground"
+                                  : "text-text-muted hover:text-foreground"
                               );
 
                               if (child.href) {
@@ -315,8 +307,18 @@ export default function Navbar() {
                                       }
                                     }}
                                   >
-                                    <ChildIcon className="h-4 w-4 text-primary" />
-                                    <span className="truncate">{child.name}</span>
+                                    {childActive && (
+                                      <>
+                                        <div
+                                          className="absolute inset-y-0 left-0 right-0 bg-secondary shadow-[0_12px_30px_rgba(99,101,185,0.08)] rounded-l-xl z-0"
+                                          style={{
+                                            clipPath: 'polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%)'
+                                          }}
+                                        />
+                                      </>
+                                    )}
+                                    <ChildIcon className="h-4 w-4 text-primary relative z-10" />
+                                    <span className="truncate relative z-10">{child.name}</span>
                                   </Link>
                                 );
                               }
@@ -328,8 +330,18 @@ export default function Navbar() {
                                   className={cn(commonClasses, "text-left")}
                                   onClick={() => handleChildAction(child)}
                                 >
-                                  <ChildIcon className="h-4 w-4 text-primary" />
-                                  <span className="truncate">{child.name}</span>
+                                  {childActive && (
+                                    <>
+                                      <div
+                                        className="absolute inset-y-0 left-0 right-0 bg-secondary shadow-[0_12px_30px_rgba(99,101,185,0.08)] rounded-l-xl z-0"
+                                        style={{
+                                          clipPath: 'polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%)'
+                                        }}
+                                      />
+                                    </>
+                                  )}
+                                  <ChildIcon className="h-4 w-4 text-primary relative z-10" />
+                                  <span className="truncate relative z-10">{child.name}</span>
                                 </button>
                               );
                             })}
@@ -348,8 +360,8 @@ export default function Navbar() {
                       className={cn(
                         navItemBaseClasses,
                         active
-                          ? "bg-secondary text-foreground shadow-[0_12px_30px_rgba(99,101,185,0.12)]"
-                          : "text-text-muted hover:bg-secondary/60 hover:text-foreground",
+                          ? "text-foreground"
+                          : "text-text-muted hover:text-foreground",
                         "border border-transparent"
                       )}
                       onClick={() => {
@@ -358,8 +370,18 @@ export default function Navbar() {
                         }
                       }}
                     >
-                      <Icon className="h-4 w-4 text-primary" />
-                      <span className="truncate">{item.name}</span>
+                      {active && (
+                        <>
+                          <div
+                            className="absolute inset-y-0 left-0 right-0 bg-secondary shadow-[0_12px_30px_rgba(99,101,185,0.12)] rounded-l-2xl z-0"
+                            style={{
+                              clipPath: 'polygon(0 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 0 100%)'
+                            }}
+                          />
+                        </>
+                      )}
+                      <Icon className="h-4 w-4 text-primary relative z-10" />
+                      <span className="truncate relative z-10">{item.name}</span>
                     </Link>
                   );
                 })}
@@ -423,7 +445,7 @@ export default function Navbar() {
       {!isMobile && (
         <div
           className={cn(
-            "fixed top-1/2 z-[60] -translate-y-1/2 transform-gpu transition-all duration-300",
+            "fixed top-1/2 z-[40] -translate-y-1/2 transform-gpu transition-all duration-300",
             isSidebarOpen ? "left-[16rem] -translate-x-1/2" : "left-0"
           )}
         >
@@ -433,11 +455,13 @@ export default function Navbar() {
             title={isSidebarOpen ? "Sembunyikan sidebar" : "Tampilkan sidebar"}
             aria-label={isSidebarOpen ? "Sembunyikan sidebar" : "Tampilkan sidebar"}
           >
-            {isSidebarOpen ? (
-              <ChevronLeft aria-hidden="true" className="h-4 w-4 text-white drop-shadow-sm" />
-            ) : (
-              <ChevronRight aria-hidden="true" className="h-4 w-4 text-white drop-shadow-sm" />
-            )}
+            <div className="flex items-center justify-center w-full h-full">
+              {isSidebarOpen ? (
+                <ChevronLeft aria-hidden="true" className="h-3.5 w-3.5 text-white drop-shadow-sm -ml-1" />
+              ) : (
+                <ChevronRight aria-hidden="true" className="h-3.5 w-3.5 text-white drop-shadow-sm -ml-1" />
+              )}
+            </div>
           </button>
         </div>
       )}

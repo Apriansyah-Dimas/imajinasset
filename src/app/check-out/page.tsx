@@ -89,6 +89,7 @@ interface CheckoutHistoryEntry {
     name: string;
     employeeId?: string | null;
   } | null;
+  returnSignatureData?: string | null;
 }
 
 interface CheckoutFormState {
@@ -310,6 +311,18 @@ function HistoryEntryCard({
               <p className="text-xs text-foreground">{effectiveDetail.notes}</p>
             </div>
           )}
+          {effectiveDetail.signatureData && (
+            <div>
+              <p className="text-[11px] font-semibold uppercase text-muted-foreground">
+                Signature
+              </p>
+              <img
+                src={effectiveDetail.signatureData}
+                alt="Signature preview"
+                className="mt-2 h-24 w-full rounded-md border bg-white object-contain p-2"
+              />
+            </div>
+          )}
           {effectiveDetail.status === "RETURNED" && (
             <div className="space-y-3">
               <div className="grid gap-2 sm:grid-cols-2">
@@ -334,18 +347,18 @@ function HistoryEntryCard({
                   </p>
                 </div>
               )}
-            </div>
-          )}
-          {effectiveDetail.signatureData && (
-            <div>
-              <p className="text-[11px] font-semibold uppercase text-muted-foreground">
-                Signature
-              </p>
-              <img
-                src={effectiveDetail.signatureData}
-                alt="Signature preview"
-                className="mt-2 h-24 w-full rounded-md border bg-white object-contain p-2"
-              />
+              {effectiveDetail.returnSignatureData && (
+                <div>
+                  <p className="text-[11px] font-semibold uppercase text-muted-foreground">
+                    Return Signature
+                  </p>
+                  <img
+                    src={effectiveDetail.returnSignatureData}
+                    alt="Return signature preview"
+                    className="mt-2 h-24 w-full rounded-md border bg-white object-contain p-2"
+                  />
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -507,11 +520,22 @@ function CheckOutContent() {
         const asset = (await response.json()) as AssetRecord;
         setSelectedAsset(asset);
         setAssetNumber(asset.noAsset);
-        setDetailModalOpen(options?.openDetail ?? true);
+        const desiredDetailState = options?.openDetail ?? true;
         const status = options?.statusOverride ?? "verified";
         setCheckoutCompleted(status === "completed");
         persistAssetState({ number: asset.noAsset, status });
-        await checkOutstandingCheckout(asset.id);
+        const outstanding = await checkOutstandingCheckout(asset.id);
+        if (outstanding) {
+          toast.error(
+            `Asset sedang dipinjam oleh ${outstanding.assignTo.name}. Selesaikan check-in terlebih dahulu.`,
+          );
+          setDetailModalOpen(false);
+          setCheckoutModalOpen(false);
+        } else if (desiredDetailState) {
+          setDetailModalOpen(true);
+        } else {
+          setDetailModalOpen(false);
+        }
       } catch (error) {
         console.error("Asset lookup error:", error);
         const message = "Terjadi kesalahan saat mencari asset.";
@@ -780,7 +804,7 @@ function CheckOutContent() {
             disabled={picsLoading || pics.length === 0}
           >
             <SelectTrigger>
-              <SelectValue placeholder="Select Person from PIC" />
+              <SelectValue placeholder="Select Person" />
             </SelectTrigger>
             <SelectContent>
               {pics.map((pic) => (
@@ -871,7 +895,7 @@ function CheckOutContent() {
       formData.assignTo,
       pics,
       picsLoading,
-    ]
+    ],
   );
 
   return (
@@ -977,24 +1001,25 @@ function CheckOutContent() {
                         check out berikutnya.
                       </div>
                     )}
-                    <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setDetailModalOpen(true)}
-                        className="flex-1"
-                      >
-                        Lihat Detail
-                      </Button>
-                      <Button
-                        type="button"
-                        onClick={advanceToCheckoutForm}
-                        className="flex-1"
-                        disabled={Boolean(pendingCheckout)}
-                      >
-                        Next
-                      </Button>
-                    </div>
+                    {!pendingCheckout && (
+                      <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setDetailModalOpen(true)}
+                          className="flex-1"
+                        >
+                          Lihat Detail
+                        </Button>
+                        <Button
+                          type="button"
+                          onClick={advanceToCheckoutForm}
+                          className="flex-1"
+                        >
+                          Next
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 ) : null}
               </div>
@@ -1130,7 +1155,10 @@ function CheckOutContent() {
         open={Boolean(selectedAsset) && detailModalOpen}
         onOpenChange={handleDetailDialogChange}
       >
-        <DialogContent showCloseButton={false} className="sm:max-w-3xl">
+        <DialogContent
+          showCloseButton={false}
+          className="sm:max-w-3xl max-h-[90vh] overflow-y-auto"
+        >
           <DialogHeader>
             <DialogTitle>Konfirmasi Asset</DialogTitle>
             <DialogDescription>
@@ -1191,7 +1219,10 @@ function CheckOutContent() {
         open={checkoutModalOpen}
         onOpenChange={handleCheckoutDialogChange}
       >
-        <DialogContent showCloseButton={false} className="sm:max-w-3xl">
+        <DialogContent
+          showCloseButton={false}
+          className="sm:max-w-3xl max-h-[90vh] overflow-y-auto"
+        >
           <DialogHeader>
             <DialogTitle>Check Out Form</DialogTitle>
             <DialogDescription>
@@ -1200,78 +1231,76 @@ function CheckOutContent() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-5">
-            {selectedAsset && (
-              <div className="rounded-lg border bg-muted/30 p-4">
-                <p className="text-xs uppercase text-muted-foreground">Asset</p>
-                <p className="text-sm font-semibold text-foreground">
-                  {selectedAsset.name}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {selectedAsset.noAsset}
-                </p>
-              </div>
-            )}
+          {selectedAsset && (
+            <div className="rounded-lg border bg-muted/30 p-4">
+              <p className="text-xs uppercase text-muted-foreground">Asset</p>
+              <p className="text-sm font-semibold text-foreground">
+                {selectedAsset.name}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {selectedAsset.noAsset}
+              </p>
+            </div>
+          )}
 
-            <div className="space-y-4">
-              {formFields.map((field) => (
-                <div
-                  key={field.label}
-                  className={`grid gap-3 sm:grid-cols-[160px_1fr] ${
-                    field.alignTop ? "items-start" : "items-center"
-                  }`}
-                >
-                  <Label className="text-sm text-muted-foreground">
-                    {field.label}
-                  </Label>
-                  <div className="space-y-1">
-                    {field.input}
-                    {field.helper && (
-                      <p className="text-xs text-muted-foreground">
-                        {field.helper}
-                      </p>
-                    )}
-                  </div>
+          <div className="space-y-4">
+            {formFields.map((field) => (
+              <div
+                key={field.label}
+                className={`grid gap-3 sm:grid-cols-[160px_1fr] ${
+                  field.alignTop ? "items-start" : "items-center"
+                }`}
+              >
+                <Label className="text-sm text-muted-foreground">
+                  {field.label}
+                </Label>
+                <div className="space-y-1">
+                  {field.input}
+                  {field.helper && (
+                    <p className="text-xs text-muted-foreground">
+                      {field.helper}
+                    </p>
+                  )}
                 </div>
-              ))}
-
-              <div className="grid gap-3 sm:grid-cols-[160px_1fr]">
-                <Label className="text-sm text-muted-foreground">Sign</Label>
-                <SignaturePad
-                  value={formData.signature}
-                  onChange={(signature) =>
-                    setFormData((prev) => ({ ...prev, signature }))
-                  }
-                />
               </div>
-            </div>
+            ))}
 
-            <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:justify-end">
-              <Button
-                type="button"
-                variant="outline"
-                className="sm:w-32"
-                onClick={resetFlow}
-                disabled={submitting}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                className="sm:w-40"
-                onClick={handleCheckoutSubmit}
-                disabled={submitting || !formData.assignTo}
-              >
-                {submitting ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Processing
-                  </>
-                ) : (
-                  "Check Out"
-                )}
-              </Button>
+            <div className="grid gap-3 sm:grid-cols-[160px_1fr]">
+              <Label className="text-sm text-muted-foreground">Sign</Label>
+              <SignaturePad
+                value={formData.signature}
+                onChange={(signature) =>
+                  setFormData((prev) => ({ ...prev, signature }))
+                }
+              />
             </div>
+          </div>
+
+          <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              className="sm:w-32"
+              onClick={resetFlow}
+              disabled={submitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              className="sm:w-40"
+              onClick={handleCheckoutSubmit}
+              disabled={submitting || !formData.assignTo}
+            >
+              {submitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Processing
+                </>
+              ) : (
+                "Check Out"
+              )}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

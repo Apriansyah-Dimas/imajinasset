@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
+import { Lock, Unlock } from "lucide-react"
 
 interface SignaturePadProps {
   value: string | null
@@ -15,6 +16,7 @@ export default function SignaturePad({ value, onChange }: SignaturePadProps) {
   const [hasDrawing, setHasDrawing] = useState(false)
   const [isDirty, setIsDirty] = useState(false)
   const [isConfirmed, setIsConfirmed] = useState(Boolean(value))
+  const [isLocked, setIsLocked] = useState(false)
 
   const clearCanvas = useCallback(() => {
     const canvas = canvasRef.current
@@ -149,6 +151,7 @@ export default function SignaturePad({ value, onChange }: SignaturePadProps) {
   }
 
   const helperText = (() => {
+    if (isLocked) return "Lock aktif: scroll dinonaktifkan untuk memudahkan tanda tangan."
     if (isConfirmed) return "Signature confirmed."
     if (hasDrawing && isDirty) return "Click Confirm to save the signature."
     return "Sign inside the box, then Confirm to save."
@@ -160,6 +163,7 @@ export default function SignaturePad({ value, onChange }: SignaturePadProps) {
         <canvas
           ref={canvasRef}
           className="h-44 w-full rounded-t-lg bg-background"
+          style={{ touchAction: isLocked ? "none" : "auto" }}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={stopDrawing}
@@ -170,6 +174,24 @@ export default function SignaturePad({ value, onChange }: SignaturePadProps) {
         <div className="flex flex-col gap-3 border-t border-muted-foreground/30 px-4 py-3 text-sm sm:flex-row sm:items-center">
           <p className="flex-1 text-xs text-muted-foreground">{helperText}</p>
           <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsLocked((prev) => !prev)}
+            >
+              {isLocked ? (
+                <>
+                  <Unlock className="mr-1 h-4 w-4" />
+                  Unlock
+                </>
+              ) : (
+                <>
+                  <Lock className="mr-1 h-4 w-4" />
+                  Lock
+                </>
+              )}
+            </Button>
             <Button
               type="button"
               variant="outline"

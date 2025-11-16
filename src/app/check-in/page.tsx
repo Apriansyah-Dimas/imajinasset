@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import SignaturePad from "@/components/signature-pad";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,6 +40,7 @@ interface CheckInFormState {
   returnDate: string;
   receivedBy: string;
   notes: string;
+  signature: string | null;
 }
 
 const formatDateTimeForInput = (date: Date) => {
@@ -100,7 +102,7 @@ function OutstandingCard({
           </p>
         </div>
         <Button variant="secondary" size="sm" onClick={() => onSelect(entry)}>
-          Gunakan
+          Check In
         </Button>
       </div>
       <p className="mt-2 text-xs text-muted-foreground">
@@ -131,6 +133,7 @@ function CheckInContent() {
     returnDate: formatDateTimeForInput(new Date()),
     receivedBy: "",
     notes: "",
+    signature: null,
   });
   const [submitting, setSubmitting] = useState(false);
   const [pendingCheckouts, setPendingCheckouts] = useState<CheckoutEntry[]>([]);
@@ -140,7 +143,14 @@ function CheckInContent() {
   const fetchPics = useCallback(async () => {
     setPicsLoading(true);
     try {
-      const response = await fetch("/api/pics");
+      // Get auth token
+      const token = localStorage.getItem('auth_token');
+
+      const response = await fetch("/api/pics", {
+        headers: {
+          "Authorization": token ? `Bearer ${token}` : '',
+        },
+      });
       if (!response.ok) {
         toast.error("Gagal memuat PIC.");
         return;
@@ -159,7 +169,14 @@ function CheckInContent() {
     setPendingLoading(true);
     setPendingError(null);
     try {
-      const response = await fetch("/api/check-outs?status=OUT&limit=50");
+      // Get auth token
+      const token = localStorage.getItem('auth_token');
+
+      const response = await fetch("/api/check-outs?status=OUT&limit=50", {
+        headers: {
+          "Authorization": token ? `Bearer ${token}` : '',
+        },
+      });
       if (!response.ok) {
         const data = (await response.json().catch(() => null)) as
           | { error?: string }
@@ -194,13 +211,22 @@ function CheckInContent() {
       returnDate: formatDateTimeForInput(new Date()),
       receivedBy: "",
       notes: "",
+      signature: null,
     });
   };
 
   const fetchActiveCheckout = useCallback(async (assetId: string) => {
     try {
+      // Get auth token
+      const token = localStorage.getItem('auth_token');
+
       const response = await fetch(
         `/api/check-outs?assetId=${assetId}&limit=1`,
+        {
+          headers: {
+            "Authorization": token ? `Bearer ${token}` : '',
+          },
+        },
       );
       if (!response.ok) {
         setActiveCheckout(null);
@@ -238,8 +264,15 @@ function CheckInContent() {
       setAssetError(null);
       setLookupLoading(true);
       try {
+        // Get auth token
+        const token = localStorage.getItem('auth_token');
+
         const query = encodeURIComponent(trimmed);
-        const response = await fetch(`/api/assets/by-number?number=${query}`);
+        const response = await fetch(`/api/assets/by-number?number=${query}`, {
+          headers: {
+            "Authorization": token ? `Bearer ${token}` : '',
+          },
+        });
         if (!response.ok) {
           const data = (await response.json().catch(() => null)) as
             | { error?: string }
@@ -282,15 +315,22 @@ function CheckInContent() {
     }
     setSubmitting(true);
     try {
+      // Get auth token
+      const token = localStorage.getItem('auth_token');
+
       const response = await fetch(
         `/api/check-outs/${activeCheckout.id}/return`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": token ? `Bearer ${token}` : '',
+          },
           body: JSON.stringify({
             returnedAt: formData.returnDate,
             receivedById: formData.receivedBy,
             returnNotes: formData.notes,
+            returnSignatureData: formData.signature,
           }),
         },
       );
@@ -481,6 +521,19 @@ function CheckInContent() {
                           }))
                         }
                         placeholder="Catatan kondisi asset saat kembali."
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Signature Penerima</Label>
+                      <SignaturePad
+                        value={formData.signature}
+                        onChange={(signature) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            signature,
+                          }))
+                        }
                       />
                     </div>
 
