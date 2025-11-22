@@ -860,16 +860,21 @@ export default function AssetDetailModal({
                   </SelectTrigger>
                   <SelectContent>
                     {pics.length > 0 ? (
-                      pics.map((pic) => (
-                        <SelectItem key={pic.id} value={pic.id} className="text-sm">
-                          <div className="flex flex-col">
-                            <span>{pic.name}</span>
-                            {pic.position && (
-                              <span className="text-xs text-muted-foreground">{pic.position}</span>
-                            )}
-                          </div>
-                        </SelectItem>
-                      ))
+                      pics.map((pic) => {
+                        const positionLabel = (pic.position || '').trim()
+                        const showPosition = positionLabel && positionLabel.toLowerCase() !== 'test'
+
+                        return (
+                          <SelectItem key={pic.id} value={pic.id} className="text-sm">
+                            <div className="flex flex-col">
+                              <span>{pic.name}</span>
+                              {showPosition && (
+                                <span className="text-xs text-muted-foreground">{positionLabel}</span>
+                              )}
+                            </div>
+                          </SelectItem>
+                        )
+                      })
                     ) : (
                       <SelectItem value="no-pics" disabled>
                         No PIC available

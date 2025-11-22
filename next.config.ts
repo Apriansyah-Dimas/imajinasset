@@ -5,13 +5,7 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   reactStrictMode: false,
-  // Enable Supabase environment variables
-  env: {
-    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
-    NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-  },
   webpack: (config, { isServer }) => {
-    // Add Supabase to webpack externals for serverless
     if (!isServer) {
       config.resolve.fallback = {
         ...config.resolve.fallback,
@@ -74,6 +68,10 @@ const nextConfig: NextConfig = {
   // Set base path for custom domain
   basePath: "",
   assetPrefix: "",
+  // Disable the Next.js dev indicator/watermark
+  devIndicators: {
+    position: "bottom-right",
+  },
 };
 
 export default nextConfig;

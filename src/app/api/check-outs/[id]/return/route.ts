@@ -86,12 +86,6 @@ export async function POST(
       },
     });
 
-    // Also update the asset status
-    await prisma.asset.update({
-      where: { id: checkout.assetId },
-      data: { status: "Available" },
-    });
-
     try {
       await recordAssetEvent({
         assetId: checkout.assetId,

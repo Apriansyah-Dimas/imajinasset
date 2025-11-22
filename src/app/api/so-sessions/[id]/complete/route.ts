@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { verifyToken, canCompleteSOSession } from '@/lib/auth'
+import { recordAssetEvent } from '@/lib/asset-events'
 
 export async function POST(
   request: NextRequest,
@@ -80,27 +81,63 @@ export async function POST(
 
     console.log('DEBUG: Syncing SO entries to main assets:', soAssetEntries.length)
 
-    // Update main assets with data from SO session
+    // Update main assets with data from SO session & record history only upon completion
     for (const entry of soAssetEntries) {
-      if (entry.isIdentified) {
-        console.log('DEBUG: Updating asset:', entry.asset.noAsset)
-        console.log('DEBUG: New status:', entry.tempStatus)
-        console.log('DEBUG: New name:', entry.tempName)
-        
+      if (entry.isIdentified && entry.asset) {
+        const updates = {
+          name: entry.tempName || entry.asset.name,
+          status: entry.tempStatus || entry.asset.status,
+          serialNo: entry.tempSerialNo || entry.asset.serialNo,
+          pic: entry.tempPic || entry.asset.pic,
+          brand: entry.tempBrand || entry.asset.brand,
+          model: entry.tempModel || entry.asset.model,
+          cost: entry.tempCost || entry.asset.cost,
+          notes: entry.tempNotes ?? entry.asset.notes,
+        }
+
+        const changes: Array<{ field: string; before: any; after: any }> = []
+        const addChange = (field: string, before: any, after: any) => {
+          const beforeVal = before ?? null
+          const afterVal = after ?? null
+          if (JSON.stringify(beforeVal) !== JSON.stringify(afterVal)) {
+            changes.push({ field, before: beforeVal, after: afterVal })
+          }
+        }
+
+        addChange('name', entry.asset.name, updates.name)
+        addChange('status', entry.asset.status, updates.status)
+        addChange('serialNo', entry.asset.serialNo, updates.serialNo)
+        addChange('pic', entry.asset.pic, updates.pic)
+        addChange('brand', entry.asset.brand, updates.brand)
+        addChange('model', entry.asset.model, updates.model)
+        addChange('cost', entry.asset.cost, updates.cost)
+        addChange('notes', entry.asset.notes, updates.notes)
+
         await db.asset.update({
           where: { id: entry.assetId },
           data: {
-            name: entry.tempName || entry.asset.name,
-            status: entry.tempStatus || entry.asset.status,
-            serialNo: entry.tempSerialNo || entry.asset.serialNo,
-            pic: entry.tempPic || entry.asset.pic,
-            brand: entry.tempBrand || entry.asset.brand,
-            model: entry.tempModel || entry.asset.model,
-            cost: entry.tempCost || entry.asset.cost,
-            notes: entry.tempNotes ?? entry.asset.notes,
+            ...updates,
             updatedAt: new Date()
           }
         })
+
+        if (changes.length > 0) {
+          try {
+            await recordAssetEvent({
+              assetId: entry.assetId,
+              type: 'SO_UPDATE',
+              actor: user.name || user.email,
+              soSessionId: sessionId,
+              soAssetEntryId: entry.id,
+              payload: {
+                sessionName: session.name,
+                changes,
+              },
+            })
+          } catch (eventError) {
+            console.error('Failed to record SO completion event:', eventError)
+          }
+        }
       }
     }
 

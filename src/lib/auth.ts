@@ -1,5 +1,6 @@
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
+import type { NextRequest } from "next/server";
 import { db } from "./db";
 
 const JWT_SECRET =

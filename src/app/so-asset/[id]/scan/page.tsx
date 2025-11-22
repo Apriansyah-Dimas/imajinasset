@@ -358,7 +358,12 @@ function ScanPageContent() {
   };
 
   const resetFiltersAndSort = () => {
-    setFilters({ status: "all", category: "all", site: "all" });
+    setFilters({
+      status: "all",
+      category: "all",
+      site: "all",
+      department: "all"
+    });
     setSortOption("name-asc");
   };
 
