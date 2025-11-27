@@ -38,6 +38,8 @@ interface ScannedEntry {
   scannedAt: string;
   status: string;
   isIdentified: boolean;
+  isCrucial?: boolean;
+  crucialNotes?: string | null;
   asset: Asset;
 }
 
@@ -46,6 +48,7 @@ interface SessionOverview {
   name: string;
   year: number;
   description?: string;
+  notes?: string | null;
   status: string;
   totalAssets: number;
   scannedAssets: number;
@@ -112,7 +115,7 @@ function ShowResultsPageContent() {
         setRemainingAssets(data.missingAssets || []);
       } catch (error) {
         console.error("Failed to load show results page:", error);
-        toast.error("Gagal memuat hasil sesi");
+        toast.error("Failed to load session results");
       } finally {
         setLoading(false);
       }
@@ -171,7 +174,7 @@ function ShowResultsPageContent() {
   const emptyState = (
     <div className="surface-card border border-dashed border-surface-border/80 py-10 text-center text-sm text-text-muted">
       <AlertCircle className="mx-auto mb-3 h-5 w-5 text-primary" />
-      <p>Tidak ada aset yang sesuai dengan pencarian</p>
+      <p>No assets match your search</p>
     </div>
   );
 
@@ -193,7 +196,7 @@ function ShowResultsPageContent() {
         <div className="flex flex-wrap items-center gap-3">
           <Button variant="outline" size="sm" onClick={() => router.push("/so-asset")}>
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Kembali
+            Back
           </Button>
           <Badge
             variant={session?.status === "Active" ? "default" : "secondary"}
@@ -206,10 +209,10 @@ function ShowResultsPageContent() {
         <div className="flex flex-col gap-2">
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="text-2xl font-semibold text-foreground">
-              {session?.name || "Memuat sesi..."}
+                {session?.name || "Loading session..."}
             </h1>
             {session?.year ? (
-              <span className="text-sm text-text-muted">Tahun {session.year}</span>
+              <span className="text-sm text-text-muted">Year {session.year}</span>
             ) : null}
           </div>
           {session?.description ? (
@@ -260,7 +263,7 @@ function ShowResultsPageContent() {
                 <Input
                   value={searchQuery}
                   onChange={(event) => setSearchQuery(event.target.value)}
-                  placeholder="Cari nama, nomor aset, atau lokasi"
+                  placeholder="Search by name, asset number, or location"
                   className="pl-10"
                 />
               </div>
@@ -313,9 +316,9 @@ function ShowResultsPageContent() {
                           </p>
                           <div className="text-xs text-text-muted">
                             <span className="mr-4">
-                              {entry.asset.site?.name || "Lokasi tidak ada"}
+                              {entry.asset.site?.name || "Location unavailable"}
                             </span>
-                            <span>{entry.asset.category?.name || "Kategori tidak ada"}</span>
+                            <span>{entry.asset.category?.name || "Category unavailable"}</span>
                           </div>
                         </div>
                         <div className="flex flex-wrap gap-2">
@@ -346,7 +349,7 @@ function ShowResultsPageContent() {
                         <h3 className="text-sm font-semibold text-foreground">{asset.name}</h3>
                         <p className="font-mono text-xs text-primary">{asset.noAsset}</p>
                         <p className="text-[0.65rem] text-text-muted">
-                          {asset.site?.name || "Lokasi belum diatur"}
+                          {asset.site?.name || "Location not set"}
                         </p>
                       </div>
                       <div className="flex gap-2">

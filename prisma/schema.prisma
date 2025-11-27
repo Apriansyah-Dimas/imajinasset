@@ -109,6 +109,10 @@ model SOSession {
   name           String
   year           Int
   description    String?
+  notes          String?
+  completionNotes String?       @map("completion_notes")
+  planStart      DateTime?      @map("plan_start")
+  planEnd        DateTime?      @map("plan_end")
   status         String         @default("Active")
   totalAssets    Int            @default(0) @map("total_assets")
   scannedAssets  Int            @default(0) @map("scanned_assets")
@@ -129,6 +133,8 @@ model SOAssetEntry {
   scannedAt    DateTime  @default(now()) @map("scanned_at")
   status       String    @default("Scanned")
   isIdentified Boolean   @default(false) @map("isidentified")
+  isCrucial    Boolean   @default(false) @map("is_crucial")
+  crucialNotes String?   @map("crucial_notes")
   tempName     String?   @map("temp_name")
   tempStatus   String?   @map("temp_status")
   tempSerialNo String?   @map("temp_serial_no")

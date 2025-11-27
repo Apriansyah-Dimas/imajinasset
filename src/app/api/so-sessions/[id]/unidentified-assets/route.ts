@@ -96,9 +96,13 @@ export async function GET(
         name: session.name,
         year: session.year,
         description: session.description,
+        notes: session.notes,
+        completionNotes: session.completionNotes,
         status: session.status,
         totalAssets: session.totalAssets,
-        scannedAssets: session.scannedAssets
+        scannedAssets: session.scannedAssets,
+        planStart: session.planStart,
+        planEnd: session.planEnd
       },
       statistics: {
         totalAssets,

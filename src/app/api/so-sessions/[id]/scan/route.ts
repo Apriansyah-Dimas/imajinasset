@@ -25,6 +25,8 @@ const transformEntry = (entry: any) => ({
   assetId: entry.assetId,
   scannedAt: entry.scannedAt,
   isIdentified: entry.isIdentified,
+  isCrucial: entry.isCrucial ?? false,
+  crucialNotes: entry.crucialNotes ?? null,
   tempName: entry.tempName,
   tempStatus: entry.tempStatus,
   tempSerialNo: entry.tempSerialNo,
@@ -128,7 +130,7 @@ export async function POST(
 
     const { id: sessionId } = await params
     const body = await request.json()
-    const { assetNumber, assetId, source = 'camera' } = body
+    const { assetNumber, assetId, source = 'camera', isCrucial = false, crucialNotes = null } = body
 
     if (!assetNumber && !assetId) {
       return NextResponse.json(
@@ -199,7 +201,9 @@ export async function POST(
         tempModel: asset.model,
         tempCost: asset.cost,
         status: 'Scanned',
-        isIdentified: false
+        isIdentified: false,
+        isCrucial: Boolean(isCrucial),
+        crucialNotes: isCrucial ? (typeof crucialNotes === 'string' ? crucialNotes.trim() || null : null) : null
       },
       include: {
         asset: { include: assetInclude }

@@ -46,6 +46,8 @@ interface ScannedEntry {
   id: string
   assetId: string
   isIdentified: boolean
+  isCrucial?: boolean
+  crucialNotes?: string | null
   scannedAt: string
   asset: Asset
 }

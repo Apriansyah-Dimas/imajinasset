@@ -9,8 +9,10 @@ import { cn } from "@/lib/utils";
 
 type ScanSource = "camera" | "manual";
 
+export type ScanResult = { success: boolean; message?: string };
+
 export interface AssetScanPanelProps {
-  onDetected: (code: string, source: ScanSource) => Promise<void> | void;
+  onDetected: (code: string, source: ScanSource) => Promise<ScanResult | void> | ScanResult | void;
   title?: string;
   description?: string;
   manualPlaceholder?: string;
@@ -34,10 +36,12 @@ export function AssetScanPanel({
   const [scannerError, setScannerError] = useState<string | null>(null);
   const [manualValue, setManualValue] = useState("");
   const [manualLoading, setManualLoading] = useState(false);
+  const [manualFeedback, setManualFeedback] = useState<string | null>(null);
 
   const scannerRef = useRef<any>(null);
   const lastDetectedRef = useRef("");
   const detectionLockRef = useRef(false);
+  const manualInputRef = useRef<HTMLInputElement>(null);
 
   const scanRegionId = useMemo(generateRegionId, []);
 
@@ -58,16 +62,49 @@ export function AssetScanPanel({
   }, []);
 
   const handleDetection = useCallback(
-    async (value: string, source: ScanSource) => {
+    async (value: string, source: ScanSource): Promise<boolean> => {
       const trimmed = value.trim();
-      if (!trimmed || detectionLockRef.current) return;
+      if (!trimmed || detectionLockRef.current) return false;
       detectionLockRef.current = true;
-      setScannerMessage(source === "camera" ? `Memproses ${trimmed}...` : null);
+      if (source === "camera") {
+        setScannerMessage(`Memproses ${trimmed}...`);
+      }
       try {
-        await onDetected(trimmed, source);
+        const result = await onDetected(trimmed, source);
+        const success = result === undefined || (result as ScanResult)?.success !== false;
+        const message =
+          (result as ScanResult)?.message || "Gagal memproses hasil scan. Coba ulangi.";
+        if (!success) {
+          if (source === "manual") {
+            setManualFeedback(message);
+          } else {
+            setScannerError(message);
+            setTimeout(() => setScannerError(null), 3000);
+          }
+          return false;
+        }
+        if (source === "manual") {
+          setManualFeedback(null);
+        }
+        return true;
+      } catch (error) {
+        const fallbackMessage = "Gagal memproses hasil scan. Coba ulangi.";
+        const message =
+          error instanceof Error && error.message
+            ? error.message
+            : fallbackMessage;
+        if (source === "manual") {
+          setManualFeedback(message);
+        } else {
+          setScannerError(message);
+          setTimeout(() => setScannerError(null), 3000);
+        }
+        return false;
       } finally {
         detectionLockRef.current = false;
-        setScannerMessage(null);
+        if (source === "camera") {
+          setScannerMessage(null);
+        }
       }
     },
     [onDetected]
@@ -134,13 +171,45 @@ export function AssetScanPanel({
     };
   }, [cameraActive, initScanner, stopScanner]);
 
+  useEffect(() => {
+    const focusManualInput = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() !== "x") return;
+      const target = event.target as HTMLElement | null;
+      const tagName = target?.tagName;
+      const isEditable =
+        target?.isContentEditable ||
+        tagName === "INPUT" ||
+        tagName === "TEXTAREA" ||
+        tagName === "SELECT";
+      if (isEditable) return;
+      event.preventDefault();
+      manualInputRef.current?.focus();
+      manualInputRef.current?.select();
+    };
+
+    window.addEventListener("keydown", focusManualInput);
+    return () => window.removeEventListener("keydown", focusManualInput);
+  }, []);
+
   const handleManualSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!manualValue.trim()) return;
+    const trimmed = manualValue.trim();
+    if (!trimmed) {
+      setManualFeedback("Nomor aset tidak boleh kosong");
+      return;
+    }
     setManualLoading(true);
+    setManualFeedback(null);
     try {
-      await handleDetection(manualValue.trim(), "manual");
-      setManualValue("");
+      const success = await handleDetection(trimmed, "manual");
+      if (success) {
+        setManualValue("");
+        setManualFeedback(null);
+      }
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Gagal memproses input manual";
+      setManualFeedback(message);
     } finally {
       setManualLoading(false);
     }
@@ -207,8 +276,14 @@ export function AssetScanPanel({
           </label>
           <div className="flex flex-col gap-3 sm:flex-row">
             <Input
+              ref={manualInputRef}
               value={manualValue}
-              onChange={(e) => setManualValue(e.target.value)}
+              onChange={(e) => {
+                setManualValue(e.target.value);
+                if (manualFeedback) {
+                  setManualFeedback(null);
+                }
+              }}
               placeholder={manualPlaceholder}
               className="h-11 text-sm"
             />
@@ -228,6 +303,9 @@ export function AssetScanPanel({
           </div>
           {manualHelperText && (
             <p className="text-xs text-text-muted">{manualHelperText}</p>
+          )}
+          {manualFeedback && (
+            <p className="text-xs font-medium text-red-500">{manualFeedback}</p>
           )}
         </form>
         <style jsx global>{`

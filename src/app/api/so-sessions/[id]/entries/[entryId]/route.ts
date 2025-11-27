@@ -65,6 +65,9 @@ export async function GET(
       assetId: entry.assetId,
       scannedAt: entry.scannedAt,
       isIdentified: entry.isIdentified,
+      isCrucial: entry.isCrucial,
+      crucialNotes: entry.crucialNotes,
+      isCrucial: entry.isCrucial,
       tempName: entry.tempName,
       tempStatus: entry.tempStatus,
       tempSerialNo: entry.tempSerialNo,
@@ -162,6 +165,21 @@ export async function PUT(
       status: 'Updated'
     }
 
+    if (body.isCrucial !== undefined) {
+      updateData.isCrucial = Boolean(body.isCrucial)
+      if (!updateData.isCrucial) {
+        updateData.crucialNotes = null
+      }
+    }
+
+    if (body.crucialNotes !== undefined) {
+      const note =
+        typeof body.crucialNotes === 'string'
+          ? body.crucialNotes.trim()
+          : ''
+      updateData.crucialNotes = note || null
+    }
+
     console.log('DEBUG: Update data prepared:', updateData)
 
     const updatedEntry = await db.sOAssetEntry.update({
@@ -210,6 +228,8 @@ export async function PUT(
       assetId: updatedEntry.assetId,
       scannedAt: updatedEntry.scannedAt,
       isIdentified: updatedEntry.isIdentified,
+      isCrucial: updatedEntry.isCrucial,
+      crucialNotes: updatedEntry.crucialNotes,
       tempName: updatedEntry.tempName,
       tempStatus: updatedEntry.tempStatus,
       tempSerialNo: updatedEntry.tempSerialNo,

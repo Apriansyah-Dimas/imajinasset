@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Plus, Search, Edit, Trash2, Eye, Download, Upload, AlertCircle, CheckCircle, Clock, DollarSign, MapPin, User, Tag } from 'lucide-react'
+import { Plus, Search, Edit, Trash2, Eye, Download, Upload, AlertCircle, CheckCircle, Clock, IndianRupee, MapPin, User, Tag } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface Asset {
@@ -488,7 +488,7 @@ export default function AssetManagementPage() {
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <DollarSign className="h-8 w-8 text-purple-600" />
+              <IndianRupee className="h-8 w-8 text-purple-600" />
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-500">Total Value</p>

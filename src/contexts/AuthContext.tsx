@@ -13,7 +13,10 @@ interface User {
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<boolean>;
+  login: (
+    email: string,
+    password: string
+  ) => Promise<{ success: boolean; message?: string }>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -73,7 +76,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const login = async (email: string, password: string): Promise<boolean> => {
+  const login = async (
+    email: string,
+    password: string
+  ): Promise<{ success: boolean; message?: string }> => {
     try {
       console.log("Attempting login with:", email);
 
@@ -90,9 +96,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log("Login response ok:", checkResponse.ok);
 
       if (!checkResponse.ok) {
-        const errorText = await checkResponse.text();
-        console.error("Login failed with status:", checkResponse.status, errorText);
-        return false;
+        let errorMessage = "Invalid credentials";
+        try {
+          const errorBody = await checkResponse.json();
+          if (typeof errorBody?.error === "string" && errorBody.error.trim()) {
+            errorMessage = errorBody.error;
+          }
+        } catch {
+          const errorText = await checkResponse.text().catch(() => "");
+          if (errorText) {
+            errorMessage = errorText;
+          }
+        }
+
+        if (checkResponse.status >= 500) {
+          console.error("Login failed with status:", checkResponse.status, errorMessage);
+        } else {
+          console.warn("Login failed:", errorMessage);
+        }
+        return { success: false, message: errorMessage };
       }
 
       const loginData = await checkResponse.json();
@@ -103,14 +125,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setClientAuthToken(loginData.token);
         setUser(loginData.user);
         console.log("Login successful:", loginData.user);
-        return true;
+        return { success: true };
       } else {
         console.error("Invalid login response format:", loginData);
-        return false;
+        return {
+          success: false,
+          message: "Unexpected response from server. Please try again."
+        };
       }
     } catch (error) {
       console.error("Login error:", error);
-      return false;
+      return {
+        success: false,
+        message: "Unable to sign in. Please try again."
+      };
     }
   };
 

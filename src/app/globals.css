@@ -96,6 +96,13 @@
   --focus-ring: 0 0 0 3px rgba(99, 101, 185, 0.25);
 }
 
+:root[data-reduce-motion='true'] {
+  --shadow-soft: 0px 8px 18px rgba(99, 101, 185, 0.08);
+  --shadow-medium: 0px 12px 28px rgba(99, 101, 185, 0.12);
+  --shadow-strong: 0px 18px 38px rgba(99, 101, 185, 0.16);
+  --surface-gradient: none;
+}
+
 @layer base {
   * {
     @apply border-border;
@@ -113,6 +120,24 @@
       BlinkMacSystemFont, "Segoe UI", sans-serif;
     letter-spacing: -0.01em;
     font-size: 0.79rem; /* ~12.5px for denser UI */
+  }
+
+  html[data-reduce-motion='true'] body {
+    background-image: none;
+    background-color: var(--background);
+    background-attachment: scroll;
+  }
+
+  html[data-reduce-motion='true'] * {
+    transition-duration: 150ms !important;
+    animation-duration: 0.4s !important;
+    animation-iteration-count: 1 !important;
+  }
+
+  @media (max-width: 1024px) {
+    body {
+      background-attachment: scroll;
+    }
   }
 
   ::selection {
@@ -329,6 +354,17 @@
 
   .dashboard-layout--single {
     grid-template-columns: 1fr;
+  }
+
+  html[data-reduce-motion='true'] .surface-card,
+  html[data-reduce-motion='true'] .surface-panel {
+    transition: border-color 120ms ease, background-color 120ms ease;
+    box-shadow: var(--shadow-soft);
+  }
+
+  html[data-reduce-motion='true'] .surface-card:hover {
+    transform: none;
+    box-shadow: var(--shadow-soft);
   }
 }
 

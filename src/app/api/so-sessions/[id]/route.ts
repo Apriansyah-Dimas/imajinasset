@@ -117,14 +117,59 @@ export async function PUT(
       )
     }
 
-    // Update session
+    const updateData: Record<string, unknown> = {}
+
+    if (typeof body.name === 'string' && body.name.trim()) {
+      updateData.name = body.name.trim()
+    }
+    if (typeof body.year === 'number') {
+      updateData.year = body.year
+    }
+    if (typeof body.description === 'string' || body.description === null) {
+      updateData.description = body.description
+    }
+
+    if (body.startDate) {
+      const planStart = new Date(body.startDate)
+      if (Number.isNaN(planStart.getTime())) {
+        return NextResponse.json(
+          { error: 'Invalid startDate' },
+          { status: 400 }
+        )
+      }
+      updateData.planStart = planStart
+    }
+
+    if (body.endDate) {
+      const planEnd = new Date(body.endDate)
+      if (Number.isNaN(planEnd.getTime())) {
+        return NextResponse.json(
+          { error: 'Invalid endDate' },
+          { status: 400 }
+        )
+      }
+      updateData.planEnd = planEnd
+    }
+
+    if (updateData.planStart && updateData.planEnd) {
+      if ((updateData.planEnd as Date) < (updateData.planStart as Date)) {
+        return NextResponse.json(
+          { error: 'End date must be after start date' },
+          { status: 400 }
+        )
+      }
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return NextResponse.json(
+        { error: 'No valid fields to update' },
+        { status: 400 }
+      )
+    }
+
     const updatedSession = await db.sOSession.update({
       where: { id: sessionId },
-      data: {
-        name: body.name,
-        year: body.year,
-        description: body.description
-      }
+      data: updateData
     })
 
     return NextResponse.json({

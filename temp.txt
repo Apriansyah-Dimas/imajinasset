@@ -927,29 +927,29 @@ function ScanPageContent() {
                     setActiveList(value as "scanned" | "remaining" | "crucial")
                   }
                 >
-                  <TabsList className="mb-5 mt-2 flex w-full flex-wrap gap-x-3 gap-y-3 rounded-2xl bg-surface p-2 sm:mb-2 sm:mt-1 sm:grid sm:grid-cols-3 sm:gap-0 sm:p-1">
+                  <TabsList className="flex w-full flex-col gap-2 rounded-2xl bg-surface p-1.5 sm:grid sm:grid-cols-3 sm:gap-0 sm:p-1">
                     <TabsTrigger
                       value="scanned"
-                      className="flex-1 min-w-[calc(50%-0.5rem)] justify-center rounded-2xl px-4 py-3 text-sm font-semibold shadow-sm sm:min-w-0 sm:rounded-xl sm:px-3 sm:py-2 sm:text-sm sm:font-medium sm:shadow-none"
+                      className="rounded-xl px-4 py-3 text-sm font-medium sm:text-base"
                     >
                       Scanned ({filteredScannedEntries.length})
                     </TabsTrigger>
                     <TabsTrigger
                       value="crucial"
-                      className="flex-1 min-w-[calc(50%-0.5rem)] justify-center rounded-2xl px-4 py-3 text-sm font-semibold shadow-sm sm:min-w-0 sm:rounded-xl sm:px-3 sm:py-2 sm:text-sm sm:font-medium sm:shadow-none"
+                      className="rounded-xl px-4 py-3 text-sm font-medium sm:text-base"
                     >
                       Pending ({filteredCrucialEntries.length})
                     </TabsTrigger>
                     <TabsTrigger
                       value="remaining"
-                      className="flex-1 min-w-full justify-center rounded-2xl px-4 py-3 text-sm font-semibold shadow-sm sm:min-w-0 sm:rounded-xl sm:px-3 sm:py-2 sm:text-sm sm:font-medium sm:shadow-none"
+                      className="rounded-xl px-4 py-3 text-sm font-medium sm:text-base"
                     >
                       Remaining ({filteredRemainingAssets.length})
                     </TabsTrigger>
                   </TabsList>
                 </Tabs>
 
-                <div className="mt-6 max-h-[70vh] space-y-3 overflow-y-auto pr-1 sm:mt-3">
+                <div className="max-h-[70vh] space-y-3 overflow-y-auto pr-1">
                   {loadingData ? (
                     <div className="space-y-3">
                       {[1, 2, 3].map((item) => (

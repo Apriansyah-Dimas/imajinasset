@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Textarea } from '@/components/ui/textarea'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Trash2, History as HistoryIcon, Clock8 } from 'lucide-react'
@@ -55,6 +57,8 @@ interface AssetDetailModalProps {
   sessionContext?: {
     sessionId: string
     entryId: string
+    initialIsCrucial?: boolean
+    initialCrucialNotes?: string | null
   }
 }
 
@@ -78,6 +82,74 @@ type HistoryEntry = {
   summary: string
   details?: any
   source: 'checkout' | 'event'
+}
+
+type SessionEntry = {
+  id: string
+  soSessionId: string
+  assetId: string
+  scannedAt: string
+  status?: string
+  isIdentified?: boolean
+  isCrucial?: boolean | null
+  crucialNotes?: string | null
+  tempName?: string | null
+  tempStatus?: string | null
+  tempSerialNo?: string | null
+  tempPic?: string | null
+  tempNotes?: string | null
+  tempBrand?: string | null
+  tempModel?: string | null
+  tempCost?: number | string | null
+  asset?: Asset | null
+}
+
+const normalizeEntryCost = (value: number | string | null | undefined) => {
+  if (value === null || value === undefined || value === '') return undefined
+  const parsed = typeof value === 'string' ? parseFloat(value) : Number(value)
+  return Number.isNaN(parsed) ? undefined : parsed
+}
+
+const mapSessionEntryToAsset = (entry: SessionEntry): Asset => {
+  const fallback: Asset = {
+    id: entry.assetId,
+    name: entry.tempName || 'Aset tanpa nama',
+    noAsset: entry.asset?.noAsset || '-',
+    status: entry.tempStatus || 'Unidentified',
+    serialNo: entry.tempSerialNo ?? undefined,
+    purchaseDate: entry.asset?.purchaseDate,
+    cost: normalizeEntryCost(entry.tempCost),
+    brand: entry.tempBrand ?? entry.asset?.brand,
+    model: entry.tempModel ?? entry.asset?.model,
+    site: entry.asset?.site || null,
+    category: entry.asset?.category || null,
+    department: entry.asset?.department || null,
+    pic: entry.tempPic ?? entry.asset?.pic ?? entry.asset?.employee?.name ?? null,
+    picId: entry.asset?.picId,
+    imageUrl: entry.asset?.imageUrl ?? null,
+    notes: entry.tempNotes ?? entry.asset?.notes ?? null,
+    employee: entry.asset?.employee,
+    dateCreated: entry.asset?.dateCreated || entry.scannedAt || new Date().toISOString()
+  }
+
+  const base = entry.asset
+    ? {
+        ...entry.asset,
+        dateCreated: entry.asset.dateCreated || entry.scannedAt || new Date().toISOString()
+      }
+    : fallback
+
+  return {
+    ...base,
+    name: entry.tempName || base.name,
+    status: entry.tempStatus || base.status,
+    serialNo: entry.tempSerialNo ?? base.serialNo,
+    brand: entry.tempBrand ?? base.brand,
+    model: entry.tempModel ?? base.model,
+    cost: normalizeEntryCost(entry.tempCost) ?? base.cost,
+    notes: entry.tempNotes ?? base.notes,
+    pic: entry.tempPic ?? base.pic
+  }
 }
 
 export default function AssetDetailModal({
@@ -114,6 +186,8 @@ export default function AssetDetailModal({
   const [assetPrefix, setAssetPrefix] = useState('FA001')
   const [assetSuffix, setAssetSuffix] = useState({ categoryRoman: 'I', siteNumber: '01' })
   const isSessionContext = Boolean(sessionContext)
+  const [entryCrucial, setEntryCrucial] = useState(false)
+  const [entryCrucialNotes, setEntryCrucialNotes] = useState('')
   const sanitizeString = (value?: string | null) => {
     if (value === undefined || value === null) return null
     const trimmed = value.trim()
@@ -241,59 +315,118 @@ export default function AssetDetailModal({
   }
 
   useEffect(() => {
-    if (asset) {
-      // Verify asset still exists when opening modal
-      const verifyAsset = async () => {
+    if (!asset) return
+
+    const loadAssetData = async () => {
+      let assetData: Asset | null = asset
+
+      if (isSessionContext && sessionContext) {
         try {
-          const response = await fetch(`/api/assets/${asset.id}`)
-          if (!response.ok) {
-            // Asset doesn't exist, notify parent and close modal
-            alert('Asset not found. The asset may have been deleted by another user.')
-            onUpdate() // Refresh the assets list
+          const response = await fetch(
+            `/api/so-sessions/${sessionContext.sessionId}/entries/${sessionContext.entryId}`,
+            { cache: 'no-store' }
+          )
+
+          if (response.status === 404) {
+            alert('Data sesi tidak ditemukan atau sudah dihapus.')
+            onUpdate()
             onOpenChange(false)
             return
           }
 
-          // Asset exists, proceed with setting form data
-          setFormData({ ...asset })
-          setOriginalData({ ...asset })
-          setIsEditing(startInEditMode && !forceReadOnly)
-
-          // Parse additional information from notes field
-          if (asset.notes) {
-            try {
-              const additionalInfo = JSON.parse(asset.notes)
-              const fields = Object.entries(additionalInfo).map(([name, value], index) => ({
-                id: Date.now().toString() + index,
-                name,
-                value: String(value)
-              }))
-              setAdditionalFields(fields)
-            } catch (error) {
-              setAdditionalFields([])
+          if (response.ok) {
+            const data = await response.json()
+            const entryData: SessionEntry | undefined = data.entry
+            if (entryData) {
+              assetData = mapSessionEntryToAsset(entryData)
+              setEntryCrucial(Boolean(entryData.isCrucial))
+              setEntryCrucialNotes(entryData.crucialNotes || '')
             }
           } else {
-            setAdditionalFields([])
+            console.warn('Failed to load SO entry, using cached asset data instead.')
+          }
+        } catch (error) {
+          console.error('Error loading session entry:', error)
+        }
+      } else if (asset?.id) {
+        try {
+          const response = await fetch(`/api/assets/${asset.id}`, {
+            cache: 'no-store',
+          })
+
+          if (response.status === 404) {
+            alert('Asset not found. The asset may have been deleted by another user.')
+            onUpdate()
+            onOpenChange(false)
+            return
           }
 
-          // Set asset prefix and suffix
-          const [prefix = 'FA001', categoryPart = 'I', sitePart = '01'] = (asset.noAsset || '').split('/')
-          setAssetPrefix(prefix || 'FA001')
-          setAssetSuffix({
-            categoryRoman: categoryPart || 'I',
-            siteNumber: sitePart || '01'
-          })
+          if (response.ok) {
+            assetData = await response.json()
+          } else {
+            console.warn('Failed to verify asset, using cached data instead.')
+          }
         } catch (error) {
           console.error('Error verifying asset:', error)
-          setFormData({ ...asset })
-          setOriginalData({ ...asset })
-          setIsEditing(startInEditMode && !forceReadOnly)
         }
       }
 
-      verifyAsset();
+      if (!assetData) return
+
+      setFormData({ ...assetData })
+      setOriginalData({ ...assetData })
+      setIsEditing(startInEditMode && !forceReadOnly)
+
+      if (assetData.notes) {
+        try {
+          const additionalInfo = JSON.parse(assetData.notes)
+          const fields = Object.entries(additionalInfo).map(([name, value], index) => ({
+            id: Date.now().toString() + index,
+            name,
+            value: String(value),
+          }))
+          setAdditionalFields(fields)
+        } catch {
+          setAdditionalFields([])
+        }
+      } else {
+        setAdditionalFields([])
+      }
+
+      const [prefix = 'FA001', categoryPart = 'I', sitePart = '01'] = (assetData.noAsset || '').split('/')
+      setAssetPrefix(prefix || 'FA001')
+      setAssetSuffix({
+        categoryRoman: categoryPart || 'I',
+        siteNumber: sitePart || '01',
+      })
     }
-  }, [asset, startInEditMode, forceReadOnly]);
+
+    loadAssetData()
+  }, [
+    asset,
+    startInEditMode,
+    forceReadOnly,
+    onOpenChange,
+    onUpdate,
+    isSessionContext,
+    sessionContext?.entryId,
+    sessionContext?.sessionId,
+  ])
+
+  useEffect(() => {
+    if (isSessionContext) {
+      setEntryCrucial(Boolean(sessionContext?.initialIsCrucial))
+      setEntryCrucialNotes(sessionContext?.initialCrucialNotes || '')
+    } else {
+      setEntryCrucial(false)
+      setEntryCrucialNotes('')
+    }
+  }, [
+    isSessionContext,
+    sessionContext?.initialIsCrucial,
+    sessionContext?.initialCrucialNotes,
+    sessionContext?.entryId
+  ])
 
   useEffect(() => {
     if (forceReadOnly) {
@@ -385,6 +518,11 @@ export default function AssetDetailModal({
   const handleSave = async () => {
     if (!formData) return
 
+    if (isSessionContext && entryCrucial && !entryCrucialNotes.trim()) {
+      alert('Mohon isi keterangan kenapa aset ini ditandai sebagai Pending.')
+      return
+    }
+
     setLoading(true)
     try {
       const combinedAssetNumber = `${assetPrefix}/${assetSuffix.categoryRoman}/${assetSuffix.siteNumber}`
@@ -437,7 +575,9 @@ export default function AssetDetailModal({
           tempModel: sanitizeString(payload.model),
           tempCost: payload.cost ?? null,
           tempNotes: payload.notes ?? null,
-          isIdentified: true
+          isIdentified: true,
+          isCrucial: entryCrucial,
+          crucialNotes: entryCrucial ? entryCrucialNotes.trim() : null
         }
 
         const response = await fetch(
@@ -532,6 +672,10 @@ export default function AssetDetailModal({
       setFormData({ ...originalData })
     }
     setIsEditing(false)
+    if (isSessionContext) {
+      setEntryCrucial(Boolean(sessionContext?.initialIsCrucial))
+      setEntryCrucialNotes(sessionContext?.initialCrucialNotes || '')
+    }
   }
 
   if (!formData) return null
@@ -935,6 +1079,43 @@ export default function AssetDetailModal({
             />
           </div>
         </div>
+
+        {isSessionContext && (
+          <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50/80 p-4">
+            <label className="flex items-start gap-3 text-sm text-text-muted">
+              <Checkbox
+                checked={entryCrucial}
+                onCheckedChange={(checked) => {
+                  const next = Boolean(checked)
+                  setEntryCrucial(next)
+                  if (!next) {
+                    setEntryCrucialNotes('')
+                  }
+                }}
+                disabled={!isEditing}
+                className="mt-1 border-amber-400 text-amber-700 data-[state=checked]:bg-amber-500 data-[state=checked]:text-white"
+              />
+              <span>
+                Tandai aset ini sebagai <span className="font-semibold text-foreground">Pending</span> bila tag fisik salah, kondisi rusak, atau data tidak sinkron.
+              </span>
+            </label>
+            {entryCrucial && (
+              isEditing ? (
+                <Textarea
+                  value={entryCrucialNotes}
+                  onChange={(event) => setEntryCrucialNotes(event.target.value)}
+                  placeholder="Contoh: Tag aset hilang, label baru diperlukan."
+                  className="mt-3 text-sm"
+                  rows={3}
+                />
+              ) : entryCrucialNotes ? (
+                <p className="mt-3 text-sm text-text-muted">
+                  Keterangan: {entryCrucialNotes}
+                </p>
+              ) : null
+            )}
+          </div>
+        )}
 
         {!forceReadOnly ? (
           <div className="flex flex-col sm:flex-row sm:justify-between sm:space-x-2 space-y-3 sm:space-y-0 mt-6">

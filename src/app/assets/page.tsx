@@ -1,13 +1,14 @@
-'use client'
+﻿'use client'
 
-import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
+import { useEffect, useState, useCallback, useRef, type ComponentProps } from 'react'
+import dynamic from 'next/dynamic'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Plus, Settings, Eye, Package, Upload, Download, Search, ChevronUp, Filter } from 'lucide-react'
+import { Plus, Settings, Eye, Package, Upload, Download, Search, ChevronUp, Filter, AlertCircle, X } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,14 +16,78 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
-import ImportAssetsModal from '@/components/import-assets-modal'
-import AssetDetailModal from '@/components/asset-detail-modal'
-import AddAssetModal from '@/components/add-asset-modal'
-import EditDropdownsModal from '@/components/edit-dropdowns-modal'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import RoleBasedAccess from '@/components/RoleBasedAccess'
 import { useAuth } from '@/contexts/AuthContext'
 import AssetImagePlaceholder from '@/components/asset-image-placeholder'
+import type AssetDetailModalComponent from '@/components/asset-detail-modal'
+import type AddAssetModalComponent from '@/components/add-asset-modal'
+import type ImportAssetsModalComponent from '@/components/import-assets-modal'
+import type EditDropdownsModalComponent from '@/components/edit-dropdowns-modal'
+
+const PAGE_SIZE = 50
+
+type SortOption = 'name-asc' | 'name-desc' | 'created-newest' | 'created-oldest'
+
+const SORT_CONFIG: Record<SortOption, { sort: 'name' | 'dateCreated'; order: 'asc' | 'desc' }> = {
+  'name-asc': { sort: 'name', order: 'asc' },
+  'name-desc': { sort: 'name', order: 'desc' },
+  'created-newest': { sort: 'dateCreated', order: 'desc' },
+  'created-oldest': { sort: 'dateCreated', order: 'asc' }
+}
+
+type FilterKey = 'status' | 'category' | 'site' | 'department'
+type FilterState = Record<FilterKey, string>
+
+const INITIAL_FILTERS: FilterState = {
+  status: 'all',
+  category: 'all',
+  site: 'all',
+  department: 'all'
+}
+
+const LazyModalFallback = ({ label }: { label: string }) => (
+  <div className="rounded-2xl border border-dashed border-surface-border p-6 text-center text-xs text-text-muted">
+    {label}
+  </div>
+)
+
+type AssetDetailModalProps = ComponentProps<AssetDetailModalComponent>
+type AddAssetModalProps = ComponentProps<AddAssetModalComponent>
+type ImportAssetsModalProps = ComponentProps<ImportAssetsModalComponent>
+type EditDropdownsModalProps = ComponentProps<EditDropdownsModalComponent>
+
+const AssetDetailModal = dynamic<AssetDetailModalProps>(
+  () => import('@/components/asset-detail-modal'),
+  {
+    loading: () => <LazyModalFallback label="Memuat detail aset..." />,
+    ssr: false
+  }
+)
+
+const AddAssetModal = dynamic<AddAssetModalProps>(
+  () => import('@/components/add-asset-modal'),
+  {
+    loading: () => <LazyModalFallback label="Menyiapkan formulir tambah aset..." />,
+    ssr: false
+  }
+)
+
+const ImportAssetsModal = dynamic<ImportAssetsModalProps>(
+  () => import('@/components/import-assets-modal'),
+  {
+    loading: () => <LazyModalFallback label="Memuat modul impor aset..." />,
+    ssr: false
+  }
+)
+
+const EditDropdownsModal = dynamic<EditDropdownsModalProps>(
+  () => import('@/components/edit-dropdowns-modal'),
+  {
+    loading: () => <LazyModalFallback label="Memuat konfigurasi dropdown..." />,
+    ssr: false
+  }
+)
 
 interface Asset {
   id: string
@@ -53,103 +118,147 @@ interface Asset {
   dateCreated: string
 }
 
-const toSearchTokens = (value: unknown): string[] => {
-  if (value === null || value === undefined) return []
-
-  if (typeof value === 'string') return [value.toLowerCase()]
-  if (typeof value === 'number' || typeof value === 'boolean') {
-    return [String(value).toLowerCase()]
-  }
-  if (value instanceof Date) return [value.toISOString().toLowerCase()]
-
-  if (Array.isArray(value)) {
-    return value.flatMap(toSearchTokens)
-  }
-
-  if (typeof value === 'object') {
-    return Object.values(value).flatMap(toSearchTokens)
-  }
-
-  return []
-}
-
-// Collect relevant asset properties (including nested data) into a flat list of normalized strings for searching.
-const buildAssetSearchTokens = (asset: Asset): string[] => {
-  const baseValues: unknown[] = [
-    asset.id,
-    asset.name,
-    asset.noAsset,
-    asset.status,
-    asset.serialNo,
-    asset.purchaseDate,
-    asset.brand,
-    asset.model,
-    asset.pic,
-    asset.picId,
-    asset.imageUrl,
-    asset.dateCreated,
-    asset.cost,
-    asset.site?.name,
-    asset.site?.id,
-    asset.category?.name,
-    asset.category?.id,
-    asset.department?.name,
-    asset.department?.id,
-    asset.notes
-  ]
-
-  const employeeValues: unknown[] = asset.employee
-    ? [
-        asset.employee.id,
-        asset.employee.employeeId,
-        asset.employee.name,
-        asset.employee.email,
-        asset.employee.department,
-        asset.employee.position,
-        asset.employee.isActive
-      ]
-    : []
-
-  const additionalNoteTokens: unknown[] = []
-  if (asset.notes) {
-    try {
-      const parsedNotes = JSON.parse(asset.notes)
-      additionalNoteTokens.push(
-        ...Object.entries(parsedNotes).flatMap(([key, value]) => [key, value])
-      )
-    } catch {
-      // notes might be plain text; already handled in baseValues
-    }
-  }
-
-  return toSearchTokens([...baseValues, ...employeeValues, ...additionalNoteTokens])
-}
-
 function AssetsPageContent() {
   const { user } = useAuth()
   const [assets, setAssets] = useState<Asset[]>([])
-  const [filteredAssets, setFilteredAssets] = useState<Asset[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(true)
   const [page, setPage] = useState(1)
+  const [totalResults, setTotalResults] = useState<number | null>(null)
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null)
   const [showDetailModal, setShowDetailModal] = useState(false)
   const [showAddModal, setShowAddModal] = useState(false)
   const [showDropdownsModal, setShowDropdownsModal] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
-  const [searchQuery, setSearchQuery] = useState('')
+  const [searchInput, setSearchInput] = useState('')
+  const [searchTerm, setSearchTerm] = useState('')
   const [showScrollTop, setShowScrollTop] = useState(false)
-  const [filters, setFilters] = useState({
-    status: 'all',
-    category: 'all',
-    site: 'all',
-    department: 'all'
-  })
-  const [sortOption, setSortOption] = useState<'name-asc' | 'name-desc' | 'created-newest' | 'created-oldest'>('name-asc')
+  const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS)
+  const [sortOption, setSortOption] = useState<SortOption>('name-asc')
+  const [statusOptions, setStatusOptions] = useState<string[]>([])
+  const [categoryOptions, setCategoryOptions] = useState<string[]>([])
+  const [siteOptions, setSiteOptions] = useState<string[]>([])
+  const [departmentOptions, setDepartmentOptions] = useState<string[]>([])
+  const [fetchError, setFetchError] = useState<string | null>(null)
 
   const observer = useRef<IntersectionObserver | null>(null)
+  const fetchControllerRef = useRef<AbortController | null>(null)
+
+  const loadAssets = useCallback(async (pageNum: number = 1, append: boolean = false) => {
+    const controller = new AbortController()
+
+    if (!append) {
+      if (fetchControllerRef.current) {
+        fetchControllerRef.current.abort()
+      }
+      fetchControllerRef.current = controller
+      setLoading(true)
+      if (pageNum === 1) {
+        setAssets([])
+        setHasMore(true)
+        setFetchError(null)
+        setTotalResults(null)
+      }
+    } else {
+      setLoadingMore(true)
+    }
+
+    try {
+      const params = new URLSearchParams({
+        page: pageNum.toString(),
+        limit: PAGE_SIZE.toString()
+      })
+
+      if (searchTerm) params.set('search', searchTerm)
+      if (filters.status !== 'all') params.set('status', filters.status)
+      if (filters.category !== 'all') params.set('category', filters.category)
+      if (filters.site !== 'all') params.set('site', filters.site)
+      if (filters.department !== 'all') params.set('department', filters.department)
+
+      const sortConfig = SORT_CONFIG[sortOption]
+      params.set('sort', sortConfig.sort)
+      params.set('order', sortConfig.order)
+
+      const response = await fetch(`/api/assets?${params.toString()}`, {
+        signal: controller.signal
+      })
+
+      if (!response.ok) {
+        let errorMessage = `Gagal memuat aset (status ${response.status})`
+        try {
+          const cloned = response.clone()
+          const parsed = await cloned.json()
+          if (parsed?.error) {
+            errorMessage = parsed.error
+          }
+        } catch {
+          try {
+            const text = await response.text()
+            if (text) {
+              errorMessage = text
+            }
+          } catch {
+            // ignore
+          }
+        }
+        throw new Error(errorMessage)
+      }
+
+      const data = await response.json()
+      const assetsData: Asset[] = data.assets || []
+      setAssets(prevAssets => (append ? [...prevAssets, ...assetsData] : assetsData))
+
+      const pagination = data.pagination ?? {}
+      setFetchError(null)
+      setTotalResults(prevTotal => {
+        if (typeof pagination.total === 'number') {
+          return pagination.total
+        }
+        if (append) {
+          return (prevTotal ?? 0) + assetsData.length
+        }
+        return assetsData.length
+      })
+      const derivedHasMore =
+        typeof pagination.hasNext === 'boolean'
+          ? pagination.hasNext
+          : assetsData.length === PAGE_SIZE
+
+      setHasMore(derivedHasMore)
+      setPage(pagination.page ?? pageNum)
+    } catch (error) {
+      if ((error as DOMException).name === 'AbortError') return
+      console.error('Failed to load assets:', error)
+      setFetchError(error instanceof Error ? error.message : 'Gagal memuat data aset.')
+      if (!append) {
+        setAssets([])
+        setHasMore(false)
+      }
+    } finally {
+      if (!append) {
+        setLoading(false)
+        if (fetchControllerRef.current === controller) {
+          fetchControllerRef.current = null
+        }
+      } else {
+        setLoadingMore(false)
+      }
+    }
+  }, [searchTerm, filters, sortOption])
+
+  const loadMoreAssets = useCallback(() => {
+    if (loading || loadingMore || !hasMore) {
+      return
+    }
+    loadAssets(page + 1, true)
+  }, [hasMore, loading, loadingMore, loadAssets, page])
+
+  const refreshAssets = useCallback(() => {
+    loadAssets(1, false)
+  }, [loadAssets])
+
   const lastAssetElementRef = useCallback((node: HTMLTableRowElement | null) => {
     if (loadingMore) return
     if (observer.current) observer.current.disconnect()
@@ -159,56 +268,88 @@ function AssetsPageContent() {
       }
     })
     if (node) observer.current.observe(node)
-  }, [loadingMore, hasMore])
+  }, [loadingMore, hasMore, loadMoreAssets])
 
-  const assetSearchIndex = useMemo(
-    () => assets.map(asset => ({ asset, tokens: buildAssetSearchTokens(asset) })),
-    [assets]
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setSearchTerm(searchInput.trim())
+    }, 350)
+
+    return () => clearTimeout(handler)
+  }, [searchInput])
+
+  const handleSearchSubmit = useCallback(
+    (event?: React.FormEvent<HTMLFormElement> | React.MouseEvent<HTMLButtonElement>) => {
+      if (event) event.preventDefault()
+      setSearchTerm(searchInput.trim())
+    },
+    [searchInput]
   )
 
-  const statusOptions = useMemo(
-    () =>
-      Array.from(new Set(assets.map(asset => asset.status).filter(Boolean))).sort((a, b) =>
-        a.localeCompare(b)
-      ),
-    [assets]
-  )
+  useEffect(() => {
+    let isActive = true
+    const controller = new AbortController()
+    const signal = controller.signal
 
-  const categoryOptions = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          assets
-            .map(asset => asset.category?.name)
-            .filter((name): name is string => Boolean(name))
-        )
-      ).sort((a, b) => a.localeCompare(b)),
-    [assets]
-  )
+    const fetchFilterOptions = async () => {
+      try {
+        const [statusRes, categoryRes, siteRes, departmentRes] = await Promise.all([
+          fetch('/api/assets/statuses', { signal }),
+          fetch('/api/categories', { signal }),
+          fetch('/api/sites', { signal }),
+          fetch('/api/departments', { signal })
+        ])
 
-  const siteOptions = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          assets
-            .map(asset => asset.site?.name)
-            .filter((name): name is string => Boolean(name))
-        )
-      ).sort((a, b) => a.localeCompare(b)),
-    [assets]
-  )
+        if (!isActive) return
 
-  const departmentOptions = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          assets
-            .map(asset => asset.department?.name)
-            .filter((name): name is string => Boolean(name))
-        )
-      ).sort((a, b) => a.localeCompare(b)),
-    [assets]
-  )
+        if (statusRes.ok) {
+          const statuses: string[] = await statusRes.json()
+          setStatusOptions(statuses)
+        }
+
+        if (categoryRes.ok) {
+          const categories = await categoryRes.json()
+          setCategoryOptions(
+            categories
+              .map((category: { name?: string }) => category.name)
+              .filter((name): name is string => Boolean(name))
+              .sort((a, b) => a.localeCompare(b))
+          )
+        }
+
+        if (siteRes.ok) {
+          const sites = await siteRes.json()
+          setSiteOptions(
+            sites
+              .map((site: { name?: string }) => site.name)
+              .filter((name): name is string => Boolean(name))
+              .sort((a, b) => a.localeCompare(b))
+          )
+        }
+
+        if (departmentRes.ok) {
+          const departments = await departmentRes.json()
+          setDepartmentOptions(
+            departments
+              .map((department: { name?: string }) => department.name)
+              .filter((name): name is string => Boolean(name))
+              .sort((a, b) => a.localeCompare(b))
+          )
+        }
+      } catch (error) {
+        if ((error as DOMException).name === 'AbortError') return
+        console.error('Failed to load filter options:', error)
+      }
+    }
+
+    fetchFilterOptions()
+
+    return () => {
+      isActive = false
+      controller.abort()
+    }
+  }, [])
+
 
   const hasActiveFilters =
     filters.status !== 'all' ||
@@ -216,8 +357,9 @@ function AssetsPageContent() {
     filters.site !== 'all' ||
     filters.department !== 'all'
   const showActiveFilterDot = hasActiveFilters || sortOption !== 'name-asc'
+  const showInitialSkeleton = loading && assets.length === 0 && !fetchError
 
-  const handleFilterChange = (type: 'status' | 'category' | 'site' | 'department', value: string) => {
+  const handleFilterChange = (type: FilterKey, value: string) => {
     setFilters(prev => ({
       ...prev,
       [type]: value
@@ -225,12 +367,7 @@ function AssetsPageContent() {
   }
 
   const resetFilters = () => {
-    setFilters({
-      status: 'all',
-      category: 'all',
-      site: 'all',
-      department: 'all'
-    })
+    setFilters(INITIAL_FILTERS)
   }
 
   const resetFiltersAndSort = () => {
@@ -253,7 +390,7 @@ function AssetsPageContent() {
     }`
 
   const sortOptionsList: Array<{
-    value: typeof sortOption
+    value: SortOption
     label: string
     description: string
   }> = [
@@ -262,53 +399,6 @@ function AssetsPageContent() {
     { value: 'created-newest', label: 'Terbaru', description: 'Aset dengan tanggal dibuat terbaru' },
     { value: 'created-oldest', label: 'Terlama', description: 'Aset paling lama dibuat' }
   ]
-
-  const loadAssets = async (pageNum: number = 1, append: boolean = false) => {
-    if (!append) setLoading(true)
-    else setLoadingMore(true)
-
-    try {
-      const response = await fetch(`/api/assets?limit=10000`)
-
-      if (response.ok) {
-        const data = await response.json()
-        const assetsData: Asset[] = data.assets || []
-
-        let updatedAssets: Asset[] = []
-        setAssets(prevAssets => {
-          updatedAssets = append ? [...prevAssets, ...assetsData] : assetsData
-          return updatedAssets
-        })
-
-        if (searchQuery.trim() === '') {
-          setFilteredAssets(updatedAssets)
-        }
-      } else if (!append) {
-        setAssets([])
-        setFilteredAssets([])
-      }
-    } catch (error) {
-      if (!append) {
-        setAssets([])
-        setFilteredAssets([])
-      }
-    }
-
-    setHasMore(false)
-    setPage(pageNum)
-    setLoading(false)
-    setLoadingMore(false)
-  }
-
-  const loadMoreAssets = () => {
-    if (!loadingMore && hasMore) {
-      loadAssets(page + 1, true)
-    }
-  }
-
-  const refreshAssets = () => {
-    loadAssets(1, false)
-  }
 
   const handleDetailModalOpenChange = (isOpen: boolean) => {
     setShowDetailModal(isOpen)
@@ -356,52 +446,8 @@ function AssetsPageContent() {
   }
 
   useEffect(() => {
-    loadAssets()
-  }, [])
-
-  useEffect(() => {
-    const normalizedQuery = searchQuery.trim().toLowerCase()
-
-    let workingAssets: Asset[] =
-      normalizedQuery === ''
-        ? assets
-        : assetSearchIndex
-            .filter(entry => entry.tokens.some(token => token.includes(normalizedQuery)))
-            .map(entry => entry.asset)
-
-    if (filters.status !== 'all') {
-      workingAssets = workingAssets.filter(asset => asset.status === filters.status)
-    }
-
-    if (filters.category !== 'all') {
-      workingAssets = workingAssets.filter(asset => asset.category?.name === filters.category)
-    }
-
-    if (filters.site !== 'all') {
-      workingAssets = workingAssets.filter(asset => asset.site?.name === filters.site)
-    }
-
-    if (filters.department !== 'all') {
-      workingAssets = workingAssets.filter(asset => asset.department?.name === filters.department)
-    }
-
-    const sortedAssets = [...workingAssets].sort((a, b) => {
-      switch (sortOption) {
-        case 'name-asc':
-          return a.name.localeCompare(b.name)
-        case 'name-desc':
-          return b.name.localeCompare(a.name)
-        case 'created-newest':
-          return new Date(b.dateCreated).getTime() - new Date(a.dateCreated).getTime()
-        case 'created-oldest':
-          return new Date(a.dateCreated).getTime() - new Date(b.dateCreated).getTime()
-        default:
-          return 0
-      }
-    })
-
-    setFilteredAssets(sortedAssets)
-  }, [searchQuery, assets, assetSearchIndex, filters, sortOption])
+    loadAssets(1, false)
+  }, [loadAssets])
 
   useEffect(() => {
     const handleScroll = () => {
@@ -434,40 +480,6 @@ function AssetsPageContent() {
         return 'bg-surface text-text-muted border border-surface-border'
     }
   }
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background px-4 py-8 sm:px-6 lg:px-10">
-        <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
-          <div className="space-y-3">
-            <div className="h-4 w-32 rounded-full bg-surface-border/70" />
-            <div className="h-9 w-64 rounded-xl bg-surface-border/60" />
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {[1, 2, 3, 4].map((i) => (
-              <div
-                key={i}
-                className="surface-card animate-pulse space-y-4"
-              >
-                <div className="h-3 w-20 rounded-full bg-surface-border/70" />
-                <div className="h-6 w-24 rounded-full bg-surface-border/60" />
-              </div>
-            ))}
-          </div>
-          <div className="surface-card animate-pulse space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="h-5 w-32 rounded-full bg-surface-border/70" />
-              <div className="h-9 w-40 rounded-2xl bg-surface-border/60" />
-            </div>
-            {[1, 2, 3, 4, 5].map((row) => (
-              <div key={row} className="h-12 rounded-2xl bg-surface-border/40" />
-            ))}
-          </div>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className="min-h-screen bg-background px-4 py-6 sm:px-6 lg:px-10">
       <div className="mx-auto w-full max-w-7xl space-y-6">
@@ -550,16 +562,38 @@ function AssetsPageContent() {
       {/* Search Bar */}
       <div className="surface-card">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
-          <div className="relative flex-1">
+          <form className="relative flex-1" onSubmit={handleSearchSubmit}>
             <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
             <input
-              className="sneat-input h-12 w-full pl-12 text-sm"
+              className="sneat-input h-12 w-full pl-12 pr-28 text-sm"
               type="text"
               placeholder="Cari aset (nama, nomor aset, PIC, status, dsb)"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
             />
-          </div>
+            <div className="absolute right-2 top-1/2 flex -translate-y-1/2 gap-2">
+              {searchInput && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchInput('')
+                    setSearchTerm('')
+                  }}
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-surface-border text-text-muted transition hover:text-primary"
+                  aria-label="Clear search"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+              <button
+                type="submit"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-primary text-white shadow-[0_10px_25px_rgba(99,101,185,0.35)] transition hover:bg-primary/90"
+                aria-label="Cari aset"
+              >
+                <Search className="h-4 w-4" />
+              </button>
+            </div>
+          </form>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
@@ -703,11 +737,54 @@ function AssetsPageContent() {
             <h2 className="text-xl font-bold text-foreground">ASSET LIST</h2>
           </div>
           <span className="sneat-chip bg-primary/10 text-primary">
-            {filteredAssets.length} item
+            {loading && assets.length === 0
+              ? 'Memuat data...'
+              : `Menampilkan ${assets.length}${typeof totalResults === 'number' ? ` dari ${totalResults}` : ''} aset`}
           </span>
         </div>
 
-        {filteredAssets.length > 0 ? (
+        {fetchError ? (
+          <div className="border-b border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-red-500" />
+                <p>{fetchError}</p>
+              </div>
+              <button
+                type="button"
+                onClick={refreshAssets}
+                className="inline-flex items-center justify-center rounded-2xl border border-red-200 px-3 py-1 text-xs font-semibold uppercase tracking-[0.3em] text-red-600 transition hover:border-red-300"
+              >
+                Coba lagi
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {showInitialSkeleton ? (
+          <div className="p-4 sm:p-6">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="h-5 w-32 rounded-full bg-surface-border/70" />
+                <div className="h-9 w-40 rounded-2xl bg-surface-border/60" />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="surface-card animate-pulse space-y-3 p-4">
+                    <div className="h-3 w-20 rounded-full bg-surface-border/70" />
+                    <div className="h-6 w-24 rounded-full bg-surface-border/60" />
+                    <div className="h-10 rounded-2xl bg-surface-border/40" />
+                  </div>
+                ))}
+              </div>
+              <div className="space-y-3">
+                {[1, 2, 3, 4, 5].map((row) => (
+                  <div key={row} className="h-12 rounded-2xl bg-surface-border/40" />
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : assets.length > 0 ? (
           <>
             {/* Desktop/Table View - Hidden on small screens */}
             <div className="hidden sm:block">
@@ -723,10 +800,10 @@ function AssetsPageContent() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredAssets.map((asset, index) => (
+                  {assets.map((asset, index) => (
                     <TableRow
                       key={asset.id}
-                      ref={index === filteredAssets.length - 1 ? lastAssetElementRef : null}
+                      ref={index === assets.length - 1 ? lastAssetElementRef : null}
                       className="border-b border-surface-border/60 transition hover:bg-secondary/20"
                     >
                       <TableCell className="px-3 py-3 align-top">
@@ -736,6 +813,8 @@ function AssetsPageContent() {
                               <img
                                 src={asset.imageUrl}
                                 alt={asset.name}
+                                loading="lazy"
+                                decoding="async"
                                 className="w-full h-full rounded-lg object-cover"
                                 onError={(e) => {
                                   e.currentTarget.style.display = 'none'
@@ -799,18 +878,20 @@ function AssetsPageContent() {
 
             {/* Mobile Card View - Shown only on small screens */}
             <div className="sm:hidden space-y-3">
-              {filteredAssets.map((asset, index) => (
+              {assets.map((asset, index) => (
                 <div
                   key={asset.id}
-                  ref={index === filteredAssets.length - 1 ? lastAssetElementRef : null}
-                  className="surface-card p-3 shadow-none transition-all hover:-translate-y-0.5"
+                  ref={index === assets.length - 1 ? lastAssetElementRef : null}
+                  className="surface-card p-4 shadow-none"
                 >
-                  <div className="flex items-start gap-3 mb-2">
-                    <div className="flex-shrink-0">
+                  <div className="flex items-start gap-3">
+                    <div className="flex-shrink-0 relative">
                       {asset.imageUrl ? (
                         <img
                           src={asset.imageUrl}
                           alt={asset.name}
+                          loading="lazy"
+                          decoding="async"
                           className="w-12 h-12 rounded-2xl border border-surface-border object-cover"
                           onError={(e) => {
                             e.currentTarget.style.display = 'none'
@@ -819,57 +900,83 @@ function AssetsPageContent() {
                           }}
                         />
                       ) : null}
-                      <div
-                        data-placeholder
-                        className={asset.imageUrl ? 'hidden' : ''}
-                      >
+                      <div data-placeholder className={asset.imageUrl ? 'hidden' : ''}>
                         <AssetImagePlaceholder size="sm" />
                       </div>
                     </div>
-                    <div className="flex-1 min-w-0 pr-2">
+                    <div className="flex-1 min-w-0">
                       <div className="flex justify-between items-start gap-2">
                         <h3 className="font-semibold text-sm text-foreground break-words leading-tight">
                           {asset.name}
                         </h3>
-                        <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-[0.7rem] font-semibold ${getStatusColor(asset.status)} flex-shrink-0`}>
+                        <span
+                          className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-[0.68rem] font-semibold ${getStatusColor(
+                            asset.status
+                          )} flex-shrink-0`}
+                        >
                           <span className="h-2 w-2 rounded-full bg-current opacity-60" />
                           {asset.status}
                         </span>
                       </div>
-                    </div>
-                  </div>
 
-                  <div className="space-y-1 text-xs">
-                    <div className="flex justify-between items-center">
-                      <span className="text-text-muted font-medium uppercase tracking-[0.3em]">No Asset</span>
-                      <span className="font-mono text-primary break-all ml-2">{asset.noAsset}</span>
-                    </div>
-
-                    <div className="flex justify-between items-center">
-                      <span className="text-text-muted font-medium uppercase tracking-[0.3em]">Category</span>
-                      <span className="text-foreground break-all ml-2">{asset.category?.name}</span>
-                    </div>
-
-                    {(asset.pic || asset.employee) && (
-                      <div className="flex justify-between items-center">
-                        <span className="text-text-muted font-medium uppercase tracking-[0.3em]">PIC</span>
-                        <span className="text-foreground break-all ml-2 text-right">
-                          {asset.employee ? (
-                            <div className="space-y-0.5 text-right">
-                              <div className="font-semibold">{asset.employee.name}</div>
-                              {asset.employee.position && (
-                                <div className="text-[0.65rem] uppercase tracking-[0.3em] text-text-muted">{asset.employee.position}</div>
-                              )}
-                            </div>
-                          ) : (
-                            asset.pic
-                          )}
-                        </span>
+                      <div className="mt-2 flex flex-wrap gap-2 text-[0.6rem] uppercase tracking-[0.3em] text-text-muted">
+                        {asset.category?.name && (
+                          <span className="rounded-full border border-surface-border px-2 py-0.5">
+                            {asset.category.name}
+                          </span>
+                        )}
+                        {asset.site?.name && (
+                          <span className="rounded-full border border-surface-border px-2 py-0.5">
+                            {asset.site.name}
+                          </span>
+                        )}
+                        {asset.department?.name && (
+                          <span className="rounded-full border border-surface-border px-2 py-0.5">
+                            {asset.department.name}
+                          </span>
+                        )}
                       </div>
-                    )}
+                    </div>
                   </div>
 
-                  <div className="mt-3 pt-2 border-t border-surface-border">
+                  <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
+                    <div>
+                      <p className="text-[0.6rem] uppercase tracking-[0.3em] text-text-muted">No Asset</p>
+                      <p className="font-mono text-foreground break-all">{asset.noAsset || '-'}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[0.6rem] uppercase tracking-[0.3em] text-text-muted">Status</p>
+                      <p className="font-semibold text-foreground">{asset.status}</p>
+                    </div>
+                    <div>
+                      <p className="text-[0.6rem] uppercase tracking-[0.3em] text-text-muted">Kategori</p>
+                      <p className="text-foreground break-all">{asset.category?.name || '-'}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[0.6rem] uppercase tracking-[0.3em] text-text-muted">Lokasi</p>
+                      <p className="text-foreground break-all">{asset.site?.name || '-'}</p>
+                    </div>
+                  </div>
+
+                  {(asset.pic || asset.employee) && (
+                    <div className="mt-3 rounded-2xl border border-surface-border bg-surface-muted/60 px-3 py-2 text-xs">
+                      <p className="text-[0.6rem] uppercase tracking-[0.35em] text-text-muted">PIC</p>
+                      {asset.employee ? (
+                        <div className="mt-1">
+                          <p className="font-semibold text-foreground">{asset.employee.name}</p>
+                          {asset.employee.position && (
+                            <p className="text-[0.6rem] uppercase tracking-[0.3em] text-text-muted">
+                              {asset.employee.position}
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="mt-1 text-foreground">{asset.pic}</p>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="mt-4 flex flex-col gap-2 pt-2">
                     <button
                       onClick={() => {
                         setSelectedAsset(asset)
@@ -878,7 +985,7 @@ function AssetsPageContent() {
                       className="w-full sneat-btn sneat-btn-outlined justify-center text-xs font-semibold uppercase tracking-[0.3em]"
                     >
                       <Eye className="h-4 w-4" />
-                      View Details
+                      Lihat Detail
                     </button>
                   </div>
                 </div>
@@ -886,6 +993,19 @@ function AssetsPageContent() {
             </div>
           </>
         ) : null}
+
+        {hasMore && !loading && (
+          <div className="mt-6 flex justify-center">
+            <button
+              type="button"
+              onClick={loadMoreAssets}
+              disabled={loadingMore || loading}
+              className="sneat-btn sneat-btn-primary inline-flex items-center gap-2 px-6 py-2 text-sm font-semibold disabled:opacity-50"
+            >
+              {loadingMore ? 'Memuat data...' : `Muat ${PAGE_SIZE} item lagi`}
+            </button>
+          </div>
+        )}
 
         {/* Loading More */}
         {loadingMore && (
@@ -957,26 +1077,26 @@ function AssetsPageContent() {
         )}
 
         {/* No More Assets */}
-        {!hasMore && filteredAssets.length > 0 && (
+        {!hasMore && assets.length > 0 && (
           <div className="border-t border-surface-border bg-surface px-4 py-3 text-center text-xs uppercase tracking-[0.35em] text-text-muted">
-            END OF LIST -- {filteredAssets.length} ASSETS LOADED
+            END OF LIST -- {typeof totalResults === 'number' ? totalResults : assets.length} ASSETS LOADED
           </div>
         )}
 
         {/* Empty State */}
-        {filteredAssets.length === 0 && (
+        {assets.length === 0 && (
           <div className="surface-card text-center">
             <Package className="mx-auto mb-4 h-12 w-12 text-primary" />
             <h3 className="mb-2 text-lg font-semibold text-foreground">
-              {searchQuery.trim() !== '' ? 'No assets found' : 'Belum ada asset terdaftar'}
+              {searchTerm !== '' ? 'No assets found' : 'Belum ada asset terdaftar'}
             </h3>
             <p className="mx-auto mb-6 max-w-md text-sm text-text-muted">
-              {searchQuery.trim() !== ''
-                ? `No assets match "${searchQuery}"`
+              {searchTerm !== ''
+                ? `No assets match "${searchTerm}"`
                 : 'Start by adding your first asset to the system'
               }
             </p>
-            {searchQuery.trim() === '' ? (
+            {searchTerm === '' ? (
               <RoleBasedAccess allowedRoles={['ADMIN']}>
                 <button
                   onClick={() => setShowAddModal(true)}
@@ -988,9 +1108,13 @@ function AssetsPageContent() {
               </RoleBasedAccess>
             ) : (
               <button
-                onClick={() => setSearchQuery('')}
-                className="sneat-btn sneat-btn-outlined inline-flex min-w-[160px] justify-center"
+                onClick={() => {
+                  setSearchInput('')
+                  setSearchTerm('')
+                }}
+                className="sneat-btn sneat-btn-outlined inline-flex min-w-[160px] items-center justify-center gap-2"
               >
+                <X className="h-4 w-4" />
                 Clear search
               </button>
             )}
@@ -1059,3 +1183,5 @@ export default function AssetsPage() {
     </ProtectedRoute>
   )
 }
+
+

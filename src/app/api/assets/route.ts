@@ -1,48 +1,167 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
 import { db } from '@/lib/db'
+
+const MAX_DB_RETRIES = 3
+const RETRY_DELAY_MS = 120
+
+async function retryOnBusy<T>(operation: () => Promise<T>): Promise<T> {
+  let lastError: unknown
+
+  for (let attempt = 1; attempt <= MAX_DB_RETRIES; attempt += 1) {
+    try {
+      return await operation()
+    } catch (error) {
+      lastError = error
+      const message = (error as Error)?.message?.toLowerCase() ?? ''
+      const isBusy =
+        message.includes('database is locked') ||
+        message.includes('database is busy') ||
+        message.includes('busy:')
+
+      if (!isBusy || attempt === MAX_DB_RETRIES) {
+        throw error
+      }
+
+      await new Promise((resolve) =>
+        setTimeout(resolve, RETRY_DELAY_MS * attempt)
+      )
+    }
+  }
+
+  throw lastError
+}
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '10')
+    const rawPage = parseInt(searchParams.get('page') || '1', 10)
+    const rawLimit = parseInt(searchParams.get('limit') || '10', 10)
+    const page = Number.isNaN(rawPage) || rawPage < 1 ? 1 : rawPage
+    const limit = Number.isNaN(rawLimit)
+      ? 10
+      : Math.min(Math.max(rawLimit, 1), 200)
+
     const picId = searchParams.get('picId')
     const categoryId = searchParams.get('categoryId')
     const siteId = searchParams.get('siteId')
     const departmentId = searchParams.get('departmentId')
-    const search = searchParams.get('search')
+    const search = searchParams.get('search')?.trim() || ''
+    const status = searchParams.get('status')
+    const categoryName = searchParams.get('category')
+    const siteName = searchParams.get('site')
+    const departmentName = searchParams.get('department')
+    const sortParam = (searchParams.get('sort') || 'dateCreated').toLowerCase()
+    const orderParam = (searchParams.get('order') || 'desc').toLowerCase()
 
-    const where: any = {}
+    const where: Prisma.AssetWhereInput = {}
     if (picId) where.picId = picId
     if (categoryId) where.categoryId = categoryId
     if (siteId) where.siteId = siteId
     if (departmentId) where.departmentId = departmentId
+    if (status) {
+      where.status = { equals: status }
+    }
+    if (categoryName) {
+      where.category = {
+        is: {
+          name: {
+            equals: categoryName
+          }
+        }
+      }
+    }
+    if (siteName) {
+      where.site = {
+        is: {
+          name: {
+            equals: siteName
+          }
+        }
+      }
+    }
+    if (departmentName) {
+      where.department = {
+        is: {
+          name: {
+            equals: departmentName
+          }
+        }
+      }
+    }
 
     if (search) {
       where.OR = [
-        { name: { contains: search, mode: 'insensitive' } },
-        { noAsset: { contains: search, mode: 'insensitive' } },
-        { status: { contains: search, mode: 'insensitive' } },
-        { serialNo: { contains: search, mode: 'insensitive' } },
-        { brand: { contains: search, mode: 'insensitive' } },
-        { model: { contains: search, mode: 'insensitive' } }
+        { id: { contains: search } },
+        { name: { contains: search } },
+        { noAsset: { contains: search } },
+        { status: { contains: search } },
+        { serialNo: { contains: search } },
+        { brand: { contains: search } },
+        { model: { contains: search } },
+        { pic: { contains: search } },
+        { notes: { contains: search } },
+        {
+          site: {
+            is: {
+              name: { contains: search }
+            }
+          }
+        },
+        {
+          category: {
+            is: {
+              name: { contains: search }
+            }
+          }
+        },
+        {
+          department: {
+            is: {
+              name: { contains: search }
+            }
+          }
+        },
+        {
+          employee: {
+            is: {
+              OR: [
+                { name: { contains: search } },
+                { employeeId: { contains: search } },
+                { email: { contains: search } },
+                { department: { contains: search } },
+                { position: { contains: search } }
+              ]
+            }
+          }
+        }
       ]
     }
 
-    const totalCount = await db.asset.count({ where })
+    const totalCount = await retryOnBusy(() => db.asset.count({ where }))
     const skip = (page - 1) * limit
-    const assets = await db.asset.findMany({
-      where,
-      skip,
-      take: limit,
-      orderBy: { createdAt: 'desc' },
-      include: {
-        site: { select: { id: true, name: true } },
-        category: { select: { id: true, name: true } },
-        department: { select: { id: true, name: true } },
-        employee: { select: { id: true, employeeId: true, name: true } }
-      }
-    })
+
+    const sortField = sortParam === 'name' ? 'name' : 'dateCreated'
+    const sortOrder: Prisma.SortOrder = orderParam === 'asc' ? 'asc' : 'desc'
+    const orderBy: Prisma.AssetOrderByWithRelationInput =
+      sortField === 'name'
+        ? { name: sortOrder }
+        : { dateCreated: sortOrder }
+
+    const assets = await retryOnBusy(() =>
+      db.asset.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy,
+        include: {
+          site: { select: { id: true, name: true } },
+          category: { select: { id: true, name: true } },
+          department: { select: { id: true, name: true } },
+          employee: { select: { id: true, employeeId: true, name: true } }
+        }
+      })
+    )
     const totalPages = Math.ceil(totalCount / limit)
 
     return NextResponse.json({
@@ -59,7 +178,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Assets API error:', error)
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: error instanceof Error ? error.message : 'Internal server error' },
       { status: 500 }
     )
   }

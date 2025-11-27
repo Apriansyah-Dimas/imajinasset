@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts'
-import { Package, DollarSign } from 'lucide-react'
+import { Package } from 'lucide-react'
 
 interface DashboardData {
   totalAssets: number
@@ -181,7 +181,7 @@ export default function Dashboard() {
               <div className="text-3xl font-bold text-green-600">{formatCurrency(totalValue)}</div>
             </div>
             <div className="w-12 h-12 bg-green-100 flex items-center justify-center rounded-lg">
-              <DollarSign className="h-6 w-6 text-green-600" />
+              <span className="text-green-600 font-bold text-lg">Rp</span>
             </div>
           </div>
         </div>

@@ -8,6 +8,23 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const body = await request.json().catch(() => null)
+    const completionNotesInput =
+      body && typeof body.completionNotes === 'string'
+        ? body.completionNotes
+        : typeof body?.notes === 'string'
+          ? body.notes
+          : ''
+    const trimmedNotes = completionNotesInput.trim()
+    const completionNotes = trimmedNotes ? trimmedNotes.slice(0, 5000) : ''
+
+    if (!completionNotes) {
+      return NextResponse.json(
+        { error: 'Completion notes are required' },
+        { status: 400 }
+      )
+    }
+
     // Check authentication
     const authHeader = request.headers.get('authorization')
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -69,7 +86,8 @@ export async function POST(
       data: {
         status: 'Completed',
         completedAt: new Date(),
-        scannedAssets: session._count.soAssetEntries
+        scannedAssets: session._count.soAssetEntries,
+        completionNotes // Now using the proper completionNotes field
       }
     })
 

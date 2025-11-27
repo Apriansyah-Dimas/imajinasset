@@ -45,13 +45,17 @@ export async function GET(request: NextRequest) {
       name: session.name,
       year: session.year,
       description: session.description,
+      planStart: session.planStart,
+      planEnd: session.planEnd,
+      notes: session.notes,
       status: session.status,
       totalAssets: globalAssetCount,
       scannedAssets: session.scannedAssets,
       startedAt: session.startedAt,
       completedAt: session.completedAt,
       createdAt: session.createdAt,
-      updatedAt: session.updatedAt
+      updatedAt: session.updatedAt,
+      completionNotes: session.completionNotes
     }))
 
     return NextResponse.json(camelCaseSessions)
@@ -94,11 +98,28 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { name, year, description } = body
+    const { name, year, description, startDate, endDate } = body
 
-    if (!name || !year) {
+    if (!name || !year || !startDate || !endDate) {
       return NextResponse.json(
-        { error: 'Name and year are required' },
+        { error: 'Name, year, startDate, and endDate are required' },
+        { status: 400 }
+      )
+    }
+
+    const planStart = new Date(startDate)
+    const planEnd = new Date(endDate)
+
+    if (Number.isNaN(planStart.getTime()) || Number.isNaN(planEnd.getTime())) {
+      return NextResponse.json(
+        { error: 'Invalid start or end date' },
+        { status: 400 }
+      )
+    }
+
+    if (planEnd < planStart) {
+      return NextResponse.json(
+        { error: 'End date must be after start date' },
         { status: 400 }
       )
     }
@@ -112,6 +133,8 @@ export async function POST(request: NextRequest) {
         name,
         year,
         description,
+        planStart,
+        planEnd,
         status: 'Active',
         totalAssets: totalAssets || 0,
         scannedAssets: 0,
@@ -125,13 +148,17 @@ export async function POST(request: NextRequest) {
       name: session.name,
       year: session.year,
       description: session.description,
+      planStart: session.planStart,
+      planEnd: session.planEnd,
+      notes: session.notes,
       status: session.status,
       totalAssets: session.totalAssets,
       scannedAssets: session.scannedAssets,
       startedAt: session.startedAt,
       completedAt: session.completedAt,
       createdAt: session.createdAt,
-      updatedAt: session.updatedAt
+      updatedAt: session.updatedAt,
+      completionNotes: session.completionNotes
     }, { status: 201 })
   } catch (error) {
     console.error('Error creating SO session:', error)

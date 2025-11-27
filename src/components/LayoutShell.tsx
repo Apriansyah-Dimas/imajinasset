@@ -1,14 +1,37 @@
 "use client";
 
-import { ReactNode } from "react";
+import { ReactNode, useMemo } from "react";
+import { usePathname } from "next/navigation";
 import Navbar from "@/components/navbar";
 import { useSidebarMargin } from "@/hooks/useSidebarMargin";
 import { useMotionPreference } from "@/hooks/useMotionPreference";
 import { cn } from "@/lib/utils";
 
+const IMMERSIVE_ROUTES = ["/login", "/register", "/logout", "/unauthorized"];
+
 export function LayoutShell({ children }: { children: ReactNode }) {
-  useSidebarMargin();
+  const pathname = usePathname();
   const reduceMotion = useMotionPreference();
+
+  const isImmersiveRoute = useMemo(() => {
+    if (!pathname) return false;
+    return IMMERSIVE_ROUTES.some((route) =>
+      pathname === route || pathname.startsWith(`${route}/`)
+    );
+  }, [pathname]);
+
+  useSidebarMargin({ disabled: isImmersiveRoute });
+
+  if (isImmersiveRoute) {
+    return (
+      <main
+        id="main-content"
+        className="min-h-screen bg-background text-foreground"
+      >
+        {children}
+      </main>
+    );
+  }
 
   return (
     <div className="flex">
