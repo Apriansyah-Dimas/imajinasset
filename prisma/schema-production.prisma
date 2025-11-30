@@ -39,6 +39,7 @@ model Site {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   assets      Asset[]
+  tempEntries SOAssetEntry[] @relation("TempSiteOnEntry")
 }
 
 model Category {
@@ -47,6 +48,7 @@ model Category {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   assets      Asset[]
+  tempEntries SOAssetEntry[] @relation("TempCategoryOnEntry")
 }
 
 model Department {
@@ -55,6 +57,7 @@ model Department {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   assets      Asset[]
+  tempEntries SOAssetEntry[] @relation("TempDepartmentOnEntry")
 }
 
 model SOSession {
@@ -90,12 +93,22 @@ model SOAssetEntry {
   tempBrand     String?
   tempModel     String?
   tempCost      Float?
+  tempPurchaseDate DateTime?
+  tempImageUrl  String?
+  tempSiteId    String?
+  tempCategoryId String?
+  tempDepartmentId String?
+  tempPicId     String?
 
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
   soSession     SOSession @relation(fields: [soSessionId], references: [id])
   asset         Asset     @relation(fields: [assetId], references: [id])
+  tempSite       Site?       @relation("TempSiteOnEntry", fields: [tempSiteId], references: [id])
+  tempCategory   Category?   @relation("TempCategoryOnEntry", fields: [tempCategoryId], references: [id])
+  tempDepartment Department? @relation("TempDepartmentOnEntry", fields: [tempDepartmentId], references: [id])
+  tempPicEmployee Employee?  @relation("TempPicOnEntry", fields: [tempPicId], references: [id])
 }
 
 model Employee {
@@ -109,4 +122,5 @@ model Employee {
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  tempSOEntries SOAssetEntry[] @relation("TempPicOnEntry")
 }

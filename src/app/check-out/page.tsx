@@ -37,6 +37,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import Image from "next/image";
 
 interface AssetRecord {
   id: string;
@@ -316,11 +317,16 @@ function HistoryEntryCard({
               <p className="text-[11px] font-semibold uppercase text-muted-foreground">
                 Signature
               </p>
-              <img
-                src={effectiveDetail.signatureData}
-                alt="Signature preview"
-                className="mt-2 h-24 w-full rounded-md border bg-white object-contain p-2"
-              />
+              <div className="relative mt-2 h-24 w-full overflow-hidden rounded-md border bg-white">
+                <Image
+                  src={effectiveDetail.signatureData}
+                  alt="Signature preview"
+                  fill
+                  sizes="(max-width: 640px) 100vw, 600px"
+                  className="object-contain p-2"
+                  unoptimized
+                />
+              </div>
             </div>
           )}
           {effectiveDetail.status === "RETURNED" && (
@@ -352,11 +358,16 @@ function HistoryEntryCard({
                   <p className="text-[11px] font-semibold uppercase text-muted-foreground">
                     Return Signature
                   </p>
-                  <img
-                    src={effectiveDetail.returnSignatureData}
-                    alt="Return signature preview"
-                    className="mt-2 h-24 w-full rounded-md border bg-white object-contain p-2"
-                  />
+                  <div className="relative mt-2 h-24 w-full overflow-hidden rounded-md border bg-white">
+                    <Image
+                      src={effectiveDetail.returnSignatureData}
+                      alt="Return signature preview"
+                      fill
+                      sizes="(max-width: 640px) 100vw, 600px"
+                      className="object-contain p-2"
+                      unoptimized
+                    />
+                  </div>
                 </div>
               )}
             </div>

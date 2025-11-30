@@ -1,13 +1,20 @@
-'use client'
-
 import Dashboard from '@/components/dashboard'
 import ProtectedRoute from '@/components/ProtectedRoute'
+import { getServerAuth } from '@/lib/server-auth'
+import { redirect } from 'next/navigation'
 
-export default function Home() {
+export const dynamic = 'force-dynamic'
+
+export default async function Home() {
+  const auth = await getServerAuth()
+
+  if (!auth.isAuthenticated) {
+    redirect('/login')
+  }
+
   return (
     <ProtectedRoute>
       <div className="min-h-screen">
-        {/* Page Content - Default to Dashboard */}
         <Dashboard />
       </div>
     </ProtectedRoute>

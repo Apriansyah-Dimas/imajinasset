@@ -27,7 +27,7 @@ const ensureUniqueEmployeeId = async (candidate: string) => {
   let attempt = normalized
   let suffix = 1
 
-  // eslint-disable-next-line no-constant-condition
+   
   while (true) {
     const exists = await db.employee.findUnique({
       where: { employeeId: attempt }

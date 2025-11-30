@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef, type ComponentProps } from 'react'
 import dynamic from 'next/dynamic'
+import Image from 'next/image'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -27,13 +28,24 @@ import type EditDropdownsModalComponent from '@/components/edit-dropdowns-modal'
 
 const PAGE_SIZE = 50
 
-type SortOption = 'name-asc' | 'name-desc' | 'created-newest' | 'created-oldest'
+type SortOption =
+  | 'name-asc'
+  | 'name-desc'
+  | 'purchase-newest'
+  | 'purchase-oldest'
+  | 'asset-number-asc'
+  | 'asset-number-desc'
 
-const SORT_CONFIG: Record<SortOption, { sort: 'name' | 'dateCreated'; order: 'asc' | 'desc' }> = {
+const SORT_CONFIG: Record<
+  SortOption,
+  { sort: 'name' | 'purchaseDate' | 'noAsset'; order: 'asc' | 'desc' }
+> = {
   'name-asc': { sort: 'name', order: 'asc' },
   'name-desc': { sort: 'name', order: 'desc' },
-  'created-newest': { sort: 'dateCreated', order: 'desc' },
-  'created-oldest': { sort: 'dateCreated', order: 'asc' }
+  'purchase-newest': { sort: 'purchaseDate', order: 'desc' },
+  'purchase-oldest': { sort: 'purchaseDate', order: 'asc' },
+  'asset-number-asc': { sort: 'noAsset', order: 'asc' },
+  'asset-number-desc': { sort: 'noAsset', order: 'desc' }
 }
 
 type FilterKey = 'status' | 'category' | 'site' | 'department'
@@ -396,8 +408,10 @@ function AssetsPageContent() {
   }> = [
     { value: 'name-asc', label: 'Nama (A-Z)', description: 'Urut berdasarkan nama aset' },
     { value: 'name-desc', label: 'Nama (Z-A)', description: 'Nama aset dari Z ke A' },
-    { value: 'created-newest', label: 'Terbaru', description: 'Aset dengan tanggal dibuat terbaru' },
-    { value: 'created-oldest', label: 'Terlama', description: 'Aset paling lama dibuat' }
+    { value: 'purchase-newest', label: 'Pembelian terbaru', description: 'Urut berdasarkan tanggal beli terbaru' },
+    { value: 'purchase-oldest', label: 'Pembelian terlama', description: 'Urut berdasarkan tanggal beli paling lama' },
+    { value: 'asset-number-asc', label: 'Nomor aset (A-Z)', description: 'Urut berdasarkan nomor aset' },
+    { value: 'asset-number-desc', label: 'Nomor aset (Z-A)', description: 'Urut berdasarkan nomor aset dari terbesar' }
   ]
 
   const handleDetailModalOpenChange = (isOpen: boolean) => {
@@ -810,18 +824,22 @@ function AssetsPageContent() {
                         <div className="flex items-center gap-3">
                           <div className="flex-shrink-0 w-12 h-12 rounded-lg border border-surface-border bg-surface-muted/20 flex items-center justify-center">
                             {asset.imageUrl ? (
-                              <img
-                                src={asset.imageUrl}
-                                alt={asset.name}
-                                loading="lazy"
-                                decoding="async"
-                                className="w-full h-full rounded-lg object-cover"
-                                onError={(e) => {
-                                  e.currentTarget.style.display = 'none'
-                                  const fallback = e.currentTarget.parentElement?.querySelector('[data-placeholder]') as HTMLElement | null
-                                  if (fallback) fallback.classList.remove('hidden')
-                                }}
-                              />
+                              <div className="relative w-full h-full rounded-lg overflow-hidden">
+                                <Image
+                                  src={asset.imageUrl}
+                                  alt={asset.name}
+                                  fill
+                                  sizes="48px"
+                                  className="object-cover"
+                                  loading="lazy"
+                                  onError={(e) => {
+                                    const fallback = e.currentTarget.parentElement?.parentElement?.querySelector('[data-placeholder]') as HTMLElement | null
+                                    if (fallback) fallback.classList.remove('hidden')
+                                    e.currentTarget.parentElement?.classList.add('hidden')
+                                  }}
+                                  unoptimized
+                                />
+                              </div>
                             ) : null}
                             <div data-placeholder className={asset.imageUrl ? 'hidden' : 'w-full h-full'}>
                               <AssetImagePlaceholder size="sm" />
@@ -887,18 +905,22 @@ function AssetsPageContent() {
                   <div className="flex items-start gap-3">
                     <div className="flex-shrink-0 relative">
                       {asset.imageUrl ? (
-                        <img
-                          src={asset.imageUrl}
-                          alt={asset.name}
-                          loading="lazy"
-                          decoding="async"
-                          className="w-12 h-12 rounded-2xl border border-surface-border object-cover"
-                          onError={(e) => {
-                            e.currentTarget.style.display = 'none'
-                            const fallback = e.currentTarget.parentElement?.querySelector('[data-placeholder]') as HTMLElement | null
-                            if (fallback) fallback.classList.remove('hidden')
-                          }}
-                        />
+                        <div className="relative w-12 h-12 rounded-2xl border border-surface-border overflow-hidden">
+                          <Image
+                            src={asset.imageUrl}
+                            alt={asset.name}
+                            fill
+                            sizes="48px"
+                            className="object-cover"
+                            loading="lazy"
+                            onError={(e) => {
+                              const fallback = e.currentTarget.parentElement?.parentElement?.querySelector('[data-placeholder]') as HTMLElement | null
+                              if (fallback) fallback.classList.remove('hidden')
+                              e.currentTarget.parentElement?.classList.add('hidden')
+                            }}
+                            unoptimized
+                          />
+                        </div>
                       ) : null}
                       <div data-placeholder className={asset.imageUrl ? 'hidden' : ''}>
                         <AssetImagePlaceholder size="sm" />

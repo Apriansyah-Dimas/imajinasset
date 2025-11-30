@@ -103,13 +103,19 @@ export async function POST(
     for (const entry of soAssetEntries) {
       if (entry.isIdentified && entry.asset) {
         const updates = {
-          name: entry.tempName || entry.asset.name,
-          status: entry.tempStatus || entry.asset.status,
-          serialNo: entry.tempSerialNo || entry.asset.serialNo,
-          pic: entry.tempPic || entry.asset.pic,
-          brand: entry.tempBrand || entry.asset.brand,
-          model: entry.tempModel || entry.asset.model,
-          cost: entry.tempCost || entry.asset.cost,
+          name: entry.tempName ?? entry.asset.name,
+          status: entry.tempStatus ?? entry.asset.status,
+          serialNo: entry.tempSerialNo ?? entry.asset.serialNo,
+          purchaseDate: entry.tempPurchaseDate ?? entry.asset.purchaseDate,
+          siteId: entry.tempSiteId ?? entry.asset.siteId,
+          categoryId: entry.tempCategoryId ?? entry.asset.categoryId,
+          departmentId: entry.tempDepartmentId ?? entry.asset.departmentId,
+          picId: entry.tempPicId ?? entry.asset.picId,
+          pic: entry.tempPicId ? null : (entry.tempPic ?? entry.asset.pic),
+          brand: entry.tempBrand ?? entry.asset.brand,
+          model: entry.tempModel ?? entry.asset.model,
+          cost: entry.tempCost ?? entry.asset.cost,
+          imageUrl: entry.tempImageUrl ?? entry.asset.imageUrl,
           notes: entry.tempNotes ?? entry.asset.notes,
         }
 
@@ -125,10 +131,16 @@ export async function POST(
         addChange('name', entry.asset.name, updates.name)
         addChange('status', entry.asset.status, updates.status)
         addChange('serialNo', entry.asset.serialNo, updates.serialNo)
+        addChange('purchaseDate', entry.asset.purchaseDate, updates.purchaseDate)
+        addChange('siteId', entry.asset.siteId, updates.siteId)
+        addChange('categoryId', entry.asset.categoryId, updates.categoryId)
+        addChange('departmentId', entry.asset.departmentId, updates.departmentId)
+        addChange('picId', entry.asset.picId, updates.picId)
         addChange('pic', entry.asset.pic, updates.pic)
         addChange('brand', entry.asset.brand, updates.brand)
         addChange('model', entry.asset.model, updates.model)
         addChange('cost', entry.asset.cost, updates.cost)
+        addChange('imageUrl', entry.asset.imageUrl, updates.imageUrl)
         addChange('notes', entry.asset.notes, updates.notes)
 
         await db.asset.update({

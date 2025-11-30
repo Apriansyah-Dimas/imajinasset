@@ -9,6 +9,18 @@ const parseCostInput = (value: any) => {
 }
 
 const pickDefined = (primary: any, secondary: any) => (primary !== undefined ? primary : secondary)
+const parseDateInput = (value: any) => {
+  if (value === undefined) return undefined
+  if (value === null || value === '') return null
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.getTime()) ? null : parsed
+}
+const normalizeIdInput = (value: any) => {
+  if (value === undefined) return undefined
+  if (value === null) return null
+  const trimmed = String(value).trim()
+  return trimmed === '' ? null : trimmed
+}
 
 export async function GET(
   request: NextRequest,
@@ -40,7 +52,11 @@ export async function GET(
             department: { select: { id: true, name: true } },
             employee: { select: { id: true, employeeId: true, name: true, email: true, department: true, position: true, isActive: true } }
           }
-        }
+        },
+        tempSite: { select: { id: true, name: true } },
+        tempCategory: { select: { id: true, name: true } },
+        tempDepartment: { select: { id: true, name: true } },
+        tempPicEmployee: { select: { id: true, employeeId: true, name: true, email: true, department: true, position: true, isActive: true } }
       }
     })
 
@@ -68,17 +84,26 @@ export async function GET(
       isCrucial: entry.isCrucial,
       crucialNotes: entry.crucialNotes,
       isCrucial: entry.isCrucial,
+      tempPurchaseDate: entry.tempPurchaseDate,
       tempName: entry.tempName,
       tempStatus: entry.tempStatus,
       tempSerialNo: entry.tempSerialNo,
       tempPic: entry.tempPic,
       tempNotes: entry.tempNotes,
-      tempPicId: entry.asset?.employee?.id || null,
+      tempPicId: (entry.tempPicId ?? entry.asset?.employee?.id) || null,
       tempBrand: entry.tempBrand,
       tempModel: entry.tempModel,
       tempCost: entry.tempCost,
+      tempImageUrl: entry.tempImageUrl,
+      tempSiteId: entry.tempSiteId,
+      tempCategoryId: entry.tempCategoryId,
+      tempDepartmentId: entry.tempDepartmentId,
       createdAt: entry.createdAt,
       updatedAt: entry.updatedAt,
+      tempSite: entry.tempSite,
+      tempCategory: entry.tempCategory,
+      tempDepartment: entry.tempDepartment,
+      tempPicEmployee: entry.tempPicEmployee,
       // Include asset data with noAsset field
       asset: entry.asset ? {
         ...entry.asset,
@@ -161,6 +186,17 @@ export async function PUT(
       tempModel: pickDefined(body.tempModel, body.model),
       tempCost: parseCostInput(pickDefined(body.tempCost, body.cost)),
       tempNotes: pickDefined(body.tempNotes, body.notes),
+      tempPurchaseDate: pickDefined(parseDateInput(body.tempPurchaseDate), parseDateInput(body.purchaseDate)),
+      tempSiteId: pickDefined(normalizeIdInput(body.tempSiteId), normalizeIdInput(body.siteId)),
+      tempCategoryId: pickDefined(normalizeIdInput(body.tempCategoryId), normalizeIdInput(body.categoryId)),
+      tempDepartmentId: pickDefined(normalizeIdInput(body.tempDepartmentId), normalizeIdInput(body.departmentId)),
+      tempPicId: pickDefined(normalizeIdInput(body.tempPicId), normalizeIdInput(body.picId)),
+      tempImageUrl:
+        body.tempImageUrl !== undefined
+          ? (body.tempImageUrl || null)
+          : body.imageUrl !== undefined
+            ? (body.imageUrl || null)
+            : undefined,
       isIdentified: body.isIdentified !== undefined ? body.isIdentified : true,
       status: 'Updated'
     }
@@ -193,7 +229,11 @@ export async function PUT(
             department: { select: { id: true, name: true } },
             employee: { select: { id: true, employeeId: true, name: true, email: true, department: true, position: true, isActive: true } }
           }
-        }
+        },
+        tempSite: { select: { id: true, name: true } },
+        tempCategory: { select: { id: true, name: true } },
+        tempDepartment: { select: { id: true, name: true } },
+        tempPicEmployee: { select: { id: true, employeeId: true, name: true, email: true, department: true, position: true, isActive: true } }
       }
     })
 
@@ -230,15 +270,24 @@ export async function PUT(
       isIdentified: updatedEntry.isIdentified,
       isCrucial: updatedEntry.isCrucial,
       crucialNotes: updatedEntry.crucialNotes,
+      tempPurchaseDate: updatedEntry.tempPurchaseDate,
       tempName: updatedEntry.tempName,
       tempStatus: updatedEntry.tempStatus,
       tempSerialNo: updatedEntry.tempSerialNo,
       tempPic: updatedEntry.tempPic,
-      tempPicId: updatedEntry.asset?.employee?.id || null,
+      tempPicId: (updatedEntry.tempPicId ?? updatedEntry.asset?.employee?.id) || null,
       tempNotes: updatedEntry.tempNotes,
       tempBrand: updatedEntry.tempBrand,
       tempModel: updatedEntry.tempModel,
       tempCost: updatedEntry.tempCost,
+      tempImageUrl: updatedEntry.tempImageUrl,
+      tempSiteId: updatedEntry.tempSiteId,
+      tempCategoryId: updatedEntry.tempCategoryId,
+      tempDepartmentId: updatedEntry.tempDepartmentId,
+      tempSite: updatedEntry.tempSite,
+      tempCategory: updatedEntry.tempCategory,
+      tempDepartment: updatedEntry.tempDepartment,
+      tempPicEmployee: updatedEntry.tempPicEmployee,
       createdAt: updatedEntry.createdAt,
       updatedAt: updatedEntry.updatedAt,
       // Include asset data with noAsset field

@@ -42,6 +42,24 @@ const nextConfig: NextConfig = {
         ],
       },
       {
+        source: "/_next/static/:path*",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
+        ],
+      },
+      {
+        source: "/uploads/:path*",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
+        ],
+      },
+      {
+        source: "/:path*.{svg,png,jpg,jpeg,gif,webp,ico}",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
+        ],
+      },
+      {
         source: "/((?!api|_next/static|_next/image|favicon.ico).*)",
         headers: [
           {
@@ -63,7 +81,7 @@ const nextConfig: NextConfig = {
   },
   trailingSlash: true,
   images: {
-    unoptimized: true,
+    formats: ["image/avif", "image/webp"],
   },
   // Set base path for custom domain
   basePath: "",
