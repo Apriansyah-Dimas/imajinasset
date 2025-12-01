@@ -99,6 +99,20 @@ export async function GET(
               }
             }
           }
+        },
+        tempSite: { select: { id: true, name: true } },
+        tempCategory: { select: { id: true, name: true } },
+        tempDepartment: { select: { id: true, name: true } },
+        tempPicEmployee: {
+          select: {
+            id: true,
+            employeeId: true,
+            name: true,
+            email: true,
+            department: true,
+            position: true,
+            isActive: true
+          }
         }
       }
     })
@@ -114,10 +128,19 @@ export async function GET(
       tempStatus: entry.tempStatus,
       tempSerialNo: entry.tempSerialNo,
       tempPic: entry.tempPic,
-      tempPicId: entry.asset?.employee?.id || null,
+      tempPicId: entry.tempPicId ?? entry.asset?.employee?.id || null,
       tempBrand: entry.tempBrand,
       tempModel: entry.tempModel,
       tempCost: entry.tempCost,
+      tempPurchaseDate: entry.tempPurchaseDate,
+      tempImageUrl: entry.tempImageUrl,
+      tempSiteId: entry.tempSiteId,
+      tempCategoryId: entry.tempCategoryId,
+      tempDepartmentId: entry.tempDepartmentId,
+      tempSite: entry.tempSite,
+      tempCategory: entry.tempCategory,
+      tempDepartment: entry.tempDepartment,
+      tempPicEmployee: entry.tempPicEmployee,
       createdAt: entry.createdAt,
       updatedAt: entry.updatedAt,
       // Include asset data with noAsset field

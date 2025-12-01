@@ -40,7 +40,32 @@ export async function GET(
           include: {
             site: true,
             category: true,
-            department: true
+            department: true,
+            employee: {
+              select: {
+                id: true,
+                employeeId: true,
+                name: true,
+                email: true,
+                department: true,
+                position: true,
+                isActive: true
+              }
+            }
+          }
+        },
+        tempSite: { select: { id: true, name: true } },
+        tempCategory: { select: { id: true, name: true } },
+        tempDepartment: { select: { id: true, name: true } },
+        tempPicEmployee: {
+          select: {
+            id: true,
+            employeeId: true,
+            name: true,
+            email: true,
+            department: true,
+            position: true,
+            isActive: true
           }
         }
       },

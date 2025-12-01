@@ -1,5 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+
+const cacheHeaders = {
+  'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=900'
+}
 
 export async function GET() {
   try {
@@ -104,18 +108,24 @@ export async function GET() {
       cost: item.cost
     }))
 
-    return NextResponse.json({
-      totalAssets,
-      totalCostByCategory: formattedTotalCostByCategory,
-      assetsBySite,
-      assetsByCategory,
-      assetsByDepartment
-    })
+    return NextResponse.json(
+      {
+        totalAssets,
+        totalCostByCategory: formattedTotalCostByCategory,
+        assetsBySite,
+        assetsByCategory,
+        assetsByDepartment
+      },
+      { headers: cacheHeaders }
+    )
   } catch (error) {
     console.error('Dashboard API error:', error)
     return NextResponse.json(
       { error: 'Failed to fetch dashboard data' },
-      { status: 500 }
+      {
+        status: 500,
+        headers: { 'Cache-Control': 'no-store' }
+      }
     )
   }
 }

@@ -3,7 +3,7 @@ const path = require('path')
 const { PrismaClient } = require('@prisma/client')
 
 const prisma = new PrismaClient()
-const CSV_PATH = path.join(__dirname, '..', 'Untitled spreadsheet - Sheet1.csv')
+const CSV_PATH = path.join(__dirname, '..', 'Data raw AMS.csv')
 
 const monthMap = {
   jan: 0,
@@ -162,15 +162,45 @@ const loadRecords = () => {
     throw new Error('CSV file does not contain data rows')
   }
 
-  const headers = rows[0].map((header, index) => {
-    const trimmed = safeTrim(header)
-    if (!trimmed) {
-      return index === 0 ? 'RowNumber' : `H${index}`
-    }
-    return trimmed
-  })
+  const defaultHeaders = [
+    'RowNumber',
+    'Asset ID',
+    'Category',
+    'Category Roman',
+    'Asset Number',
+    'Asset Name',
+    'Purchase Date',
+    'Cost (Finance)',
+    'Serial Number',
+    'PIC',
+    'Department',
+    'Site',
+    'Qty',
+    'H2',
+    'H3',
+    'H4',
+    'H5',
+    'Status',
+  ]
 
-  return rows.slice(1).map((row) => {
+  const isRawAmsLayout =
+    rows[0].length === defaultHeaders.length && /^\d+$/.test(safeTrim(rows[0][0]))
+
+  let headers = defaultHeaders
+  let dataRows = rows
+
+  if (!isRawAmsLayout) {
+    headers = rows[0].map((header, index) => {
+      const trimmed = safeTrim(header)
+      if (!trimmed) {
+        return index === 0 ? 'RowNumber' : `H${index}`
+      }
+      return trimmed
+    })
+    dataRows = rows.slice(1)
+  }
+
+  return dataRows.map((row) => {
     const record = {}
     headers.forEach((header, idx) => {
       record[header] = safeTrim(row[idx] ?? '')
@@ -273,7 +303,7 @@ const buildAssetDetails = async (record) => {
 }
 
 const extractAssetCode = (record, assetMap) => {
-  const candidates = [record['Asset ID'], record.ID]
+  const candidates = [record['Asset Number'], record['Asset ID'], record.ID]
   for (const candidate of candidates) {
     const trimmed = safeTrim(candidate)
     if (!trimmed) continue
@@ -371,6 +401,17 @@ const syncAssets = async () => {
       continue
     }
 
+    const faMatch = /^FA(\d+)/i.exec(assetCode)
+    if (!faMatch) {
+      continue // only handle FA-prefixed assets
+    }
+    const faNumber = Number(faMatch[1])
+    if (Number.isNaN(faNumber) || faNumber < 400 || faNumber > 501) {
+      continue
+    }
+
+    const assetNumber = safeTrim(record['Asset Number']) || assetCode
+
     if (seenAssetCodes.has(assetCode)) {
       summary.skippedDuplicates += 1
       continue
@@ -391,7 +432,7 @@ const syncAssets = async () => {
         const createdAsset = await prisma.asset.create({
           data: {
             name: details.name,
-            noAsset: assetCode,
+            noAsset: assetNumber,
             status: details.status,
             serialNo: details.serialNo,
             purchaseDate: details.purchaseDate,
@@ -409,11 +450,15 @@ const syncAssets = async () => {
         assetMap.set(assetCode, createdAsset)
         summary.created += 1
         summary.processed += 1
-        console.log(`Created asset ${assetCode} (${details.name})`)
+        console.log(`Created asset ${assetNumber} (${details.name})`)
       } else {
         const updateData = {}
         const updatedFields = []
 
+        if (existing.noAsset !== assetNumber) {
+          updateData.noAsset = assetNumber
+          updatedFields.push('noAsset')
+        }
         if (!existing.name && details.name) {
           updateData.name = details.name
           updatedFields.push('name')

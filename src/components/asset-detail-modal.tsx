@@ -17,6 +17,7 @@ import AdditionalInformation from '@/components/additional-information'
 import ImageUpload from '@/components/image-upload'
 import AssetImagePlaceholder from '@/components/asset-image-placeholder'
 import { getClientAuthToken } from '@/lib/client-auth'
+import Image from 'next/image'
 
 interface Asset {
   id: string
@@ -93,6 +94,7 @@ type SessionEntry = {
   isIdentified?: boolean
   isCrucial?: boolean | null
   crucialNotes?: string | null
+  tempPurchaseDate?: string | null
   tempName?: string | null
   tempStatus?: string | null
   tempSerialNo?: string | null
@@ -101,6 +103,23 @@ type SessionEntry = {
   tempBrand?: string | null
   tempModel?: string | null
   tempCost?: number | string | null
+  tempImageUrl?: string | null
+  tempSiteId?: string | null
+  tempCategoryId?: string | null
+  tempDepartmentId?: string | null
+  tempPicId?: string | null
+  tempSite?: { id: string; name: string } | null
+  tempCategory?: { id: string; name: string } | null
+  tempDepartment?: { id: string; name: string } | null
+  tempPicEmployee?: {
+    id: string
+    employeeId?: string | null
+    name: string
+    email?: string | null
+    department?: string | null
+    position?: string | null
+    isActive?: boolean | null
+  } | null
   asset?: Asset | null
 }
 
@@ -111,44 +130,54 @@ const normalizeEntryCost = (value: number | string | null | undefined) => {
 }
 
 const mapSessionEntryToAsset = (entry: SessionEntry): Asset => {
-  const fallback: Asset = {
+  const resolvedCost = normalizeEntryCost(entry.tempCost)
+  const resolvedPurchaseDate = entry.tempPurchaseDate ?? entry.asset?.purchaseDate ?? null
+  const resolvedSite = entry.tempSite ?? entry.asset?.site ?? null
+  const resolvedCategory = entry.tempCategory ?? entry.asset?.category ?? null
+  const resolvedDepartment = entry.tempDepartment ?? entry.asset?.department ?? null
+  const resolvedPicEmployee = entry.tempPicEmployee ?? entry.asset?.employee ?? null
+  const resolvedPicId = entry.tempPicId ?? resolvedPicEmployee?.id ?? entry.asset?.picId
+  const resolvedPicName = entry.tempPic ?? resolvedPicEmployee?.name ?? entry.asset?.pic ?? null
+  const resolvedImageUrl = entry.tempImageUrl ?? entry.asset?.imageUrl ?? null
+
+  const base: Asset = {
     id: entry.assetId,
-    name: entry.tempName || 'Aset tanpa nama',
+    name: entry.asset?.name || entry.tempName || 'Aset tanpa nama',
     noAsset: entry.asset?.noAsset || '-',
-    status: entry.tempStatus || 'Unidentified',
-    serialNo: entry.tempSerialNo ?? undefined,
-    purchaseDate: entry.asset?.purchaseDate,
-    cost: normalizeEntryCost(entry.tempCost),
-    brand: entry.tempBrand ?? entry.asset?.brand,
-    model: entry.tempModel ?? entry.asset?.model,
-    site: entry.asset?.site || null,
-    category: entry.asset?.category || null,
-    department: entry.asset?.department || null,
-    pic: entry.tempPic ?? entry.asset?.pic ?? entry.asset?.employee?.name ?? null,
-    picId: entry.asset?.picId,
-    imageUrl: entry.asset?.imageUrl ?? null,
+    status: entry.asset?.status || entry.tempStatus || 'Unidentified',
+    serialNo: entry.asset?.serialNo ?? undefined,
+    purchaseDate: resolvedPurchaseDate || undefined,
+    cost: resolvedCost ?? entry.asset?.cost,
+    brand: entry.asset?.brand,
+    model: entry.asset?.model,
+    site: resolvedSite,
+    category: resolvedCategory,
+    department: resolvedDepartment,
+    pic: resolvedPicName,
+    picId: resolvedPicId,
+    imageUrl: resolvedImageUrl,
     notes: entry.tempNotes ?? entry.asset?.notes ?? null,
-    employee: entry.asset?.employee,
+    employee: resolvedPicEmployee ?? undefined,
     dateCreated: entry.asset?.dateCreated || entry.scannedAt || new Date().toISOString()
   }
 
-  const base = entry.asset
-    ? {
-        ...entry.asset,
-        dateCreated: entry.asset.dateCreated || entry.scannedAt || new Date().toISOString()
-      }
-    : fallback
-
   return {
     ...base,
-    name: entry.tempName || base.name,
-    status: entry.tempStatus || base.status,
+    name: entry.tempName ?? base.name,
+    status: entry.tempStatus ?? base.status,
     serialNo: entry.tempSerialNo ?? base.serialNo,
     brand: entry.tempBrand ?? base.brand,
     model: entry.tempModel ?? base.model,
-    cost: normalizeEntryCost(entry.tempCost) ?? base.cost,
+    cost: resolvedCost ?? base.cost,
     notes: entry.tempNotes ?? base.notes,
-    pic: entry.tempPic ?? base.pic
+    pic: resolvedPicName,
+    picId: resolvedPicId,
+    purchaseDate: resolvedPurchaseDate ?? base.purchaseDate,
+    site: resolvedSite,
+    category: resolvedCategory,
+    department: resolvedDepartment,
+    imageUrl: resolvedImageUrl,
+    employee: resolvedPicEmployee ?? base.employee
   }
 }
 
@@ -571,10 +600,16 @@ export default function AssetDetailModal({
           tempStatus: payload.status,
           tempSerialNo: sanitizeString(payload.serialNo),
           tempPic: sanitizeString(formData.employee?.name || formData.pic || null),
+          tempPicId: formData.employee?.id || formData.picId || null,
           tempBrand: sanitizeString(payload.brand),
           tempModel: sanitizeString(payload.model),
           tempCost: payload.cost ?? null,
           tempNotes: payload.notes ?? null,
+          tempPurchaseDate: payload.purchaseDate || null,
+          tempSiteId: payload.siteId || null,
+          tempCategoryId: payload.categoryId || null,
+          tempDepartmentId: payload.departmentId || null,
+          tempImageUrl: payload.imageUrl ?? null,
           isIdentified: true,
           isCrucial: entryCrucial,
           crucialNotes: entryCrucial ? entryCrucialNotes.trim() : null
@@ -711,16 +746,21 @@ export default function AssetDetailModal({
             ) : (
               <div className="mt-2 flex items-center">
                 {formData.imageUrl ? (
-                  <img
-                    src={formData.imageUrl}
-                    alt={formData.name}
-                    className="w-24 h-24 sm:w-28 sm:h-28 rounded-lg border border-gray-200 object-cover"
-                    onError={(e) => {
-                      e.currentTarget.style.display = 'none'
-                      const fallback = e.currentTarget.parentElement?.querySelector('[data-placeholder]') as HTMLElement | null
-                      if (fallback) fallback.classList.remove('hidden')
-                    }}
-                  />
+                  <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-lg border border-gray-200 overflow-hidden">
+                    <Image
+                      src={formData.imageUrl}
+                      alt={formData.name}
+                      fill
+                      sizes="112px"
+                      className="object-cover"
+                      onError={(e) => {
+                        const fallback = e.currentTarget.parentElement?.parentElement?.querySelector('[data-placeholder]') as HTMLElement | null
+                        if (fallback) fallback.classList.remove('hidden')
+                        e.currentTarget.parentElement?.classList.add('hidden')
+                      }}
+                      unoptimized
+                    />
+                  </div>
                 ) : null}
                 <div
                   data-placeholder
@@ -755,7 +795,7 @@ export default function AssetDetailModal({
                       value={assetPrefix}
                       onChange={(e) => handleAssetNumberChange(e.target.value)}
                       placeholder="FA040.1"
-                      className="text-sm"
+                      className="text-sm bg-white text-foreground"
                     />
                   </div>
                   <div className="flex items-center min-w-0 flex-1">
@@ -779,25 +819,30 @@ export default function AssetDetailModal({
 
           <div>
             <Label htmlFor="status" className="text-sm font-medium">Status</Label>
-            <Select
-              value={formData.status}
-              onValueChange={(value) => setFormData({ ...formData, status: value })}
-              disabled={!isEditing}
-            >
-              <SelectTrigger
-                className={`mt-1 text-sm ${!isEditing ? "" : ""}`}
-                      style={!isEditing ? { backgroundColor: '#ffffff !important', color: '#000000 !important' } : {}}
+            {isEditing ? (
+              <Select
+                value={formData.status}
+                onValueChange={(value) => setFormData({ ...formData, status: value })}
               >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Unidentified">Unidentified</SelectItem>
-                <SelectItem value="Active">Active</SelectItem>
-                <SelectItem value="Broken">Broken</SelectItem>
-                <SelectItem value="Lost/Missing">Lost/Missing</SelectItem>
-                <SelectItem value="Sell">Sell</SelectItem>
+                <SelectTrigger className="mt-1 text-sm bg-white text-foreground text-black">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                <SelectItem value="Unidentified" className="text-sm text-black">Unidentified</SelectItem>
+                <SelectItem value="Active" className="text-sm text-black">Active</SelectItem>
+                <SelectItem value="Broken" className="text-sm text-black">Broken</SelectItem>
+                <SelectItem value="Lost/Missing" className="text-sm text-black">Lost/Missing</SelectItem>
+                <SelectItem value="Sell" className="text-sm text-black">Sell</SelectItem>
               </SelectContent>
             </Select>
+            ) : (
+              <Input
+                value={formData.status}
+                disabled
+                className="mt-1 text-sm w-full"
+                style={{ backgroundColor: '#ffffff !important', color: '#000000 !important' }}
+              />
+            )}
           </div>
 
           <div>
@@ -807,7 +852,7 @@ export default function AssetDetailModal({
               value={formData.serialNo || ''}
               onChange={(e) => setFormData({ ...formData, serialNo: e.target.value })}
               disabled={!isEditing}
-              className={`mt-1 text-sm ${!isEditing ? "" : ""}`}
+              className={`mt-1 text-sm ${isEditing ? 'bg-white text-foreground' : ''}`}
                       style={!isEditing ? { backgroundColor: '#ffffff !important', color: '#000000 !important' } : {}}
             />
           </div>
@@ -820,7 +865,7 @@ export default function AssetDetailModal({
               value={formData.purchaseDate ? new Date(formData.purchaseDate).toISOString().split('T')[0] : ''}
               onChange={(e) => setFormData({ ...formData, purchaseDate: e.target.value })}
               disabled={!isEditing}
-              className={`mt-1 text-sm ${!isEditing ? "" : ""}`}
+              className={`mt-1 text-sm ${isEditing ? 'bg-white text-foreground' : ''}`}
                       style={!isEditing ? { backgroundColor: '#ffffff !important', color: '#000000 !important' } : {}}
             />
           </div>
@@ -834,7 +879,7 @@ export default function AssetDetailModal({
               onChange={(e) => setFormData({ ...formData, cost: parseCurrency(e.target.value) })}
               placeholder={isEditing ? "1.000.000" : ""}
               disabled={!isEditing}
-              className={`mt-1 text-sm ${!isEditing ? "" : ""}`}
+              className={`mt-1 text-sm ${isEditing ? 'bg-white text-foreground' : ''}`}
                       style={!isEditing ? { backgroundColor: '#ffffff !important', color: '#000000 !important' } : {}}
             />
           </div>
@@ -846,7 +891,7 @@ export default function AssetDetailModal({
               value={formData.brand || ''}
               onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
               disabled={!isEditing}
-              className={`mt-1 text-sm ${!isEditing ? "" : ""}`}
+              className={`mt-1 text-sm ${isEditing ? 'bg-white text-foreground' : ''}`}
                       style={!isEditing ? { backgroundColor: '#ffffff !important', color: '#000000 !important' } : {}}
             />
           </div>
@@ -858,7 +903,7 @@ export default function AssetDetailModal({
               value={formData.model || ''}
               onChange={(e) => setFormData({ ...formData, model: e.target.value })}
               disabled={!isEditing}
-              className={`mt-1 text-sm ${!isEditing ? "" : ""}`}
+              className={`mt-1 text-sm ${isEditing ? 'bg-white text-foreground' : ''}`}
                       style={!isEditing ? { backgroundColor: '#ffffff !important', color: '#000000 !important' } : {}}
             />
           </div>
@@ -869,7 +914,7 @@ export default function AssetDetailModal({
               <div className="flex items-center justify-center h-9 border rounded-md bg-muted mt-1">
                 <span className="text-xs text-muted-foreground">Loading...</span>
               </div>
-            ) : (
+            ) : isEditing ? (
               <Select
                 value={formData.site?.id || ''}
                 onValueChange={(value) => {
@@ -878,20 +923,24 @@ export default function AssetDetailModal({
                 }}
                 disabled={!isEditing}
               >
-                <SelectTrigger
-                  className={`mt-1 text-sm ${!isEditing ? "" : ""}`}
-                      style={!isEditing ? { backgroundColor: '#ffffff !important', color: '#000000 !important' } : {}}
-                >
+                <SelectTrigger className="mt-1 text-sm bg-white text-foreground text-black">
                   <SelectValue placeholder="Select site" />
                 </SelectTrigger>
                 <SelectContent>
                   {sites.map((site) => (
-                    <SelectItem key={site.id} value={site.id} className="text-sm">
+                    <SelectItem key={site.id} value={site.id} className="text-sm text-black">
                       {site.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+            ) : (
+              <Input
+                value={formData.site?.name || 'No site'}
+                disabled
+                className="mt-1 text-sm w-full"
+                style={{ backgroundColor: '#ffffff !important', color: '#000000 !important' }}
+              />
             )}
             {!masterDataLoading && sites.length === 0 && (
               <p className="text-xs text-red-500 mt-1">No sites available</p>
@@ -904,7 +953,7 @@ export default function AssetDetailModal({
               <div className="flex items-center justify-center h-9 border rounded-md bg-muted mt-1">
                 <span className="text-xs text-muted-foreground">Loading...</span>
               </div>
-            ) : (
+            ) : isEditing ? (
               <Select
                 value={formData.category?.id || ''}
                 onValueChange={(value) => {
@@ -913,20 +962,24 @@ export default function AssetDetailModal({
                 }}
                 disabled={!isEditing}
               >
-                <SelectTrigger
-                  className={`mt-1 text-sm ${!isEditing ? "" : ""}`}
-                      style={!isEditing ? { backgroundColor: '#ffffff !important', color: '#000000 !important' } : {}}
-                >
+                <SelectTrigger className="mt-1 text-sm bg-white text-foreground text-black">
                   <SelectValue placeholder="Select category" />
                 </SelectTrigger>
                 <SelectContent>
                   {categories.map((category) => (
-                    <SelectItem key={category.id} value={category.id} className="text-sm">
+                    <SelectItem key={category.id} value={category.id} className="text-sm text-black">
                       {category.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+            ) : (
+              <Input
+                value={formData.category?.name || 'No category'}
+                disabled
+                className="mt-1 text-sm w-full"
+                style={{ backgroundColor: '#ffffff !important', color: '#000000 !important' }}
+              />
             )}
             {!masterDataLoading && categories.length === 0 && (
               <p className="text-xs text-red-500 mt-1">No categories available</p>
@@ -939,7 +992,7 @@ export default function AssetDetailModal({
               <div className="flex items-center justify-center h-9 border rounded-md bg-muted mt-1">
                 <span className="text-xs text-muted-foreground">Loading...</span>
               </div>
-            ) : (
+            ) : isEditing ? (
               <Select
                 value={formData.department?.id || ''}
                 onValueChange={(value) => {
@@ -948,20 +1001,24 @@ export default function AssetDetailModal({
                 }}
                 disabled={!isEditing}
               >
-                <SelectTrigger
-                  className={`mt-1 text-sm ${!isEditing ? "" : ""}`}
-                      style={!isEditing ? { backgroundColor: '#ffffff !important', color: '#000000 !important' } : {}}
-                >
+                <SelectTrigger className="mt-1 text-sm bg-white text-foreground text-black">
                   <SelectValue placeholder="Select department" />
                 </SelectTrigger>
                 <SelectContent>
                   {departments.map((department) => (
-                    <SelectItem key={department.id} value={department.id} className="text-sm">
+                    <SelectItem key={department.id} value={department.id} className="text-sm text-black">
                       {department.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+            ) : (
+              <Input
+                value={formData.department?.name || 'No department'}
+                disabled
+                className="mt-1 text-sm w-full"
+                style={{ backgroundColor: '#ffffff !important', color: '#000000 !important' }}
+              />
             )}
             {!masterDataLoading && departments.length === 0 && (
               <p className="text-xs text-red-500 mt-1">No departments available</p>
@@ -999,22 +1056,22 @@ export default function AssetDetailModal({
                   }}
                   disabled={pics.length === 0}
                 >
-                  <SelectTrigger className="mt-1 text-sm">
-                    <SelectValue placeholder={pics.length === 0 ? 'No PIC available' : 'Select PIC'} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {pics.length > 0 ? (
-                      pics.map((pic) => {
-                        const positionLabel = (pic.position || '').trim()
-                        const showPosition = positionLabel && positionLabel.toLowerCase() !== 'test'
+                <SelectTrigger className="mt-1 text-sm bg-white text-foreground text-black">
+                  <SelectValue placeholder={pics.length === 0 ? 'No PIC available' : 'Select PIC'} />
+                </SelectTrigger>
+                <SelectContent>
+                  {pics.length > 0 ? (
+                    pics.map((pic) => {
+                      const positionLabel = (pic.position || '').trim()
+                      const showPosition = positionLabel && positionLabel.toLowerCase() !== 'test'
 
-                        return (
-                          <SelectItem key={pic.id} value={pic.id} className="text-sm">
-                            <div className="flex flex-col">
-                              <span>{pic.name}</span>
-                              {showPosition && (
-                                <span className="text-xs text-muted-foreground">{positionLabel}</span>
-                              )}
+                      return (
+                        <SelectItem key={pic.id} value={pic.id} className="text-sm text-black">
+                          <div className="flex flex-col">
+                            <span>{pic.name}</span>
+                            {showPosition && (
+                              <span className="text-xs text-muted-foreground">{positionLabel}</span>
+                            )}
                             </div>
                           </SelectItem>
                         )
@@ -1045,13 +1102,18 @@ export default function AssetDetailModal({
                 )}
               </div>
             ) : (
-              <div className="mt-1 h-9 flex items-center border rounded-md bg-muted px-3 text-sm text-gray-700">
-                {formData.employee
-                  ? formData.employee.name
-                  : formData.pic
-                    ? formData.pic
-                    : 'No PIC assigned'}
-              </div>
+              <Input
+                value={
+                  formData.employee
+                    ? formData.employee.name
+                    : formData.pic
+                      ? formData.pic
+                      : 'No PIC assigned'
+                }
+                disabled
+                className="mt-1 text-sm w-full"
+                style={{ backgroundColor: '#ffffff !important', color: '#000000 !important' }}
+              />
             )}
             {!masterDataLoading && pics.length === 0 && (
               <p className="text-xs text-red-500 mt-1">No PIC available</p>

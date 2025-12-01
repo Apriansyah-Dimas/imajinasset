@@ -57,6 +57,7 @@ model Site {
   createdAt  DateTime @default(now()) @map("createdat")
   updatedAt  DateTime @updatedAt @map("updatedat")
   assets     Asset[]
+  tempEntries SOAssetEntry[] @relation("TempSiteOnEntry")
 
   @@map("sites")
 }
@@ -69,6 +70,7 @@ model Category {
   createdAt   DateTime @default(now()) @map("createdat")
   updatedAt   DateTime @updatedAt @map("updatedat")
   assets      Asset[]
+  tempEntries SOAssetEntry[] @relation("TempCategoryOnEntry")
 
   @@map("categories")
 }
@@ -82,6 +84,7 @@ model Department {
   updatedAt   DateTime        @updatedAt @map("updatedat")
   checkouts   AssetCheckout[]
   assets      Asset[]
+  tempEntries SOAssetEntry[] @relation("TempDepartmentOnEntry")
 
   @@map("departments")
 }
@@ -100,6 +103,7 @@ model Employee {
   receivedCheckouts AssetCheckout[] @relation("EmployeeCheckoutReceivedBy")
   assignedCheckouts AssetCheckout[] @relation("EmployeeCheckoutAssignments")
   assets            Asset[]
+  tempSOEntries     SOAssetEntry[]  @relation("TempPicOnEntry")
 
   @@map("employees")
 }
@@ -135,6 +139,7 @@ model SOAssetEntry {
   isIdentified Boolean   @default(false) @map("isidentified")
   isCrucial    Boolean   @default(false) @map("is_crucial")
   crucialNotes String?   @map("crucial_notes")
+  tempPurchaseDate DateTime? @map("temp_purchase_date")
   tempName     String?   @map("temp_name")
   tempStatus   String?   @map("temp_status")
   tempSerialNo String?   @map("temp_serial_no")
@@ -143,11 +148,21 @@ model SOAssetEntry {
   tempBrand    String?   @map("temp_brand")
   tempModel    String?   @map("temp_model")
   tempCost     Decimal?  @map("temp_cost")
+  tempImageUrl String?   @map("temp_image_url")
+  tempSiteId   String?   @map("temp_site_id")
+  tempCategoryId String? @map("temp_category_id")
+  tempDepartmentId String? @map("temp_department_id")
+  tempPicId    String?   @map("temp_pic_id")
   createdAt    DateTime  @default(now()) @map("createdat")
   updatedAt    DateTime  @updatedAt @map("updatedat")
   asset        Asset     @relation(fields: [assetId], references: [id])
   soSession    SOSession @relation(fields: [soSessionId], references: [id])
   events       AssetEvent[]
+
+  tempSite       Site?       @relation("TempSiteOnEntry", fields: [tempSiteId], references: [id])
+  tempCategory   Category?   @relation("TempCategoryOnEntry", fields: [tempCategoryId], references: [id])
+  tempDepartment Department? @relation("TempDepartmentOnEntry", fields: [tempDepartmentId], references: [id])
+  tempPicEmployee Employee?  @relation("TempPicOnEntry", fields: [tempPicId], references: [id])
 
   @@index([soSessionId])
   @@index([assetId])

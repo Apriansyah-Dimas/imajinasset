@@ -73,6 +73,7 @@ interface Asset {
   picId?: string | null;
   imageUrl?: string | null;
   notes?: string | null;
+  purchaseDate?: string | null;
   employee?: {
     id: string;
     name: string;
@@ -100,6 +101,24 @@ interface ScannedEntry {
   tempBrand?: string | null;
   tempModel?: string | null;
   tempCost?: number | string | null;
+  tempPurchaseDate?: string | null;
+  tempImageUrl?: string | null;
+  tempSiteId?: string | null;
+  tempCategoryId?: string | null;
+  tempDepartmentId?: string | null;
+  tempPicId?: string | null;
+  tempSite?: { id: string; name: string } | null;
+  tempCategory?: { id: string; name: string } | null;
+  tempDepartment?: { id: string; name: string } | null;
+  tempPicEmployee?: {
+    id: string;
+    employeeId?: string | null;
+    name: string;
+    email?: string | null;
+    department?: string | null;
+    position?: string | null;
+    isActive?: boolean | null;
+  } | null;
   asset: Asset;
 }
 
@@ -141,16 +160,24 @@ const getEntryDisplayAsset = (entry: ScannedEntry): Asset => {
     } as Asset;
   }
 
+  const basePicName = base.pic ?? base.employee?.name ?? null;
+  const basePicId = base.picId ?? base.employee?.id ?? null;
   return {
     ...base,
     name: entry.tempName || base.name,
     status: entry.tempStatus || base.status,
     serialNo: entry.tempSerialNo ?? base.serialNo,
-    pic: entry.tempPic ?? base.pic,
+    pic: entry.tempPic ?? entry.tempPicEmployee?.name ?? basePicName,
+    picId: entry.tempPicId ?? entry.tempPicEmployee?.id ?? basePicId,
     brand: entry.tempBrand ?? base.brand,
     model: entry.tempModel ?? base.model,
     cost: normalizeCostValue(entry.tempCost ?? base.cost) ?? null,
-    notes: entry.tempNotes ?? base.notes
+    notes: entry.tempNotes ?? base.notes,
+    purchaseDate: entry.tempPurchaseDate ?? base.purchaseDate ?? null,
+    site: entry.tempSite ?? base.site ?? null,
+    category: entry.tempCategory ?? base.category ?? null,
+    department: entry.tempDepartment ?? base.department ?? null,
+    imageUrl: entry.tempImageUrl ?? base.imageUrl ?? null
   };
 };
 
@@ -175,14 +202,22 @@ const sortTileClass = (active: boolean) =>
   }`;
 
 const sortOptionsList: Array<{
-  value: "name-asc" | "name-desc" | "created-newest" | "created-oldest";
+  value:
+    | "name-asc"
+    | "name-desc"
+    | "purchase-newest"
+    | "purchase-oldest"
+    | "asset-number-asc"
+    | "asset-number-desc";
   label: string;
   description: string;
 }> = [
   { value: "name-asc", label: "Name (A-Z)", description: "Sort by asset name" },
   { value: "name-desc", label: "Name (Z-A)", description: "Asset name Z-A" },
-  { value: "created-newest", label: "Newest", description: "Newest assets by creation date" },
-  { value: "created-oldest", label: "Oldest", description: "Oldest assets by creation date" }
+  { value: "purchase-newest", label: "Newest purchase", description: "Latest purchase date" },
+  { value: "purchase-oldest", label: "Oldest purchase", description: "Earliest purchase date" },
+  { value: "asset-number-asc", label: "Asset number (A-Z)", description: "Sort by asset code" },
+  { value: "asset-number-desc", label: "Asset number (Z-A)", description: "Asset code descending" }
 ];
 
 const getStatusColor = (status: string) => {
@@ -250,9 +285,14 @@ function ScanPageContent() {
     department: "all"
   });
   const [sortOption, setSortOption] =
-    useState<"name-asc" | "name-desc" | "created-newest" | "created-oldest">(
-      "name-asc"
-    );
+    useState<
+      | "name-asc"
+      | "name-desc"
+      | "purchase-newest"
+      | "purchase-oldest"
+      | "asset-number-asc"
+      | "asset-number-desc"
+    >("name-asc");
   const [activeList, setActiveList] = useState<"scanned" | "remaining" | "crucial">("scanned");
 
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
@@ -481,16 +521,20 @@ function ScanPageContent() {
           return a.asset.name.localeCompare(b.asset.name);
         case "name-desc":
           return b.asset.name.localeCompare(a.asset.name);
-        case "created-newest":
+        case "purchase-newest":
           return (
-            new Date(b.asset.dateCreated || b.asset.id).getTime() -
-            new Date(a.asset.dateCreated || a.asset.id).getTime()
+            new Date(b.asset.purchaseDate || b.asset.dateCreated || b.asset.id).getTime() -
+            new Date(a.asset.purchaseDate || a.asset.dateCreated || a.asset.id).getTime()
           );
-        case "created-oldest":
+        case "purchase-oldest":
           return (
-            new Date(a.asset.dateCreated || a.asset.id).getTime() -
-            new Date(b.asset.dateCreated || b.asset.id).getTime()
+            new Date(a.asset.purchaseDate || a.asset.dateCreated || a.asset.id).getTime() -
+            new Date(b.asset.purchaseDate || b.asset.dateCreated || b.asset.id).getTime()
           );
+        case "asset-number-asc":
+          return a.asset.noAsset.localeCompare(b.asset.noAsset);
+        case "asset-number-desc":
+          return b.asset.noAsset.localeCompare(a.asset.noAsset);
         default:
           return 0;
       }

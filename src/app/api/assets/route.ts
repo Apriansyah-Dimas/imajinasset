@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
     const categoryName = searchParams.get('category')
     const siteName = searchParams.get('site')
     const departmentName = searchParams.get('department')
-    const sortParam = (searchParams.get('sort') || 'dateCreated').toLowerCase()
+    const sortParam = (searchParams.get('sort') || 'purchaseDate').toLowerCase()
     const orderParam = (searchParams.get('order') || 'desc').toLowerCase()
 
     const where: Prisma.AssetWhereInput = {}
@@ -141,12 +141,28 @@ export async function GET(request: NextRequest) {
     const totalCount = await retryOnBusy(() => db.asset.count({ where }))
     const skip = (page - 1) * limit
 
-    const sortField = sortParam === 'name' ? 'name' : 'dateCreated'
     const sortOrder: Prisma.SortOrder = orderParam === 'asc' ? 'asc' : 'desc'
-    const orderBy: Prisma.AssetOrderByWithRelationInput =
-      sortField === 'name'
-        ? { name: sortOrder }
-        : { dateCreated: sortOrder }
+    let orderBy: Prisma.AssetOrderByWithRelationInput | Prisma.AssetOrderByWithRelationInput[]
+
+    switch (sortParam) {
+      case 'name':
+        orderBy = { name: sortOrder }
+        break
+      case 'noasset':
+      case 'no_asset':
+      case 'asset':
+      case 'assetnumber':
+        orderBy = { noAsset: sortOrder }
+        break
+      case 'purchasedate':
+      case 'purchase_date':
+      default:
+        orderBy = [
+          { purchaseDate: sortOrder },
+          { dateCreated: 'desc' }
+        ]
+        break
+    }
 
     const assets = await retryOnBusy(() =>
       db.asset.findMany({
