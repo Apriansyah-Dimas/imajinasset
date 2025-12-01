@@ -397,11 +397,19 @@ function ScanPageContent() {
     if (!sessionId) return;
     setLoadingData(true);
     try {
+      const token = getClientAuthToken();
       const response = await fetch(
-        `/api/so-sessions/${sessionId}/unidentified-assets`
+        `/api/so-sessions/${sessionId}/unidentified-assets`,
+        {
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {})
+          }
+        }
       );
       if (!response.ok) {
-        throw new Error("Failed to fetch session data");
+        const errorData = await response.json().catch(() => ({}));
+        const message = errorData.error || "Failed to fetch session data";
+        throw new Error(message);
       }
       const data: UnidentifiedResponse = await response.json();
       setSession(data.session);
@@ -413,11 +421,15 @@ function ScanPageContent() {
       setRemainingAssets(data.missingAssets || []);
     } catch (error) {
       console.error("Failed to load session overview:", error);
-      toast.error("Failed to load session data");
+      const message = error instanceof Error ? error.message : "Failed to load session data";
+      toast.error(message);
+      if (message.toLowerCase().includes("unauthorized")) {
+        router.push("/login/");
+      }
     } finally {
       setLoadingData(false);
     }
-  }, [sessionId]);
+  }, [sessionId, router]);
 
   useEffect(() => {
     fetchSessionData();
