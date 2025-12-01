@@ -47,24 +47,24 @@ export default function Navbar() {
 
   const navigation = useMemo<NavigationItem[]>(() => {
     const baseNav: NavigationItem[] = [
-      { name: "Dashboard", href: "/", icon: LayoutDashboard },
-      { name: "Assets", href: "/assets", icon: Package },
+      { name: "Dashboard", href: "/dashboard/", icon: LayoutDashboard },
+      { name: "Assets", href: "/assets/", icon: Package },
     ];
 
     const role = user?.role;
 
     if (role === "ADMIN" || role === "SO_ASSET_USER") {
-      baseNav.push({ name: "Check Out", href: "/check-out", icon: LogOut });
-      baseNav.push({ name: "Check In", href: "/check-in", icon: LogIn });
+      baseNav.push({ name: "Check Out", href: "/check-out/", icon: LogOut });
+      baseNav.push({ name: "Check In", href: "/check-in/", icon: LogIn });
     }
 
     if (role === "ADMIN" || role === "SO_ASSET_USER" || role === "VIEWER") {
-      baseNav.push({ name: "Stock Opname", href: "/so-asset", icon: Search });
+      baseNav.push({ name: "Stock Opname", href: "/so-asset/", icon: Search });
     }
 
     if (role === "ADMIN") {
-      baseNav.push({ name: "User Management", href: "/admin/users", icon: Users });
-      baseNav.push({ name: "Backup & Restore", href: "/admin/backup", icon: Database });
+      baseNav.push({ name: "User Management", href: "/admin/users/", icon: Users });
+      baseNav.push({ name: "Backup & Restore", href: "/admin/backup/", icon: Database });
     }
 
     return baseNav;
@@ -102,9 +102,15 @@ export default function Navbar() {
     });
   }, [navigation, pathname]);
 
+  const normalizePath = (path: string) => {
+    if (path === "/") return "/";
+    return path.endsWith("/") ? path.slice(0, -1) : path;
+  };
+
   const isActive = (href: string) => {
-    if (href === "/") return pathname === href;
-    return pathname.startsWith(href);
+    const current = normalizePath(pathname);
+    const target = normalizePath(href);
+    return current === target || current.startsWith(`${target}/`);
   };
 
   const toggleSection = (section: string) => {
@@ -220,7 +226,8 @@ export default function Navbar() {
           {/* Header with toggle button */}
           <div className="flex items-center justify-between px-1">
             <Link
-              href="/"
+              prefetch={false}
+              href="/dashboard/"
               className="flex items-center gap-3"
               onClick={() => {
                 if (isMobile) {
@@ -298,6 +305,7 @@ export default function Navbar() {
                               if (child.href) {
                                 return (
                                   <Link
+                                    prefetch={false}
                                     key={child.name}
                                     href={child.href}
                                     className={commonClasses}
@@ -355,6 +363,7 @@ export default function Navbar() {
                   const active = isActive(item.href);
                   return (
                     <Link
+                      prefetch={false}
                       key={item.name}
                       href={item.href}
                       className={cn(
@@ -418,6 +427,7 @@ export default function Navbar() {
               <div className="rounded-2xl border border-dashed border-border px-4 py-5 text-center">
                 <p className="text-sm text-text-muted">Belum masuk</p>
                 <Link
+                  prefetch={false}
                   href="/login"
                   className="mt-3 inline-flex w-full items-center justify-center gap-2 sneat-btn sneat-btn-primary"
                 >

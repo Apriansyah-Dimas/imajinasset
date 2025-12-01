@@ -14,7 +14,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (user) {
-      router.replace('/');
+      router.replace('/dashboard/');
     }
   }, [router, user]);
 
@@ -42,7 +42,7 @@ export default function LoginPage() {
         return;
       }
 
-      router.replace('/');
+      router.replace('/dashboard/');
     } catch (error) {
       console.error('Login error:', error);
       setErrorMessage('Something went wrong. Please try again.');

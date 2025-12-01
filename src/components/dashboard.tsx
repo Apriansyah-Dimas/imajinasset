@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import dynamic from 'next/dynamic'
+import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts'
 import { Package } from 'lucide-react'
 
 interface DashboardData {
@@ -12,13 +12,54 @@ interface DashboardData {
   assetsByDepartment: Array<{ name: string; value: number }>
 }
 
-const DashboardCharts = dynamic(
-  () => import('./dashboard-charts').then((mod) => mod.DashboardCharts),
-  {
-    ssr: false,
-    loading: () => <ChartsSkeleton />,
+const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4', '#84CC16', '#F97316', '#06B6D4']
+
+// Custom tooltip component to show actual values instead of percentages
+const CustomTooltip = ({ active, payload }: any) => {
+  if (active && payload && payload[0]) {
+    return (
+      <div className="bg-white p-2 border border-gray-300 rounded shadow-lg">
+        <p className="font-semibold">{payload[0].name}</p>
+        <p className="text-blue-600">Value: {payload[0].value}</p>
+      </div>
+    )
   }
-)
+  return null
+}
+
+// Custom legend component for two-column layout
+const CustomLegend = ({ data }: { data: Array<{ name: string; value: number }> }) => {
+  const halfLength = Math.ceil(data.length / 2)
+  const leftColumn = data.slice(0, halfLength)
+  const rightColumn = data.slice(halfLength)
+
+  return (
+    <div className="flex justify-center gap-8 mt-4">
+      <div className="space-y-2">
+        {leftColumn.map((entry, index) => (
+          <div key={`legend-left-${index}`} className="flex items-center gap-2 text-sm">
+            <div
+              className="w-3 h-3 rounded"
+              style={{ backgroundColor: COLORS[index % COLORS.length] }}
+            />
+            <span className="text-gray-700">{entry.name}</span>
+          </div>
+        ))}
+      </div>
+      <div className="space-y-2">
+        {rightColumn.map((entry, index) => (
+          <div key={`legend-right-${index + halfLength}`} className="flex items-center gap-2 text-sm">
+            <div
+              className="w-3 h-3 rounded"
+              style={{ backgroundColor: COLORS[(index + halfLength) % COLORS.length] }}
+            />
+            <span className="text-gray-700">{entry.name}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 export default function Dashboard() {
   const [data, setData] = useState<DashboardData | null>(null)
@@ -146,17 +187,88 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <DashboardCharts data={data} />
-    </div>
-  )
-}
+      {/* Charts Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        {/* Large Pie Chart - By Department */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <h3 className="text-lg font-semibold mb-4" style={{ color: '#2c2c54' }}>Assets by Department</h3>
+          <ResponsiveContainer width="100%" height={300}>
+            <PieChart>
+              <Pie
+                data={data.assetsByDepartment}
+                cx="50%"
+                cy="50%"
+                labelLine={false}
+                outerRadius={100}
+                innerRadius={40}
+                fill="#8884d8"
+                dataKey="value"
+              >
+                {data.assetsByDepartment.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip content={<CustomTooltip />} />
+            </PieChart>
+          </ResponsiveContainer>
+          <CustomLegend data={data.assetsByDepartment} />
+        </div>
 
-function ChartsSkeleton() {
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8 animate-pulse">
-      <div className="h-[360px] bg-muted rounded-lg border border-border" />
-      <div className="h-[360px] bg-muted rounded-lg border border-border" />
-      <div className="h-[360px] bg-muted rounded-lg border border-border lg:col-span-2" />
+        {/* Right Column - Two Smaller Charts */}
+        <div className="space-y-6">
+          {/* Pie Chart - By Site */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h3 className="text-lg font-semibold mb-4" style={{ color: '#2c2c54' }}>Assets by Site</h3>
+            <ResponsiveContainer width="100%" height={135}>
+              <PieChart>
+                <Pie
+                  data={data.assetsBySite}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  outerRadius={50}
+                  innerRadius={20}
+                  fill="#8884d8"
+                  dataKey="value"
+                >
+                  {data.assetsBySite.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip content={<CustomTooltip />} />
+              </PieChart>
+            </ResponsiveContainer>
+            <CustomLegend data={data.assetsBySite} />
+          </div>
+
+          {/* Pie Chart - By Category */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h3 className="text-lg font-semibold mb-4" style={{ color: '#2c2c54' }}>Assets by Category</h3>
+            <ResponsiveContainer width="100%" height={135}>
+              <PieChart>
+                <Pie
+                  data={data.assetsByCategory}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  outerRadius={50}
+                  innerRadius={20}
+                  fill="#8884d8"
+                  dataKey="value"
+                >
+                  {data.assetsByCategory.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip content={<CustomTooltip />} />
+              </PieChart>
+            </ResponsiveContainer>
+            <CustomLegend data={data.assetsByCategory} />
+          </div>
+        </div>
+      </div>
+
+
     </div>
   )
 }

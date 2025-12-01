@@ -1,15 +1,12 @@
-'use client'
-
-import Dashboard from '@/components/dashboard'
-import ProtectedRoute from '@/components/ProtectedRoute'
+import { cookies } from 'next/headers'
+import { redirect } from 'next/navigation'
 
 export default function Home() {
-  return (
-    <ProtectedRoute>
-      <div className="min-h-screen">
-        {/* Page Content - Default to Dashboard */}
-        <Dashboard />
-      </div>
-    </ProtectedRoute>
-  )
+  const token = cookies().get('auth_token')?.value
+
+  if (token) {
+    redirect('/dashboard/')
+  }
+
+  redirect('/login/')
 }
