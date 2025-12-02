@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -19,7 +19,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   AlertCircle,
   CheckCircle,
-  CheckCheck,
   Clock,
   Package,
   Search,
@@ -32,6 +31,11 @@ import {
   Eye,
 } from "lucide-react";
 import Link from "next/link";
+import ProtectedRoute from "@/components/ProtectedRoute";
+import RoleBasedAccess from "@/components/RoleBasedAccess";
+import { useAuth } from "@/contexts/AuthContext";
+import { getClientAuthToken } from "@/lib/client-auth";
+import { cn } from "@/lib/utils";
 
 interface Asset {
   id: string;
@@ -64,9 +68,17 @@ interface UnidentifiedAssetsResponse {
     id: string;
     name: string;
     year: number;
-    status: string;
+    description?: string;
+    planStart?: string | null;
+    planEnd?: string | null;
+    notes?: string | null;
+    status: "Active" | "Completed" | "Cancelled";
     totalAssets: number;
     scannedAssets: number;
+    createdAt: string;
+    startedAt?: string;
+    completedAt?: string;
+    completionNotes?: string | null;
   };
   statistics: {
     totalAssets: number;
@@ -85,12 +97,27 @@ interface UnidentifiedAssetsResponse {
   scannedEntries: ScannedEntry[];
 }
 
+// Constants untuk pagination dan filtering
+const ITEMS_PER_PAGE = 20;
+const SEARCH_DEBOUNCE_DELAY = 300;
+
 export default function UnidentifiedAssetsPage() {
   const params = useParams();
   const router = useRouter();
   const [data, setData] = useState<UnidentifiedAssetsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+
+  // State untuk pagination dan virtual scroll
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(ITEMS_PER_PAGE);
+
+  // Debounced search untuk performa lebih baik
+  const debouncedSearchQuery = useMemo(() => {
+    const trimmedQuery = searchQuery ? searchQuery.trim() : '';
+    return trimmedQuery ? `${trimmedQuery} - ${Date.now()}` : ''
+  }, [searchQuery]);
+
   const [activeTab, setActiveTab] = useState("all");
 
   useEffect(() => {
@@ -99,73 +126,299 @@ export default function UnidentifiedAssetsPage() {
     }
   }, [params.id]);
 
-  const fetchUnidentifiedAssets = async () => {
-    try {
-      const response = await fetch(
-        `/api/so-sessions/${params.id}/unidentified-assets`
-      );
-      if (response.ok) {
-        const result = await response.json();
-        setData(result);
-      } else {
-        toast.error("Failed to fetch unidentified assets");
-      }
-    } catch (error) {
-      console.error("Error fetching unidentified assets:", error);
-      toast.error("Network error. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Enhanced filtered assets dengan useMemo untuk performa lebih baik
+  const filteredUnidentifiedAssets = useMemo(() => {
+    if (!data?.missingAssets) return [];
 
-  const filteredUnidentifiedAssets =
-    data?.missingAssets.filter(
-      (asset) =>
-        asset.noAsset.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        asset.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        asset.serialNo?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        asset.pic?.toLowerCase().includes(searchQuery.toLowerCase())
-    ) || [];
+    const query = debouncedSearchQuery.toLowerCase().trim();
+    const statusFilter = activeTab;
+
+    return data?.missingAssets.filter((asset) => {
+      const matchesSearch =
+        !query ||
+        asset.noAsset.toLowerCase().includes(query) ||
+        asset.name.toLowerCase().includes(query) ||
+        (asset.description || "").toLowerCase().includes(query) ||
+        asset.serialNo?.toLowerCase().includes(query) ||
+        asset.pic?.toLowerCase().includes(query);
+
+      const matchesStatus =
+        statusFilter === "all" ||
+        asset.status?.toLowerCase() === statusFilter.toLowerCase();
+
+      const matchesCategory =
+        statusFilter === "all" ||
+        asset.category?.name.toLowerCase().includes(query);
+
+      const matchesDepartment =
+        statusFilter === "all" ||
+        asset.department?.name.toLowerCase().includes(query);
+
+      return matchesSearch && matchesStatus && matchesCategory && matchesDepartment;
+    });
+  }, [data?.missingAssets, debouncedSearchQuery, statusFilter]);
+
+  // Pagination logic
+  const paginatedAssets = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return filteredUnidentifiedAssets.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredUnidentifiedAssets, currentPage]);
+
+  const totalPages = Math.ceil((filteredUnidentifiedAssets?.length || 0) / itemsPerPage);
 
   const getGroupedAssets = () => {
-    if (!data) return {};
+    if (!data) return { site: {}, category: {}, department: {} };
 
-    switch (activeTab) {
-      case "site":
-        return data.groupedBy.site;
-      case "category":
-        return data.groupedBy.category;
-      case "department":
-        return data.groupedBy.department;
-      default:
-        return { "All Unidentified Assets": data.missingAssets };
-    }
+    return {
+      site: data.missingAssets.reduce((acc, asset) => {
+        if (!asset.site) return acc;
+        const siteName = asset.site?.name || "N/A";
+        return {
+          ...acc,
+          [siteName]: [...(acc[siteName] || []), asset]
+        };
+      }, {}),
+      category: data.missingAssets.reduce((acc, asset) => {
+        if (!asset.category) return acc;
+        const categoryName = asset.category?.name || "N/A";
+        return {
+          ...acc,
+          [categoryName]: [...(acc[categoryName] || []), asset]
+        };
+      }, {}),
+      department: data.missingAssets.reduce((acc, asset) => {
+        if (!asset.department) return acc;
+        const departmentName = asset.department?.name || "N/A";
+        return {
+          ...acc,
+          [departmentName]: [...(acc[departmentName] || []), asset]
+        };
+      }, {})
+    };
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "Active":
-        return "bg-green-100 text-green-800 border-green-200";
-      case "Broken":
-        return "bg-red-100 text-red-800 border-red-200";
-      case "Maintenance Process":
-        return "bg-yellow-100 text-yellow-800 border-yellow-300";
-      case "Lost/Missing":
-        return "bg-orange-100 text-orange-800 border-orange-200";
-      case "Sell":
-        return "bg-gray-100 text-gray-800 border-gray-200";
-      default:
-        return "bg-yellow-100 text-yellow-800 border-yellow-200";
-    }
+  const statusAccent: Record<string, string> = {
+    Active: "bg-green-100 text-green-800 border-green-200",
+    Broken: "bg-red-100 text-red-800 border-red-200",
+    "Maintenance Process": "bg-yellow-100 text-yellow-800 border-yellow-200",
+    "Lost/Missing": "bg-orange-100 text-orange-800 border-orange-200",
+    Completed: "bg-emerald-100 text-emerald-700 border-emerald-100",
+    Cancelled: "bg-gray-100 text-gray-800 border-gray-200",
+    Sell: "bg-gray-100 text-gray-800 border-gray-200",
+  };
+
+  const filterOptions: Array<{ value: typeof statusFilter; label: string }> = [
+    { value: "all", label: "All" },
+    { value: "Active", label: "Active" },
+    { value: "Completed", label: "Completed" },
+    { value: "Cancelled", label: "Cancelled" },
+  ];
+
+  const formatNumber = (value: number) =>
+    new Intl.NumberFormat("id-ID").format(value);
+
+  const formatDate = (value?: string | null) => {
+    if (!value) return "-";
+    return new Date(value).toLocaleDateString("id-ID", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  };
+
+  const renderSessionCard = (session: UnidentifiedAssetsResponse["session"]) => {
+    const progress = session.statistics.completionPercentage;
+
+    // Format progress dengan desimal agar lebih baik
+    const progressPercentage = Math.round(progress);
+
+    return (
+      <Card
+        key={session.id}
+        className="rounded-3xl border border-surface-border/70 bg-surface shadow-sm hover:shadow-lg transition-all duration-300"
+      >
+        <CardContent className="space-y-4 p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-xs text-text-muted">Year {session.year}</p>
+              <h3 className="text-xl font-semibold text-foreground">
+                {session.name}
+              </h3>
+              {session.description && (
+                <p className="text-sm text-text-muted line-clamp-2">
+                  {session.description}
+                </p>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <span
+                className={cn(
+                  "rounded-full px-3 py-1 text-xs font-medium transition-all duration-300",
+                  statusAccent[session.status]
+                )}
+              >
+                {session.status}
+              </span>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    className="h-8 w-8 rounded-full bg-muted/40 p-0 hover:bg-muted hover:text-foreground transition-colors"
+                  >
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {session.status === "Active" && (
+                    <>
+                      <RoleBasedAccess allowedRoles={["ADMIN", "SO_ASSET_USER", "VIEWER"]}>
+                        <DropdownMenuItem
+                          onClick={() => openCancelDialog(session)}
+                          className="text-destructive focus:text-destructive hover:bg-destructive/10"
+                        >
+                          <XCircle className="mr-2 h-4 w-4" />
+                          Cancel
+                        </DropdownMenuItem>
+                      </RoleBasedAccess>
+                    </>
+                  )}
+                  {session.status === "Cancelled" && (
+                    <>
+                      <RoleBasedAccess allowedRoles={["ADMIN"]}>
+                        <DropdownMenuItem
+                          onClick={() => openDeleteDialog(session)}
+                          className="text-destructive focus:text-destructive hover:bg-destructive/10"
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete
+                        </DropdownMenuItem>
+                      </RoleBasedAccess>
+                    </>
+                  )}
+                  {session.status === "Completed" && (
+                    <>
+                      <RoleBasedAccess allowedRoles={["ADMIN", "SO_ASSET_USER", "VIEWER"]}>
+                        <DropdownMenuItem
+                          onClick={() => openDeleteDialog(session)}
+                          className="text-destructive focus:text-destructive hover:bg-destructive/10"
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete
+                        </DropdownMenuItem>
+                      </RoleBasedAccess>
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </div>
+
+          {/* Progress Section with Enhanced Styling */}
+          <div className="mt-2 h-2 rounded-full bg-secondary/40">
+            <div className="flex items-center justify-between p-3">
+              <h3 className="text-sm font-medium text-muted-foreground">Progress</h3>
+              <div className="flex items-center gap-2">
+                <div className="text-right">
+                  <span className="text-xs text-muted">{progressPercentage}%</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="h-2 bg-muted rounded-full overflow-hidden">
+                    <div
+                      className={cn(
+                        "h-2 rounded-full bg-primary transition-all duration-300 ease-in-out",
+                        progress === 100 ? "bg-emerald-500" : "bg-primary"
+                      )}
+                      style={{ width: `${progressPercentage}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  const renderAssetCard = (asset: Asset, index: number) => {
+    return (
+      <Card
+        key={asset.id}
+        className="rounded-3xl border border-surface-border/70 bg-surface shadow-sm hover:shadow-lg transition-all duration-300"
+      >
+        <CardContent className="space-y-4 p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-xs text-text-muted">{formatNumber(index + 1)}</p>
+              <h3 className="text-xl font-semibold text-foreground truncate max-w-[200px]">
+                {asset.name}
+              </h3>
+            </div>
+            <div className="text-right">
+              <Badge
+                variant="outline"
+                className="flex-shrink-0 text-xs"
+              >
+                {asset.status || "Unidentified"}
+              </Badge>
+            </div>
+          </div>
+          {(asset.serialNo || asset.pic || asset.imageUrl || asset.brand || asset.model) && (
+            <div className="mt-2 space-y-1 text-xs text-text-muted">
+              {asset.serialNo && (
+                <p>
+                  <span className="font-medium">Serial No:</span> {asset.serialNo}
+                </p>
+              )}
+              {asset.pic && (
+                <p>
+                  <span className="font-medium">PIC:</span> {asset.pic}
+                </p>
+              )}
+              {asset.brand && (
+                <p>
+                  <span className="font-medium">Brand:</span> {asset.brand}
+                </p>
+              )}
+              {asset.model && (
+                <p>
+                  <span className="font-medium">Model:</span> {asset.model}
+                </p>
+              )}
+              {asset.cost && (
+                <p>
+                  <span className="font-medium">Cost:</span> Rp {asset.cost?.toLocaleString()}
+                </p>
+              )}
+              {asset.site && (
+                <p>
+                  <span className="font-medium">Site:</span> {asset.site?.name}
+                </p>
+              )}
+              {asset.category && (
+                <p>
+                  <span className="font-medium">Category:</span> {asset.category?.name}
+                </p>
+              )}
+              {asset.department && (
+                <p>
+                  <span className="font-medium">Department:</span> {asset.department?.name}
+                </p>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
   };
 
   if (loading) {
     return (
-      <div className="container mx-auto py-8">
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <Clock className="h-8 w-8 animate-spin mx-auto mb-4" />
-            <p>Loading unidentified assets...</p>
+      <div className="min-h-screen bg-background px-4 py-8 sm:px-6 lg:px-12">
+        <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
+          <div className="surface-card animate-pulse rounded-[32px] border border-surface-border/70 bg-surface px-6 py-12 text-center">
+            <List className="h-6 w-6" />
+            <h3 className="text-xl font-semibold text-foreground">Loading unidentified assets...</h3>
           </div>
         </div>
       </div>
@@ -174,247 +427,123 @@ export default function UnidentifiedAssetsPage() {
 
   if (!data) {
     return (
-      <div className="container mx-auto py-8">
-        <Alert>
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            Failed to load unidentified assets data
-          </AlertDescription>
-        </Alert>
+      <div className="min-h-screen bg-background px-4 py-8 sm:px-6 lg:px-12">
+        <div className="mx-auto flex w-full max-w-6xl space-y-8">
+          <section className="rounded-3xl border border-surface-border/70 bg-surface px-6 py-6 shadow-sm">
+            <div className="flex flex-col sm:flex-row lg:items-center lg:justify-between">
+              <div>
+                <h1 className="text-3xl font-semibold text-foreground">Unidentified Assets</h1>
+                <p className="text-sm text-text-muted">Manage asset verification sessions with ease.</p>
+              </div>
+              <RoleBasedAccess allowedRoles={["ADMIN", "SO_ASSET_USER", "VIEWER"]}>
+                <Button
+                  className="sneat-btn sneat-btn-primary flex items-center gap-2 px-5 py-2.5 text-sm"
+                  onClick={() => setShowCreateDialog(true)}
+                >
+                  <Plus className="h-4 w-4" />
+                  New Session
+                </Button>
+              </RoleBasedAccess>
+            </div>
+          </div>
+        </section>
+
+        {/* Search and Filter Section */}
+        <section className="rounded-3xl border border-surface-border/70 bg-surface px-5 py-5">
+          <div className="flex flex-wrap gap-3 items-center">
+            <div className="relative flex-1 min-w-0">
+              <Search
+                value={debouncedSearchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search assets..."
+                className="pl-8 sm:pl-10 text-xs sm:text-sm"
+              />
+            </div>
+
+            {/* Filter Options */}
+            <div className="flex flex-wrap gap-2">
+              {filterOptions.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setActiveTab(option.value)}
+                  className={cn(
+                    "rounded-full px-3 py-1.5 text-xs font-semibold transition-colors",
+                    activeTab === option.value
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-text-muted hover:text-foreground"
+                  )}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Clear Filter Button */}
+            {isFiltering && (
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab("all");
+                  setSearchQuery("");
+                }}
+                className="rounded-full px-3 py-1.5 text-xs font-semibold transition-colors text-text-muted hover:text-foreground"
+              >
+                Reset
+              </button>
+            )}
+          </div>
+        </section>
+
+        {/* Results with Pagination */}
+        <section className="rounded-3xl border border-surface-border/70 bg-surface px-6 py-6">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xl font-semibold text-foreground">
+                Unidentified Assets ({paginatedAssets.length} total)
+              </h3>
+            </div>
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                  disabled={currentPage === 1}
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                </Button>
+                <span className="text-sm text-muted">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  <ArrowLeft className="h-4 w-4 rotate-180" />
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {/* Virtual Scrolling Container */}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {paginatedAssets.map((asset, index) => renderAssetCard(asset, index + 1))}
+          </div>
+        </section>
       </div>
     );
   }
 
-  const groupedAssets = getGroupedAssets();
+  const isFiltering = searchQuery.trim().length > 0 || activeTab !== "all";
 
   return (
-    <div
-      className="container mx-auto py-3 px-1.5 sm:py-6 sm:px-4 max-w-full lg:max-w-7xl w-full overflow-x-hidden"
-      style={{ minWidth: "320px", maxWidth: "100vw" }}
-    >
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6 gap-3">
-        <div className="flex items-center gap-2 sm:gap-4">
-          <Link href={`/so-asset/${params.id}/scan`}>
-            <Button variant="outline" size="sm" className="flex-shrink-0">
-              <ArrowLeft className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-              <span className="text-xs sm:text-sm">Back</span>
-            </Button>
-          </Link>
-          <div className="min-w-0 flex-1">
-            <h1 className="text-lg sm:text-2xl font-bold truncate">
-              Remaining Assets
-            </h1>
-            <p className="text-xs sm:text-sm text-muted-foreground truncate">
-              {data.session.name} • {data.session.year}
-            </p>
-          </div>
-          <Badge
-            variant={data.session.status === "Active" ? "default" : "secondary"}
-            className="flex-shrink-0 text-xs"
-          >
-            {data.session.status}
-          </Badge>
-        </div>
-      </div>
-
-      {/* Progress Summary */}
-      <Card className="mb-3 sm:mb-6">
-        <CardContent className="pt-3 sm:pt-6 px-3 sm:px-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-            <div>
-              <h3 className="font-semibold mb-1 text-sm sm:text-base">
-                Progress
-              </h3>
-              <p className="text-xs sm:text-sm text-muted-foreground">
-                {data.statistics.scannedAssets} of {data.statistics.totalAssets}{" "}
-                scanned
-              </p>
-            </div>
-            <div className="text-center sm:text-right">
-              <div className="text-lg sm:text-2xl font-bold">
-                {data.statistics.completionPercentage}%
-              </div>
-              <div className="text-xs sm:text-sm text-muted-foreground">
-                Complete
-              </div>
-            </div>
-          </div>
-          <Progress
-            value={data.statistics.completionPercentage}
-            className="mt-2 sm:mt-4"
-          />
-        </CardContent>
-      </Card>
-
-      <div className="flex flex-col gap-3 sm:gap-6 lg:grid lg:grid-cols-4">
-        {/* Main Content */}
-        <div className="w-full lg:col-span-3 space-y-2 sm:space-y-4">
-          {/* Search */}
-          <div className="flex gap-2 sm:gap-4 items-center">
-            <div className="relative flex-1 max-w-full">
-              <Search className="absolute left-2 sm:left-3 top-1/2 transform -translate-y-1/2 h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search assets..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-8 sm:pl-10 text-xs sm:text-sm"
-              />
-            </div>
-          </div>
-
-          {/* Asset List */}
-          <Card className="w-full overflow-hidden min-w-0">
-            <CardHeader className="pb-2 sm:pb-3 px-2 sm:px-6">
-              <div className="flex items-center justify-between min-w-0">
-                <CardTitle className="text-sm sm:text-lg truncate">
-                  Assets to Scan
-                </CardTitle>
-                <div className="text-xs text-muted-foreground flex-shrink-0 ml-2">
-                  {filteredUnidentifiedAssets.length} left
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="px-2 sm:px-6 overflow-x-hidden">
-              {filteredUnidentifiedAssets.length === 0 ? (
-                <div className="text-center py-4 sm:py-8 text-muted-foreground">
-                  <CheckCheck className="h-8 w-8 sm:h-12 sm:w-12 mx-auto mb-2 sm:mb-3 opacity-30" />
-                  <h3 className="text-sm sm:text-lg font-medium mb-1">
-                    {searchQuery ? "No assets found" : "All scanned! 🎉"}
-                  </h3>
-                  <p className="text-xs sm:text-sm">
-                    {searchQuery
-                      ? "Try adjusting search"
-                      : "Great job! All assets scanned."}
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-1 sm:space-y-2 max-h-96 sm:max-h-[600px] overflow-y-auto overflow-x-hidden">
-                  {filteredUnidentifiedAssets.map((asset) => (
-                    <div
-                      key={asset.id}
-                      className="flex flex-col sm:flex-row sm:items-center justify-between p-2 sm:p-3 rounded-lg border border-orange-200 bg-orange-50 hover:bg-orange-100 transition-colors min-w-0 w-full"
-                    >
-                      <div className="flex-1 min-w-0 overflow-hidden w-full">
-                        <div className="flex flex-col sm:flex-row sm:items-center gap-1 mb-1">
-                          <span className="font-medium text-xs truncate flex-shrink-0 max-w-[120px]">
-                            {asset.noAsset}
-                          </span>
-                          <div className="flex gap-1 flex-wrap">
-                            <Badge
-                              variant="outline"
-                              className="text-xs px-1 py-0 leading-none flex-shrink-0"
-                            >
-                              {asset.status.length > 6
-                                ? asset.status.substring(0, 6) + ".."
-                                : asset.status}
-                            </Badge>
-                            <Badge
-                              variant="secondary"
-                              className="text-xs px-1 py-0 leading-none flex-shrink-0"
-                            >
-                              M
-                            </Badge>
-                          </div>
-                        </div>
-                        <p className="text-xs text-muted-foreground truncate mb-1 max-w-[200px] sm:max-w-full">
-                          {asset.name.length > 30
-                            ? asset.name.substring(0, 30) + "..."
-                            : asset.name}
-                        </p>
-                        <div className="flex flex-wrap gap-1 text-xs text-muted-foreground">
-                          <span className="flex-shrink-0">
-                            S: {(asset.site?.name || "N/A").substring(0, 6)}
-                          </span>
-                          <span className="flex-shrink-0">
-                            P: {(asset.pic || "N/A").substring(0, 4)}
-                          </span>
-                          <span className="flex-shrink-0">
-                            C: {(asset.category?.name || "N/A").substring(0, 4)}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Sidebar */}
-        <div className="w-full lg:w-auto space-y-2 sm:space-y-4">
-          {/* Quick Stats */}
-          <Card>
-            <CardHeader className="pb-2 sm:pb-3 px-3 sm:px-6">
-              <CardTitle className="text-sm sm:text-lg">Stats</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 sm:space-y-4 px-3 sm:px-6">
-              <div className="flex items-center gap-2 sm:gap-3">
-                <div className="w-6 h-6 sm:w-10 sm:h-10 bg-orange-100 rounded-full flex items-center justify-center">
-                  <Package className="h-3 w-3 sm:h-5 sm:w-5 text-orange-700" />
-                </div>
-                <div>
-                  <div className="text-base sm:text-xl font-bold">
-                    {data.statistics.missingAssets}
-                  </div>
-                  <div className="text-xs text-muted-foreground">Left</div>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 sm:gap-3">
-                <div className="w-6 h-6 sm:w-10 sm:h-10 bg-green-100 rounded-full flex items-center justify-center">
-                  <CheckCheck className="h-3 w-3 sm:h-5 sm:w-5 text-green-700" />
-                </div>
-                <div>
-                  <div className="text-base sm:text-xl font-bold">
-                    {data.statistics.scannedAssets}
-                  </div>
-                  <div className="text-xs text-muted-foreground">Scanned</div>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 sm:gap-3">
-                <div className="w-6 h-6 sm:w-10 sm:h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                  <Package className="h-3 w-3 sm:h-5 sm:w-5 text-blue-700" />
-                </div>
-                <div>
-                  <div className="text-base sm:text-xl font-bold">
-                    {data.statistics.totalAssets}
-                  </div>
-                  <div className="text-xs text-muted-foreground">Total</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Navigation */}
-          <Card>
-            <CardContent className="pt-2 sm:pt-4 px-3 sm:px-6">
-              <div className="space-y-1 sm:space-y-2">
-                <Link href={`/so-asset/${params.id}/scan`}>
-                  <Button
-                    variant="outline"
-                    className="w-full text-xs sm:text-sm px-2 py-1"
-                  >
-                    <ArrowLeft className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                    Scan
-                  </Button>
-                </Link>
-                <Link href={`/so-asset/${params.id}/show-results`}>
-                  <Button
-                    variant="outline"
-                    className="w-full text-xs sm:text-sm px-2 py-1"
-                  >
-                    <CheckCheck className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                    Scanned
-                  </Button>
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    </div>
+    <ProtectedRoute allowedRoles={["ADMIN", "SO_ASSET_USER", "VIEWER"]}>
+      <SOAssetPageContent />
+    </ProtectedRoute>
   );
 }
