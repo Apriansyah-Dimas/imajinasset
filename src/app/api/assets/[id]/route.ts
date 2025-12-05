@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { validateId, sanitizeTextInput, validateAssetName } from '@/lib/validation';
+import { AssetUpdateData } from '@/types/api';
 
 export async function GET(
   request: NextRequest,
@@ -7,6 +9,16 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
+
+    // Validate ID
+    const idValidation = validateId(id, 'Asset ID');
+    if (!idValidation.isValid) {
+      return NextResponse.json(
+        { error: idValidation.error },
+        { status: 400 }
+      );
+    }
+
     const asset = await db.asset.findUnique({
       where: { id },
       include: {
@@ -49,11 +61,14 @@ export async function PUT(
     const { id } = await params;
     const body = await request.json();
 
-    console.log("[DEBUG API] Assets PUT - Asset ID:", id);
-    console.log(
-      "[DEBUG API] Assets PUT - Request body:",
-      JSON.stringify(body, null, 2)
-    );
+    // Validate ID
+    const idValidation = validateId(id, 'Asset ID');
+    if (!idValidation.isValid) {
+      return NextResponse.json(
+        { error: idValidation.error },
+        { status: 400 }
+      );
+    }
 
     // Check if asset exists
     const existingAsset = await db.asset.findUnique({
@@ -64,8 +79,27 @@ export async function PUT(
       return NextResponse.json({ error: "Asset not found" }, { status: 404 });
     }
 
+    // Validate asset name
+    if (body.name !== undefined) {
+      const nameValidation = validateAssetName(body.name);
+      if (!nameValidation.isValid) {
+        return NextResponse.json(
+          { error: nameValidation.error },
+          { status: 400 }
+        );
+      }
+    }
+
     // Validate foreign key references if provided
     if (body.categoryId) {
+      const categoryIdValidation = validateId(body.categoryId, 'Category ID');
+      if (!categoryIdValidation.isValid) {
+        return NextResponse.json(
+          { error: categoryIdValidation.error },
+          { status: 400 }
+        );
+      }
+
       const categoryExists = await db.category.findUnique({
         where: { id: body.categoryId },
       });
@@ -78,6 +112,14 @@ export async function PUT(
     }
 
     if (body.siteId) {
+      const siteIdValidation = validateId(body.siteId, 'Site ID');
+      if (!siteIdValidation.isValid) {
+        return NextResponse.json(
+          { error: siteIdValidation.error },
+          { status: 400 }
+        );
+      }
+
       const siteExists = await db.site.findUnique({
         where: { id: body.siteId },
       });
@@ -90,6 +132,14 @@ export async function PUT(
     }
 
     if (body.departmentId) {
+      const departmentIdValidation = validateId(body.departmentId, 'Department ID');
+      if (!departmentIdValidation.isValid) {
+        return NextResponse.json(
+          { error: departmentIdValidation.error },
+          { status: 400 }
+        );
+      }
+
       const departmentExists = await db.department.findUnique({
         where: { id: body.departmentId },
       });
@@ -102,7 +152,7 @@ export async function PUT(
     }
 
     // Prepare update data
-    const updateData: any = {
+    const updateData: AssetUpdateData = {
       name: body.name,
       noAsset: body.noAsset,
       status: body.status,

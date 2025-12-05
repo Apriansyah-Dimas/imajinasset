@@ -32,8 +32,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Trash2, History as HistoryIcon, Clock8 } from "lucide-react";
-import { useAuth } from "@/contexts/AuthContext";
-import RoleBasedAccess from "@/components/RoleBasedAccess";
+import { useAuth } from "@/contexts/auth-context";
+import RoleBasedAccess from "@/components/role-based-access";
 import AdditionalInformation from "@/components/additional-information";
 import ImageUpload from "@/components/image-upload";
 import AssetImagePlaceholder from "@/components/asset-image-placeholder";
@@ -651,28 +651,6 @@ export default function AssetDetailModal({
     }
 
     setLoading(true);
-
-    // DEBUG: Log authentication token
-    const token = getClientAuthToken();
-    console.log("[DEBUG] Auth token exists:", !!token);
-    console.log("[DEBUG] Token length:", token?.length || 0);
-    console.log(
-      "[DEBUG] Token first 10 chars:",
-      token?.substring(0, 10) || "none"
-    );
-
-    // DEBUG: Log form data
-    console.log("[DEBUG] Form data before save:", {
-      id: formData.id,
-      name: formData.name,
-      siteId: formData.site?.id,
-      categoryId: formData.category?.id,
-      departmentId: formData.department?.id,
-      picId: formData.picId,
-      isSessionContext,
-      sessionId: sessionContext?.sessionId,
-      entryId: sessionContext?.entryId,
-    });
 
     try {
       const combinedAssetNumber = `${assetPrefix}/${assetSuffix.categoryRoman}/${assetSuffix.siteNumber}`;
@@ -1376,15 +1354,8 @@ export default function AssetDetailModal({
                   <Select
                     value={formData.picId || ""}
                     onValueChange={(value) => {
-                      console.log(
-                        "PIC selected:",
-                        value,
-                        "Total PICs available:",
-                        pics.length
-                      );
-
                       // Handle empty value (No PIC selection)
-                      if (value === "" || value === null || value === undefined) {
+                      if (value === "" || value === "no-pic-selected" || value === null || value === undefined) {
                         setFormData({
                           ...formData,
                           pic: null,
@@ -1430,7 +1401,7 @@ export default function AssetDetailModal({
                     >
                       {/* Add option to clear PIC selection */}
                       <SelectItem
-                        value=""
+                        value="no-pic-selected"
                         className="text-sm text-black italic"
                       >
                         <div className="flex flex-col">

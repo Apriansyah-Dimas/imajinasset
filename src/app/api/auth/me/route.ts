@@ -2,17 +2,22 @@ import { NextRequest, NextResponse } from "next/server";
 import jwt from 'jsonwebtoken';
 import { db } from '@/lib/db';
 
+interface JWTPayload {
+  userId: string;
+  email: string;
+  role: string;
+  iat?: number;
+  exp?: number;
+}
+
 const jwtSecret = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
 export async function GET(request: NextRequest) {
   try {
-    console.log("Auth/me - Checking authentication...");
-
     // Get authorization header
     const authHeader = request.headers.get('authorization');
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      console.log("No Bearer token found in header");
       return NextResponse.json(
         { error: "No authentication token found" },
         { status: 401 }
@@ -20,15 +25,12 @@ export async function GET(request: NextRequest) {
     }
 
     const token = authHeader.substring(7); // Remove 'Bearer ' prefix
-    console.log("Token extracted, attempting verification...");
 
     // Verify JWT token with proper error handling
-    let decoded;
+    let decoded: JWTPayload;
     try {
-      decoded = jwt.verify(token, jwtSecret) as any;
-      console.log("Token verified successfully");
+      decoded = jwt.verify(token, jwtSecret) as JWTPayload;
     } catch (jwtError) {
-      console.log("JWT verification failed:", jwtError instanceof Error ? jwtError.message : jwtError);
       if (jwtError instanceof jwt.TokenExpiredError) {
         return NextResponse.json(
           { error: "Token expired" },
@@ -48,7 +50,6 @@ export async function GET(request: NextRequest) {
     }
 
     if (!decoded || !decoded.userId) {
-      console.log("Invalid token payload");
       return NextResponse.json(
         { error: "Invalid or expired token" },
         { status: 401 }
