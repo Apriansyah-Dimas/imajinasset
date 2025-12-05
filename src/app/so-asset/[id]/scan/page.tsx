@@ -1,29 +1,19 @@
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState
-} from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import AssetDetailModal from "@/components/asset-detail-modal";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-  DropdownMenuTrigger
+  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
@@ -33,13 +23,9 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
-  AlertDialogTitle
+  AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Tabs,
-  TabsList,
-  TabsTrigger
-} from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { getClientAuthToken } from "@/lib/client-auth";
 import { useAuth } from "@/contexts/AuthContext";
@@ -52,7 +38,7 @@ import {
   Filter,
   Search,
   Trash2,
-  XCircle
+  XCircle,
 } from "lucide-react";
 import { AssetScanPanel } from "@/components/asset-scan-panel";
 import { Textarea } from "@/components/ui/textarea";
@@ -95,6 +81,7 @@ interface ScannedEntry {
   crucialNotes?: string | null;
   tempName?: string | null;
   tempStatus?: string | null;
+  tempNoAsset?: string | null;
   tempSerialNo?: string | null;
   tempPic?: string | null;
   tempNotes?: string | null;
@@ -144,8 +131,7 @@ interface UnidentifiedResponse {
 
 const normalizeCostValue = (value: number | string | null | undefined) => {
   if (value === null || value === undefined || value === "") return null;
-  const parsed =
-    typeof value === "string" ? parseFloat(value) : Number(value);
+  const parsed = typeof value === "string" ? parseFloat(value) : Number(value);
   return Number.isNaN(parsed) ? null : parsed;
 };
 
@@ -155,8 +141,8 @@ const getEntryDisplayAsset = (entry: ScannedEntry): Asset => {
     return {
       id: entry.assetId,
       name: entry.tempName || "Unnamed asset",
-      noAsset: "-",
-      status: entry.tempStatus || "Unidentified"
+      noAsset: entry.tempNoAsset || "-",
+      status: entry.tempStatus || "Unidentified",
     } as Asset;
   }
 
@@ -165,6 +151,7 @@ const getEntryDisplayAsset = (entry: ScannedEntry): Asset => {
   return {
     ...base,
     name: entry.tempName || base.name,
+    noAsset: entry.tempNoAsset || base.noAsset,
     status: entry.tempStatus || base.status,
     serialNo: entry.tempSerialNo ?? base.serialNo,
     pic: entry.tempPic ?? entry.tempPicEmployee?.name ?? basePicName,
@@ -177,7 +164,7 @@ const getEntryDisplayAsset = (entry: ScannedEntry): Asset => {
     site: entry.tempSite ?? base.site ?? null,
     category: entry.tempCategory ?? base.category ?? null,
     department: entry.tempDepartment ?? base.department ?? null,
-    imageUrl: entry.tempImageUrl ?? base.imageUrl ?? null
+    imageUrl: entry.tempImageUrl ?? base.imageUrl ?? null,
   };
 };
 
@@ -214,26 +201,50 @@ const sortOptionsList: Array<{
 }> = [
   { value: "name-asc", label: "Name (A-Z)", description: "Sort by asset name" },
   { value: "name-desc", label: "Name (Z-A)", description: "Asset name Z-A" },
-  { value: "purchase-newest", label: "Newest purchase", description: "Latest purchase date" },
-  { value: "purchase-oldest", label: "Oldest purchase", description: "Earliest purchase date" },
-  { value: "asset-number-asc", label: "Asset number (A-Z)", description: "Sort by asset code" },
-  { value: "asset-number-desc", label: "Asset number (Z-A)", description: "Asset code descending" }
+  {
+    value: "purchase-newest",
+    label: "Newest purchase",
+    description: "Latest purchase date",
+  },
+  {
+    value: "purchase-oldest",
+    label: "Oldest purchase",
+    description: "Earliest purchase date",
+  },
+  {
+    value: "asset-number-asc",
+    label: "Asset number (A-Z)",
+    description: "Sort by asset code",
+  },
+  {
+    value: "asset-number-desc",
+    label: "Asset number (Z-A)",
+    description: "Asset code descending",
+  },
 ];
 
 const getStatusColor = (status: string) => {
   switch (status) {
     case "Active":
-      return "bg-[#ecfdf3] text-[#1a7f5a] border border-[#9ce8c4]";
-    case "Broken":
-      return "bg-[#fff5f5] text-[#c53030] border border-[#ffc9c9]";
-    case "Maintenance Process":
-      return "bg-[#fff8e6] text-[#b7791f] border border-[#ffe0a6]";
+      return "bg-[#ecfdf3] text-[#1a7f5a] border border-[#9ce8c4]"; // Hijau segar
+    case "Missing":
+      return "bg-[#fff1ed] text-[#c2410c] border border-[#ffc9b0]"; // Oranye terang
+    case "Lost":
+      return "bg-[#fff1ed] text-[#c2410c] border border-[#ffc9b0]"; // Oranye terang (sama dengan Missing)
     case "Lost/Missing":
-      return "bg-[#fff1ed] text-[#c2410c] border border-[#ffc9b0]";
+      return "bg-[#fff1ed] text-[#c2410c] border border-[#ffc9b0]"; // Oranye terang
+    case "Broken":
+      return "bg-[#fff5f5] text-[#c53030] border border-[#ffc9c9]"; // Merah cerah
     case "Sell":
-      return "bg-[#eef4ff] text-[#314299] border border-[#c7d6ff]";
+      return "bg-[#eef4ff] text-[#314299] border border-[#c7d6ff]"; // Biru langit
+    case "Sold":
+      return "bg-[#eef4ff] text-[#314299] border border-[#c7d6ff]"; // Biru langit (sama dengan Sell)
+    case "Pending":
+      return "bg-[#fefce8] text-[#ca8a04] border border-[#fde047]"; // Kuning cerah
+    case "Maintenance Process":
+      return "bg-[#fff8e6] text-[#b7791f] border border-[#ffe0a6]"; // Kuning keemasan
     default:
-      return "bg-surface text-text-muted border border-surface-border";
+      return "bg-surface text-text-muted border border-surface-border"; // Default abu-abu
   }
 };
 
@@ -251,6 +262,15 @@ const formatDate = (value?: string) => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "-";
   return date.toLocaleString();
+};
+
+const parseJsonSafe = async (response: Response) => {
+  try {
+    return await response.json();
+  } catch (error) {
+    console.warn("[DEBUG] Failed to parse JSON response", error);
+    return null;
+  }
 };
 
 type FilterState = {
@@ -275,32 +295,37 @@ function ScanPageContent() {
   const [notesSaving, setNotesSaving] = useState(false);
   const [notesError, setNotesError] = useState<string | null>(null);
   const [completionNotes, setCompletionNotes] = useState("");
-  const [completionNotesError, setCompletionNotesError] = useState<string | null>(null);
+  const [completionNotesError, setCompletionNotesError] = useState<
+    string | null
+  >(null);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [filters, setFilters] = useState<FilterState>({
     status: "all",
     category: "all",
     site: "all",
-    department: "all"
+    department: "all",
   });
-  const [sortOption, setSortOption] =
-    useState<
-      | "name-asc"
-      | "name-desc"
-      | "purchase-newest"
-      | "purchase-oldest"
-      | "asset-number-asc"
-      | "asset-number-desc"
-    >("name-asc");
-  const [activeList, setActiveList] = useState<"scanned" | "remaining" | "crucial">("scanned");
+  const [sortOption, setSortOption] = useState<
+    | "name-asc"
+    | "name-desc"
+    | "purchase-newest"
+    | "purchase-oldest"
+    | "asset-number-asc"
+    | "asset-number-desc"
+  >("name-asc");
+  const [activeList, setActiveList] = useState<
+    "scanned" | "remaining" | "crucial"
+  >("scanned");
 
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [selectedEntry, setSelectedEntry] = useState<ScannedEntry | null>(null);
   const [showAssetModal, setShowAssetModal] = useState(false);
   const [startInEditMode, setStartInEditMode] = useState(false);
   const [modalReadOnly, setModalReadOnly] = useState(false);
-  const [pendingSessionAction, setPendingSessionAction] = useState<"cancel" | "complete" | "delete" | null>(null);
+  const [pendingSessionAction, setPendingSessionAction] = useState<
+    "cancel" | "complete" | "delete" | null
+  >(null);
   const [sessionActionLoading, setSessionActionLoading] = useState(false);
   const sessionActionDialog = {
     complete: {
@@ -308,28 +333,31 @@ function ScanPageContent() {
       description:
         "All captured changes will sync to master assets. Add completion notes before continuing.",
       confirm: "Complete Session",
-      destructive: false
+      destructive: false,
     },
     cancel: {
       title: "Cancel this session?",
-      description: "This session will stop and temporary changes will not be applied.",
+      description:
+        "This session will stop and temporary changes will not be applied.",
       confirm: "Cancel Session",
-      destructive: true
+      destructive: true,
     },
     delete: {
       title: "Delete this session?",
-      description: "This session and all scan data will be permanently deleted.",
+      description:
+        "This session and all scan data will be permanently deleted.",
       confirm: "Delete Session",
-      destructive: true
-    }
+      destructive: true,
+    },
   } as const;
-  const actionDialogCopy =
-    pendingSessionAction ? sessionActionDialog[pendingSessionAction] : sessionActionDialog.cancel;
+  const actionDialogCopy = pendingSessionAction
+    ? sessionActionDialog[pendingSessionAction]
+    : sessionActionDialog.cancel;
 
   const combinedAssets = useMemo(
     () => [
       ...scannedEntries.map((entry) => getEntryDisplayAsset(entry)),
-      ...remainingAssets
+      ...remainingAssets,
     ],
     [scannedEntries, remainingAssets]
   );
@@ -341,12 +369,20 @@ function ScanPageContent() {
   const displayTotalAssets = loadingData
     ? session?.totalAssets ?? derivedTotalAssets
     : derivedTotalAssets;
+  const remainingCount = Math.max(displayTotalAssets - displayScannedCount, 0);
+  const progressPercent =
+    displayTotalAssets > 0
+      ? Math.min(
+          100,
+          Math.round((displayScannedCount / displayTotalAssets) * 100)
+        )
+      : 0;
 
   const statusOptions = useMemo(
     () =>
-      Array.from(new Set(combinedAssets.map((asset) => asset.status).filter(Boolean))).sort((a, b) =>
-        a.localeCompare(b)
-      ),
+      Array.from(
+        new Set(combinedAssets.map((asset) => asset.status).filter(Boolean))
+      ).sort((a, b) => a.localeCompare(b)),
     [combinedAssets]
   );
 
@@ -393,25 +429,87 @@ function ScanPageContent() {
     filters.department !== "all";
   const showActiveFilterDot = hasActiveFilters || sortOption !== "name-asc";
   const hasNotesChanged = notesDraft !== sessionNotes;
+  const encodedSessionId = encodeURIComponent(sessionId);
   const fetchSessionData = useCallback(async () => {
-    if (!sessionId) return;
+    if (!sessionId) {
+      console.log("[DEBUG] No sessionId provided, returning early");
+      return;
+    }
+
+    console.log("[DEBUG] Starting fetchSessionData for sessionId:", sessionId);
     setLoadingData(true);
+
     try {
+      // Check if we're in browser environment
+      if (typeof window === "undefined") {
+        console.log("[DEBUG] Not in browser environment, skipping fetch");
+        return;
+      }
+
       const token = getClientAuthToken();
-      const response = await fetch(
-        `/api/so-sessions/${sessionId}/unidentified-assets`,
-        {
-          headers: {
-            ...(token ? { Authorization: `Bearer ${token}` } : {})
-          }
-        }
+      console.log("[DEBUG] Auth token present:", !!token);
+      console.log("[DEBUG] Token length:", token?.length || 0);
+
+      const baseUrl = window.location.origin;
+      const apiUrl = `${baseUrl}/api/so-sessions/${encodedSessionId}/unidentified-assets`;
+      console.log("[DEBUG] Fetching from URL:", apiUrl);
+      console.log("[DEBUG] Encoded sessionId:", encodedSessionId);
+
+      // Add more detailed fetch logging
+      console.log("[DEBUG] About to make fetch request...");
+      const fetchStart = Date.now();
+
+      const response = await fetch(apiUrl, {
+        cache: "no-store",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
+      const fetchDuration = Date.now() - fetchStart;
+      console.log("[DEBUG] Fetch completed in:", fetchDuration, "ms");
+      console.log("[DEBUG] Response status:", response.status);
+      console.log("[DEBUG] Response ok:", response.ok);
+      console.log(
+        "[DEBUG] Response headers:",
+        Object.fromEntries(response.headers.entries())
       );
+
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        const message = errorData.error || "Failed to fetch session data";
+        console.log("[DEBUG] Response not OK, parsing error...");
+        const errorData = (await parseJsonSafe(response)) || {};
+        console.log("[DEBUG] Error response data:", errorData);
+        const message =
+          errorData.error ||
+          `Failed to fetch session data (status ${response.status})`;
+        console.log("[DEBUG] Throwing error:", message);
         throw new Error(message);
       }
-      const data: UnidentifiedResponse = await response.json();
+
+      console.log("[DEBUG] Response OK, parsing JSON...");
+      const data = (await parseJsonSafe(response)) as UnidentifiedResponse | null;
+      if (!data) {
+        throw new Error("Invalid response format from server");
+      }
+      console.log("[DEBUG] Response data keys:", Object.keys(data));
+      console.log("[DEBUG] Session data:", data.session);
+      console.log(
+        "[DEBUG] Scanned entries count:",
+        data.scannedEntries?.length || 0
+      );
+      console.log(
+        "[DEBUG] Missing assets count:",
+        data.missingAssets?.length || 0
+      );
+
+      // Validate response data structure
+      if (!data.session) {
+        console.log("[DEBUG] No session data in response");
+        throw new Error("Invalid response: missing session data");
+      }
+
       setSession(data.session);
       const initialNotes = data.session.notes ?? "";
       setSessionNotes(initialNotes);
@@ -419,17 +517,63 @@ function ScanPageContent() {
       setNotesError(null);
       setScannedEntries(data.scannedEntries || []);
       setRemainingAssets(data.missingAssets || []);
+
+      console.log("[DEBUG] State updated successfully");
     } catch (error) {
-      console.error("Failed to load session overview:", error);
-      const message = error instanceof Error ? error.message : "Failed to load session data";
-      toast.error(message);
-      if (message.toLowerCase().includes("unauthorized")) {
+      console.error("[DEBUG] Failed to load session overview:", error);
+      console.error("[DEBUG] Error type:", typeof error);
+      console.error(
+        "[DEBUG] Error message:",
+        error instanceof Error ? error.message : "Unknown error"
+      );
+      console.error(
+        "[DEBUG] Error stack:",
+        error instanceof Error ? error.stack : "No stack"
+      );
+
+      const message =
+        error instanceof Error ? error.message : "Failed to load session data";
+
+      // Handle authentication errors specifically
+      if (
+        message.toLowerCase().includes("authentication") ||
+        message.toLowerCase().includes("unauthorized") ||
+        message.toLowerCase().includes("401") ||
+        message.toLowerCase().includes("token")
+      ) {
+        console.log(
+          "[DEBUG] Authentication error detected, clearing token and redirecting to login"
+        );
+        // Clear invalid token
+        try {
+          const { clearClientAuthToken } = require("@/lib/client-auth");
+          clearClientAuthToken();
+        } catch (clearError) {
+          console.error("[DEBUG] Failed to clear token:", clearError);
+        }
+        toast.error("Your session has expired. Please log in again.");
         router.push("/login/");
+        return;
       }
+
+      // Handle network errors
+      if (
+        message.toLowerCase().includes("network") ||
+        message.toLowerCase().includes("fetch") ||
+        message.toLowerCase().includes("failed to fetch")
+      ) {
+        console.log("[DEBUG] Network error detected");
+        toast.error(
+          "Network error. Please check your connection and try again."
+        );
+        return;
+      }
+
+      toast.error(message);
     } finally {
       setLoadingData(false);
     }
-  }, [sessionId, router]);
+  }, [sessionId, router, encodedSessionId]);
 
   useEffect(() => {
     fetchSessionData();
@@ -451,7 +595,7 @@ function ScanPageContent() {
       status: "all",
       category: "all",
       site: "all",
-      department: "all"
+      department: "all",
     });
     setSortOption("name-asc");
   };
@@ -466,21 +610,24 @@ function ScanPageContent() {
         throw new Error("Your login session expired, please sign in again.");
       }
 
-      const response = await fetch(`/api/so-sessions/${sessionId}/notes`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ notes: notesDraft })
-      });
+      const response = await fetch(
+        `/api/so-sessions/${encodedSessionId}/notes`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ notes: notesDraft }),
+        }
+      );
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
+        const errorData = (await parseJsonSafe(response)) || {};
         throw new Error(errorData.error || "Failed to save session notes");
       }
 
-      const data = await response.json();
+      const data = (await parseJsonSafe(response)) || {};
       const latestNotes = data.notes ?? "";
       setSessionNotes(latestNotes);
       setNotesDraft(latestNotes);
@@ -509,7 +656,7 @@ function ScanPageContent() {
       asset.pic,
       asset.site?.name,
       asset.category?.name,
-      asset.department?.name
+      asset.department?.name,
     ]
       .filter(Boolean)
       .map((field) => String(field).toLowerCase());
@@ -517,11 +664,16 @@ function ScanPageContent() {
   };
 
   const matchesFilters = (asset: Asset) => {
-    if (filters.status !== "all" && asset.status !== filters.status) return false;
+    if (filters.status !== "all" && asset.status !== filters.status)
+      return false;
     if (filters.category !== "all" && asset.category?.name !== filters.category)
       return false;
-    if (filters.site !== "all" && asset.site?.name !== filters.site) return false;
-    if (filters.department !== "all" && asset.department?.name !== filters.department)
+    if (filters.site !== "all" && asset.site?.name !== filters.site)
+      return false;
+    if (
+      filters.department !== "all" &&
+      asset.department?.name !== filters.department
+    )
       return false;
     return true;
   };
@@ -535,13 +687,21 @@ function ScanPageContent() {
           return b.asset.name.localeCompare(a.asset.name);
         case "purchase-newest":
           return (
-            new Date(b.asset.purchaseDate || b.asset.dateCreated || b.asset.id).getTime() -
-            new Date(a.asset.purchaseDate || a.asset.dateCreated || a.asset.id).getTime()
+            new Date(
+              b.asset.purchaseDate || b.asset.dateCreated || b.asset.id
+            ).getTime() -
+            new Date(
+              a.asset.purchaseDate || a.asset.dateCreated || a.asset.id
+            ).getTime()
           );
         case "purchase-oldest":
           return (
-            new Date(a.asset.purchaseDate || a.asset.dateCreated || a.asset.id).getTime() -
-            new Date(b.asset.purchaseDate || b.asset.dateCreated || b.asset.id).getTime()
+            new Date(
+              a.asset.purchaseDate || a.asset.dateCreated || a.asset.id
+            ).getTime() -
+            new Date(
+              b.asset.purchaseDate || b.asset.dateCreated || b.asset.id
+            ).getTime()
           );
         case "asset-number-asc":
           return a.asset.noAsset.localeCompare(b.asset.noAsset);
@@ -561,6 +721,10 @@ function ScanPageContent() {
         asset: getEntryDisplayAsset(entry),
       })),
     [scannedEntries]
+  );
+  const crucialCount = useMemo(
+    () => normalizedScannedEntries.filter((entry) => entry.isCrucial).length,
+    [normalizedScannedEntries]
   );
 
   const filteredScannedEntries = useMemo(() => {
@@ -587,7 +751,9 @@ function ScanPageContent() {
 
   const filteredRemainingAssets = useMemo(() => {
     const rows = remainingAssets
-      .filter((asset) => matchesFilters(asset) && matchesSearch(asset, searchQuery))
+      .filter(
+        (asset) => matchesFilters(asset) && matchesSearch(asset, searchQuery)
+      )
       .map((asset) => ({ asset }));
     return sortRows(rows);
   }, [remainingAssets, filters, searchQuery, sortOption]);
@@ -605,27 +771,30 @@ function ScanPageContent() {
       try {
         const token = getClientAuthToken();
 
-        const response = await fetch(`/api/so-sessions/${sessionId}/scan`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(token ? { Authorization: `Bearer ${token}` } : {})
-          },
-          body: JSON.stringify({ assetNumber: trimmed, source })
-        });
+        const response = await fetch(
+          `/api/so-sessions/${encodedSessionId}/scan`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            body: JSON.stringify({ assetNumber: trimmed, source }),
+          }
+        );
 
         if (!response.ok) {
           if (response.status === 404) {
             return { success: false, message: "Asset not found" } as const;
           }
-          const errorData = await response.json().catch(() => ({}));
+          const errorData = (await parseJsonSafe(response)) || {};
           return {
             success: false,
-            message: errorData.error || "Failed to process scan"
+            message: errorData.error || "Failed to process scan",
           } as const;
         }
 
-        const data = await response.json();
+        const data = (await parseJsonSafe(response)) || {};
         if (data.alreadyScanned) {
           toast.info("This asset is already recorded in this session");
         } else {
@@ -633,7 +802,10 @@ function ScanPageContent() {
         }
 
         if (data.entry) {
-          openAssetModal(data.entry.asset ?? null, { startEdit: true, entry: data.entry });
+          openAssetModal(data.entry.asset ?? null, {
+            startEdit: true,
+            entry: data.entry,
+          });
         } else if (data.asset) {
           openAssetModal(data.asset, { startEdit: true });
         }
@@ -674,15 +846,15 @@ function ScanPageContent() {
       }
 
       const endpointMap = {
-        complete: `/api/so-sessions/${sessionId}/complete`,
-        cancel: `/api/so-sessions/${sessionId}/cancel`,
-        delete: `/api/so-sessions/${sessionId}/delete`
+        complete: `/api/so-sessions/${encodedSessionId}/complete`,
+        cancel: `/api/so-sessions/${encodedSessionId}/cancel`,
+        delete: `/api/so-sessions/${encodedSessionId}/delete`,
       } as const;
 
       const successMessageMap = {
         complete: "Session completed successfully",
         cancel: "Session cancelled successfully",
-        delete: "Session deleted successfully"
+        delete: "Session deleted successfully",
       } as const;
 
       const endpoint = endpointMap[pendingSessionAction];
@@ -696,13 +868,13 @@ function ScanPageContent() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
         },
-        body: payload ? JSON.stringify(payload) : undefined
+        body: payload ? JSON.stringify(payload) : undefined,
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
+        const errorData = (await parseJsonSafe(response)) || {};
         throw new Error(errorData.error || "Failed to process session");
       }
 
@@ -715,7 +887,9 @@ function ScanPageContent() {
     } catch (error) {
       console.error("Session action error:", error);
       toast.error(
-        error instanceof Error ? error.message : "Failed to process session action"
+        error instanceof Error
+          ? error.message
+          : "Failed to process session action"
       );
     } finally {
       setSessionActionLoading(false);
@@ -746,72 +920,110 @@ function ScanPageContent() {
   };
 
   const emptyState = (
-    <div className="surface-card border border-dashed border-surface-border/80 py-10 text-center text-sm text-text-muted">
+    <div className="surface-card rounded-2xl border border-dashed border-surface-border/80 py-10 text-center text-sm text-text-muted">
       <AlertCircle className="mx-auto mb-3 h-5 w-5 text-primary" />
-      <p>No assets match your search</p>
+      <p>Belum ada aset yang cocok</p>
     </div>
   );
   return (
-    <div className="min-h-screen bg-background px-4 py-6 sm:px-6 lg:px-10">
+    <div className="min-h-screen bg-gradient-to-b from-background via-background to-surface/40 px-4 py-6 sm:px-6 lg:px-10">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
-        <div>
-          <div className="flex flex-wrap items-center gap-3">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => router.push("/so-asset")}
-            >
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back
-            </Button>
-            <Badge
-              variant={
-                session?.status === "Active" ? "default" : "secondary"
-              }
-              className="text-xs"
-            >
-              {session?.status || "Loading"}
-            </Badge>
-          </div>
-          <div className="mt-4 flex flex-col gap-2">
+        <div className="rounded-3xl border border-surface-border/70 bg-white/80 p-5 shadow-sm backdrop-blur supports-[backdrop-filter]:backdrop-blur">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="flex flex-wrap items-center gap-3">
-              <h1 className="text-2xl font-semibold text-foreground">
-                {session?.name || "Loading session..."}
-              </h1>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => router.push("/so-asset")}
+              >
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back
+              </Button>
+              <Badge
+                variant={session?.status === "Active" ? "default" : "secondary"}
+                className="text-xs"
+              >
+                {session?.status || "Loading"}
+              </Badge>
               {session?.year ? (
-                <span className="text-sm text-text-muted">
-                  Year {session.year}
+                <span className="rounded-full bg-muted px-3 py-1 text-xs font-semibold text-text-muted">
+                  {session.year}
                 </span>
               ) : null}
             </div>
-            <p className="text-sm text-text-muted">
-              Scan barcodes or add assets manually for this session. Every scan opens the same asset edit form as the main Assets page.
-            </p>
-            {session?.planStart && session?.planEnd && (
-              <div className="inline-flex items-center gap-2 rounded-full border border-surface-border/70 bg-white/70 px-4 py-1 text-xs font-semibold text-primary">
+            {session?.planStart && session?.planEnd ? (
+              <div className="flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
                 <Clock className="h-3.5 w-3.5" />
-                {formatPlanDate(session.planStart)} – {formatPlanDate(session.planEnd)}
+                <span>
+                  {formatPlanDate(session.planStart)} -{" "}
+                  {formatPlanDate(session.planEnd)}
+                </span>
               </div>
-            )}
+            ) : null}
+          </div>
+          <div className="mt-4 grid gap-4 md:grid-cols-[1.2fr_1fr] md:items-center">
+            <div className="space-y-2">
+              <h1 className="text-3xl font-semibold text-foreground">
+                {session?.name || "Stock Opname"}
+              </h1>
+              <p className="text-sm text-text-muted">
+                Panel scan minimalis untuk merekam aset di sesi ini.
+              </p>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { label: "Scanned", value: displayScannedCount },
+                { label: "Pending", value: crucialCount },
+                { label: "Remaining", value: remainingCount },
+              ].map((stat) => (
+                <div
+                  key={stat.label}
+                  className="rounded-2xl border border-surface-border/70 bg-surface px-3 py-2"
+                >
+                  <p className="text-[0.7rem] text-text-muted">{stat.label}</p>
+                  <p className="text-xl font-semibold text-foreground">
+                    {stat.value}
+                  </p>
+                </div>
+              ))}
+            </div>
+            <div className="col-span-full">
+              <div className="flex items-center justify-between text-xs text-text-muted">
+                <span>Progress</span>
+                <span className="font-semibold text-foreground">
+                  {progressPercent}%{" "}
+                  {displayTotalAssets
+                    ? `(${displayScannedCount}/${displayTotalAssets})`
+                    : ""}
+                </span>
+              </div>
+              <div className="mt-2 h-2 rounded-full bg-muted/50">
+                <div
+                  className="h-2 rounded-full bg-primary transition-all"
+                  style={{ width: `${progressPercent}%` }}
+                />
+              </div>
+            </div>
           </div>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
           <AssetScanPanel
             onDetected={handleAssetSelection}
-            description="Scan barcodes or enter asset numbers manually to log them in this session."
-            manualPlaceholder="Enter an asset number (e.g., FA001/I/01)"
-            manualHelperText="Use manual input if the barcode is hard to read."
+            title="Scan aset"
+            description="Scan barcode atau ketik nomor aset."
+            manualPlaceholder="Nomor aset"
+            manualHelperText="Tekan X untuk fokus ke input manual."
           />
           <div className="space-y-4">
-            <Card className="surface-card border border-surface-border/70 shadow-none">
+            <Card className="rounded-3xl border border-surface-border/70 bg-white/80 shadow-sm">
               <CardContent className="space-y-4 pt-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
                   <div className="relative flex-1">
                     <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
                     <input
                       type="text"
-                      placeholder="Search assets (name, asset number, PIC, status, etc.)"
+                      placeholder="Cari nama / nomor / PIC"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="sneat-input h-12 w-full pl-12 text-sm"
@@ -831,7 +1043,10 @@ function ScanPageContent() {
                         ) : null}
                       </button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-80 p-0">
+                    <DropdownMenuContent
+                      align="end"
+                      className="w-80 max-h-[70vh] overflow-y-auto p-0"
+                    >
                       <div className="space-y-4 p-3">
                         <div className="flex items-center justify-between">
                           <DropdownMenuLabel className="p-0 text-[0.6rem] uppercase tracking-[0.3em] text-text-muted">
@@ -934,7 +1149,10 @@ function ScanPageContent() {
                                   key={dept || "all-department"}
                                   type="button"
                                   onClick={() =>
-                                    handleFilterChange("department", dept || "all")
+                                    handleFilterChange(
+                                      "department",
+                                      dept || "all"
+                                    )
                                   }
                                   className={filterChipClass(
                                     filters.department === (dept || "all")
@@ -1042,24 +1260,33 @@ function ScanPageContent() {
                                 {entry.asset?.noAsset}
                               </p>
                               <p className="text-[0.65rem] uppercase text-text-muted">
-                                Discan pada {formatDate(entry.scannedAt)}
+                                Discan {formatDate(entry.scannedAt)}
                               </p>
                               <div className="text-xs text-text-muted">
                                 <span className="mr-4">
-                                  {entry.asset?.site?.name || "Location unavailable"}
+                                  {entry.asset?.site?.name ||
+                                    "Lokasi belum ada"}
                                 </span>
-                                <span>{entry.asset?.category?.name || "Kategori tidak ada"}</span>
+                                <span>
+                                  {entry.asset?.category?.name ||
+                                    "Kategori belum ada"}
+                                </span>
                               </div>
                             </div>
                             <div className="flex flex-wrap gap-2">
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => openAssetModal(entry.asset, { startEdit: true, entry })}
+                                onClick={() =>
+                                  openAssetModal(entry.asset, {
+                                    startEdit: true,
+                                    entry,
+                                  })
+                                }
                                 className="justify-center"
                               >
                                 <Eye className="mr-2 h-3.5 w-3.5" />
-                                Edit Asset
+                                Edit
                               </Button>
                             </div>
                           </div>
@@ -1067,14 +1294,14 @@ function ScanPageContent() {
                       ))
                     )
                   ) : activeList === "crucial" ? (
-                      filteredCrucialEntries.length === 0 ? (
-                        emptyState
-                      ) : (
-                        filteredCrucialEntries.map((entry) => (
-                          <div
-                            key={entry.id}
-                            className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4 shadow-sm"
-                          >
+                    filteredCrucialEntries.length === 0 ? (
+                      emptyState
+                    ) : (
+                      filteredCrucialEntries.map((entry) => (
+                        <div
+                          key={entry.id}
+                          className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4 shadow-sm"
+                        >
                           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                             <div className="space-y-1">
                               <div className="flex flex-wrap items-center gap-2">
@@ -1089,13 +1316,17 @@ function ScanPageContent() {
                                 {entry.asset?.noAsset}
                               </p>
                               <p className="text-[0.65rem] uppercase text-text-muted">
-                                Ditandai pada {formatDate(entry.scannedAt)}
+                                Ditandai {formatDate(entry.scannedAt)}
                               </p>
                               <div className="text-xs text-text-muted">
                                 <span className="mr-4">
-                                  {entry.asset?.site?.name || "Location unavailable"}
+                                  {entry.asset?.site?.name ||
+                                    "Lokasi belum ada"}
                                 </span>
-                                <span>{entry.asset?.category?.name || "Kategori tidak ada"}</span>
+                                <span>
+                                  {entry.asset?.category?.name ||
+                                    "Kategori belum ada"}
+                                </span>
                               </div>
                             </div>
                             <div className="flex flex-wrap gap-2">
@@ -1103,12 +1334,15 @@ function ScanPageContent() {
                                 variant="outline"
                                 size="sm"
                                 onClick={() =>
-                                  openAssetModal(entry.asset, { startEdit: true, entry })
+                                  openAssetModal(entry.asset, {
+                                    startEdit: true,
+                                    entry,
+                                  })
                                 }
                                 className="justify-center"
                               >
                                 <Eye className="mr-2 h-3.5 w-3.5" />
-                                Review Asset
+                                Review
                               </Button>
                             </div>
                           </div>
@@ -1137,17 +1371,19 @@ function ScanPageContent() {
                               {asset.noAsset}
                             </p>
                             <p className="text-[0.65rem] text-text-muted">
-                              {asset.site?.name || "Location not set"}
+                              {asset.site?.name || "Lokasi belum ada"}
                             </p>
                           </div>
                           <div className="flex gap-2">
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => openAssetModal(asset, { readOnly: true })}
+                              onClick={() =>
+                                openAssetModal(asset, { readOnly: true })
+                              }
                             >
                               <Eye className="mr-2 h-3.5 w-3.5" />
-                              Detail asset
+                              Detail
                             </Button>
                           </div>
                         </div>
@@ -1160,7 +1396,9 @@ function ScanPageContent() {
             {session && (
               <Card className="rounded-2xl border border-surface-border/70 bg-white/80 shadow-sm">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-base text-foreground">Stock Opname Notes</CardTitle>
+                  <CardTitle className="text-base text-foreground">
+                    Catatan sesi
+                  </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <Textarea
@@ -1170,14 +1408,14 @@ function ScanPageContent() {
                       setNotesError(null);
                     }}
                     rows={4}
-                    placeholder="Add updates or guidance for the stock opname team."
+                    placeholder="Catatan singkat untuk tim."
                     className="min-h-[100px] resize-y border border-surface-border bg-surface"
                   />
                   {notesError ? (
                     <p className="text-sm text-destructive">{notesError}</p>
                   ) : (
                     <p className="text-xs text-text-muted">
-                      Everyone with access to this session can read and edit these notes.
+                      Terlihat oleh semua anggota sesi.
                     </p>
                   )}
                   <div className="flex flex-wrap items-center justify-end gap-2">
@@ -1200,7 +1438,7 @@ function ScanPageContent() {
                       disabled={!hasNotesChanged || notesSaving}
                       onClick={handleNotesSave}
                     >
-                      {notesSaving ? "Saving..." : "Save notes"}
+                      {notesSaving ? "Saving..." : "Simpan"}
                     </Button>
                   </div>
                 </CardContent>
@@ -1259,7 +1497,9 @@ function ScanPageContent() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>{actionDialogCopy.title}</AlertDialogTitle>
-            <AlertDialogDescription>{actionDialogCopy.description}</AlertDialogDescription>
+            <AlertDialogDescription>
+              {actionDialogCopy.description}
+            </AlertDialogDescription>
           </AlertDialogHeader>
           {pendingSessionAction === "complete" && (
             <div className="mt-4 space-y-2">
@@ -1272,12 +1512,16 @@ function ScanPageContent() {
                 placeholder="Write your conclusion here."
                 className={cn(
                   "min-h-[120px]",
-                  completionNotesError ? "border-destructive focus-visible:ring-destructive" : ""
+                  completionNotesError
+                    ? "border-destructive focus-visible:ring-destructive"
+                    : ""
                 )}
                 disabled={sessionActionLoading}
               />
               {completionNotesError && (
-                <p className="text-sm text-destructive">{completionNotesError}</p>
+                <p className="text-sm text-destructive">
+                  {completionNotesError}
+                </p>
               )}
             </div>
           )}
@@ -1289,7 +1533,8 @@ function ScanPageContent() {
               onClick={handleSessionAction}
               disabled={
                 sessionActionLoading ||
-                (pendingSessionAction === "complete" && completionNotes.trim() === "")
+                (pendingSessionAction === "complete" &&
+                  completionNotes.trim() === "")
               }
               className={
                 actionDialogCopy.destructive
@@ -1297,7 +1542,9 @@ function ScanPageContent() {
                   : "bg-primary text-white hover:bg-primary/90"
               }
             >
-              {sessionActionLoading ? "Processing..." : actionDialogCopy.confirm}
+              {sessionActionLoading
+                ? "Processing..."
+                : actionDialogCopy.confirm}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1316,12 +1563,11 @@ function ScanPageContent() {
                 sessionId: selectedEntry.soSessionId,
                 entryId: selectedEntry.id,
                 initialIsCrucial: Boolean(selectedEntry.isCrucial),
-                initialCrucialNotes: selectedEntry.crucialNotes || '',
+                initialCrucialNotes: selectedEntry.crucialNotes || "",
               }
             : undefined
         }
       />
-
     </div>
   );
 }

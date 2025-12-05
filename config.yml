@@ -1,9 +1,11 @@
-tunnel: 894bdbac-cb3c-4230-aacd-99a71f86b02a
-credentials-file: C:\Users\Apriansyah Dimas\.cloudflared\894bdbac-cb3c-4230-aacd-99a71f86b02a.json
+tunnel: f8217f1d-3921-4f0c-985f-352c8a5d4e7b
+credentials-file: C:/Users/Apriansyah Dimas/.cloudflared/f8217f1d-3921-4f0c-985f-352c8a5d4e7b.json
 
 ingress:
   - hostname: imajinasset.biz.id
-    service: http://localhost:3000
+    service: http://localhost:3001
   - hostname: app.imajinasset.biz.id
-    service: http://localhost:3000
+    service: http://localhost:3001
+  - hostname: admin.imajinasset.biz.id
+    service: http://localhost:3001
   - service: http_status:404

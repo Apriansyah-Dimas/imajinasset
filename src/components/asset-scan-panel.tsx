@@ -216,7 +216,12 @@ export function AssetScanPanel({
   };
 
   return (
-    <Card className={cn("surface-card border border-surface-border/70 shadow-none", className)}>
+    <Card
+      className={cn(
+        "surface-card rounded-3xl border border-surface-border/70 bg-white/80 shadow-sm",
+        className
+      )}
+    >
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center gap-2 text-base font-semibold">
           <Scan className="h-4 w-4 text-primary" />

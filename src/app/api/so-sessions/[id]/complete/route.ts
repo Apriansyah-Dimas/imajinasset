@@ -1,58 +1,54 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
-import { verifyToken, canCompleteSOSession } from '@/lib/auth'
-import { recordAssetEvent } from '@/lib/asset-events'
+import { NextRequest, NextResponse } from "next/server";
+import { db } from "@/lib/db";
+import { getServerAuth } from "@/lib/server-auth";
+import { recordAssetEvent } from "@/lib/asset-events";
+// Import role checking functions from old auth module
+const { canCompleteSOSession } =
+  require("@/lib/auth") as typeof import("@/lib/auth");
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const body = await request.json().catch(() => null)
+    const body = await request.json().catch(() => null);
     const completionNotesInput =
-      body && typeof body.completionNotes === 'string'
+      body && typeof body.completionNotes === "string"
         ? body.completionNotes
-        : typeof body?.notes === 'string'
-          ? body.notes
-          : ''
-    const trimmedNotes = completionNotesInput.trim()
-    const completionNotes = trimmedNotes ? trimmedNotes.slice(0, 5000) : ''
+        : typeof body?.notes === "string"
+        ? body.notes
+        : "";
+    const trimmedNotes = completionNotesInput.trim();
+    const completionNotes = trimmedNotes ? trimmedNotes.slice(0, 5000) : "";
 
     if (!completionNotes) {
       return NextResponse.json(
-        { error: 'Completion notes are required' },
+        { error: "Completion notes are required" },
         { status: 400 }
-      )
+      );
     }
 
     // Check authentication
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    const auth = await getServerAuth();
+    if (!auth.isAuthenticated) {
+      console.log("[DEBUG API] Complete endpoint - User not authenticated");
       return NextResponse.json(
-        { error: 'Authentication required' },
+        { error: "Authentication required" },
         { status: 401 }
-      )
+      );
     }
 
-    const token = authHeader.substring(7)
-    const user = verifyToken(token)
-    
-    if (!user) {
-      return NextResponse.json(
-        { error: 'Invalid or expired token' },
-        { status: 401 }
-      )
-    }
-
+    const user = auth.user;
     // Check if user has permission to complete SO session
     if (!canCompleteSOSession(user.role)) {
+      console.log("[DEBUG API] Complete endpoint - Insufficient permissions");
       return NextResponse.json(
-        { error: 'Insufficient permissions to complete SO session' },
+        { error: "Insufficient permissions to complete SO session" },
         { status: 403 }
-      )
+      );
     }
 
-    const { id: sessionId } = await params
+    const { id: sessionId } = await params;
 
     // Check if session exists
     const session = await db.sOSession.findUnique({
@@ -60,44 +56,47 @@ export async function POST(
       include: {
         _count: {
           select: {
-            soAssetEntries: true
-          }
-        }
-      }
-    })
+            soAssetEntries: true,
+          },
+        },
+      },
+    });
 
     if (!session) {
       return NextResponse.json(
-        { error: 'SO Session not found' },
+        { error: "SO Session not found" },
         { status: 404 }
-      )
+      );
     }
 
-    if (session.status !== 'Active') {
+    if (session.status !== "Active") {
       return NextResponse.json(
-        { error: 'Only active sessions can be completed' },
+        { error: "Only active sessions can be completed" },
         { status: 400 }
-      )
+      );
     }
 
     // Update session status to completed
     const updatedSession = await db.sOSession.update({
       where: { id: sessionId },
       data: {
-        status: 'Completed',
+        status: "Completed",
         completedAt: new Date(),
         scannedAssets: session._count.soAssetEntries,
-        completionNotes // Now using the proper completionNotes field
-      }
-    })
+        completionNotes, // Now using the proper completionNotes field
+      },
+    });
 
     // Get all SO asset entries for this session
     const soAssetEntries = await db.sOAssetEntry.findMany({
       where: { soSessionId: sessionId },
-      include: { asset: true }
-    })
+      include: { asset: true },
+    });
 
-    console.log('DEBUG: Syncing SO entries to main assets:', soAssetEntries.length)
+    console.log(
+      "DEBUG: Syncing SO entries to main assets:",
+      soAssetEntries.length
+    );
 
     // Update main assets with data from SO session & record history only upon completion
     for (const entry of soAssetEntries) {
@@ -111,51 +110,59 @@ export async function POST(
           categoryId: entry.tempCategoryId ?? entry.asset.categoryId,
           departmentId: entry.tempDepartmentId ?? entry.asset.departmentId,
           picId: entry.tempPicId ?? entry.asset.picId,
-          pic: entry.tempPicId ? null : (entry.tempPic ?? entry.asset.pic),
+          pic: entry.tempPicId ? null : entry.tempPic ?? entry.asset.pic,
           brand: entry.tempBrand ?? entry.asset.brand,
           model: entry.tempModel ?? entry.asset.model,
           cost: entry.tempCost ?? entry.asset.cost,
           imageUrl: entry.tempImageUrl ?? entry.asset.imageUrl,
           notes: entry.tempNotes ?? entry.asset.notes,
-        }
+        };
 
-        const changes: Array<{ field: string; before: any; after: any }> = []
+        const changes: Array<{ field: string; before: any; after: any }> = [];
         const addChange = (field: string, before: any, after: any) => {
-          const beforeVal = before ?? null
-          const afterVal = after ?? null
+          const beforeVal = before ?? null;
+          const afterVal = after ?? null;
           if (JSON.stringify(beforeVal) !== JSON.stringify(afterVal)) {
-            changes.push({ field, before: beforeVal, after: afterVal })
+            changes.push({ field, before: beforeVal, after: afterVal });
           }
-        }
+        };
 
-        addChange('name', entry.asset.name, updates.name)
-        addChange('status', entry.asset.status, updates.status)
-        addChange('serialNo', entry.asset.serialNo, updates.serialNo)
-        addChange('purchaseDate', entry.asset.purchaseDate, updates.purchaseDate)
-        addChange('siteId', entry.asset.siteId, updates.siteId)
-        addChange('categoryId', entry.asset.categoryId, updates.categoryId)
-        addChange('departmentId', entry.asset.departmentId, updates.departmentId)
-        addChange('picId', entry.asset.picId, updates.picId)
-        addChange('pic', entry.asset.pic, updates.pic)
-        addChange('brand', entry.asset.brand, updates.brand)
-        addChange('model', entry.asset.model, updates.model)
-        addChange('cost', entry.asset.cost, updates.cost)
-        addChange('imageUrl', entry.asset.imageUrl, updates.imageUrl)
-        addChange('notes', entry.asset.notes, updates.notes)
+        addChange("name", entry.asset.name, updates.name);
+        addChange("status", entry.asset.status, updates.status);
+        addChange("serialNo", entry.asset.serialNo, updates.serialNo);
+        addChange(
+          "purchaseDate",
+          entry.asset.purchaseDate,
+          updates.purchaseDate
+        );
+        addChange("siteId", entry.asset.siteId, updates.siteId);
+        addChange("categoryId", entry.asset.categoryId, updates.categoryId);
+        addChange(
+          "departmentId",
+          entry.asset.departmentId,
+          updates.departmentId
+        );
+        addChange("picId", entry.asset.picId, updates.picId);
+        addChange("pic", entry.asset.pic, updates.pic);
+        addChange("brand", entry.asset.brand, updates.brand);
+        addChange("model", entry.asset.model, updates.model);
+        addChange("cost", entry.asset.cost, updates.cost);
+        addChange("imageUrl", entry.asset.imageUrl, updates.imageUrl);
+        addChange("notes", entry.asset.notes, updates.notes);
 
         await db.asset.update({
           where: { id: entry.assetId },
           data: {
             ...updates,
-            updatedAt: new Date()
-          }
-        })
+            updatedAt: new Date(),
+          },
+        });
 
         if (changes.length > 0) {
           try {
             await recordAssetEvent({
               assetId: entry.assetId,
-              type: 'SO_UPDATE',
+              type: "SO_UPDATE",
               actor: user.name || user.email,
               soSessionId: sessionId,
               soAssetEntryId: entry.id,
@@ -163,27 +170,27 @@ export async function POST(
                 sessionName: session.name,
                 changes,
               },
-            })
+            });
           } catch (eventError) {
-            console.error('Failed to record SO completion event:', eventError)
+            console.error("Failed to record SO completion event:", eventError);
           }
         }
       }
     }
 
-    console.log('DEBUG: Completed syncing SO entries to main assets')
+    console.log("DEBUG: Completed syncing SO entries to main assets");
 
     return NextResponse.json({
       success: true,
-      message: 'SO Session completed successfully and main assets updated',
+      message: "SO Session completed successfully and main assets updated",
       session: updatedSession,
-      assetsUpdated: soAssetEntries.filter(e => e.isIdentified).length
-    })
+      assetsUpdated: soAssetEntries.filter((e) => e.isIdentified).length,
+    });
   } catch (error) {
-    console.error('Complete SO session error:', error)
+    console.error("Complete SO session error:", error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: "Internal server error" },
       { status: 500 }
-    )
+    );
   }
 }

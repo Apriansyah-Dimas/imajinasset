@@ -29,9 +29,11 @@ export function useMotionPreference(options: MotionPreferenceOptions = {}) {
     deviceMemoryThreshold = 4,
   } = options
 
+  // Default to false during SSR to avoid hydration mismatch
   const [shouldReduce, setShouldReduce] = useState(false)
 
   useEffect(() => {
+    // Skip on server side
     if (typeof window === 'undefined') return
 
     const media = window.matchMedia('(prefers-reduced-motion: reduce)')

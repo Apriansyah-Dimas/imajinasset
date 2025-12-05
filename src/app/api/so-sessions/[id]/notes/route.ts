@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { verifyToken, canViewSOSession } from "@/lib/auth";
+import { getServerAuth } from "@/lib/server-auth";
 
 const unauthorized = NextResponse.json(
   { error: "Authentication required" },
@@ -18,13 +18,16 @@ function extractUser(request: NextRequest) {
     return null;
   }
   const token = authHeader.substring(7);
-  return verifyToken(token);
+  // Use the new server auth method instead of old verifyToken
+  return getServerAuth().then((auth) =>
+    auth.isAuthenticated ? auth.user : null
+  );
 }
 
 async function ensureSessionExists(id: string) {
   return db.sOSession.findUnique({
     where: { id },
-    select: { id: true, description: true, notes: true }
+    select: { id: true, description: true, notes: true },
   });
 }
 
@@ -33,8 +36,15 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const user = extractUser(request);
-    if (!user) return unauthorized;
+    const auth = await getServerAuth();
+    if (!auth.isAuthenticated) {
+      console.log("[DEBUG API] Notes endpoint - User not authenticated");
+      return unauthorized;
+    }
+
+    const user = auth.user;
+    // Import the auth functions for role checking
+    const { canViewSOSession } = await import("@/lib/auth").then((m) => m);
     if (!canViewSOSession(user.role)) return forbidden;
 
     const { id } = await params;
@@ -48,7 +58,7 @@ export async function GET(
     }
 
     return NextResponse.json({
-      notes: session.notes ?? ""
+      notes: session.notes ?? "",
     });
   } catch (error) {
     console.error("Get SO session notes error:", error);
@@ -64,16 +74,22 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const user = extractUser(request);
-    if (!user) return unauthorized;
+    const auth = await getServerAuth();
+    if (!auth.isAuthenticated) {
+      console.log("[DEBUG API] Notes endpoint - User not authenticated");
+      return unauthorized;
+    }
+
+    const user = auth.user;
+    // Import the auth functions for role checking
+    const { canViewSOSession } = await import("@/lib/auth").then((m) => m);
     if (!canViewSOSession(user.role)) return forbidden;
 
     const { id } = await params;
     const body = await request.json().catch(() => ({}));
     const rawNotes =
       typeof body.notes === "string" ? body.notes : body.description;
-    const notes =
-      typeof rawNotes === "string" ? rawNotes.slice(0, 5000) : "";
+    const notes = typeof rawNotes === "string" ? rawNotes.slice(0, 5000) : "";
 
     const session = await ensureSessionExists(id);
     if (!session) {
@@ -86,17 +102,17 @@ export async function PUT(
     const updatedSession = await db.sOSession.update({
       where: { id },
       data: {
-        notes: notes.trim() === "" ? null : notes
+        notes: notes.trim() === "" ? null : notes,
       },
       select: {
         id: true,
-        notes: true
-      }
+        notes: true,
+      },
     });
 
     return NextResponse.json({
       success: true,
-      notes: updatedSession.notes ?? ""
+      notes: updatedSession.notes ?? "",
     });
   } catch (error) {
     console.error("Update SO session notes error:", error);

@@ -21,10 +21,10 @@ import ProtectedRoute from '@/components/ProtectedRoute'
 import RoleBasedAccess from '@/components/RoleBasedAccess'
 import { useAuth } from '@/contexts/AuthContext'
 import AssetImagePlaceholder from '@/components/asset-image-placeholder'
-import type AssetDetailModalComponent from '@/components/asset-detail-modal'
-import type AddAssetModalComponent from '@/components/add-asset-modal'
-import type ImportAssetsModalComponent from '@/components/import-assets-modal'
-import type EditDropdownsModalComponent from '@/components/edit-dropdowns-modal'
+import AssetDetailModalComponent from '@/components/asset-detail-modal'
+import AddAssetModalComponent from '@/components/add-asset-modal'
+import ImportAssetsModalComponent from '@/components/import-assets-modal'
+import EditDropdownsModalComponent from '@/components/edit-dropdowns-modal'
 
 const PAGE_SIZE = 50
 
@@ -622,8 +622,8 @@ function AssetsPageContent() {
                 ) : null}
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-80 p-0">
-              <div className="space-y-4 p-3">
+            <DropdownMenuContent align="end" className="w-80 max-h-[80vh] p-0">
+              <div className="space-y-4 p-3 overflow-y-auto max-h-[80vh]">
                 <div className="flex items-center justify-between">
                   <DropdownMenuLabel className="p-0 text-[0.6rem] uppercase tracking-[0.3em] text-text-muted">
                     Filter & Sort

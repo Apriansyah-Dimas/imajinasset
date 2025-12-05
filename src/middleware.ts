@@ -14,8 +14,7 @@ const roleBasedRoutes = {
 };
 
 export function middleware(request: NextRequest) {
-  // DISABLED MIDDLEWARE - Allow all routes for now
-  // TODO: Re-enable middleware after fixing token verification
+  // RE-ENABLED MIDDLEWARE - Fix API access for dashboard
 
   const { pathname } = request.nextUrl;
 

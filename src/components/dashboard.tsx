@@ -177,7 +177,7 @@ export default function Dashboard() {
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow duration-200">
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">Value of Assets</div>
+              <div className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">COST OF ASSETS</div>
               <div className="text-3xl font-bold text-green-600">{formatCurrency(totalValue)}</div>
             </div>
             <div className="w-12 h-12 bg-green-100 flex items-center justify-center rounded-lg">

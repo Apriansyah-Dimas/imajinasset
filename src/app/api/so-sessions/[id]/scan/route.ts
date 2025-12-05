@@ -1,6 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
-import { verifyToken, canScanInSOSession } from '@/lib/auth'
+import { NextRequest, NextResponse } from "next/server";
+import { db } from "@/lib/db";
+import { getServerAuth } from "@/lib/server-auth";
+// Import role checking functions from old auth module
+const { canScanInSOSession } =
+  require("@/lib/auth") as typeof import("@/lib/auth");
 
 const assetInclude = {
   site: { select: { id: true, name: true } },
@@ -14,10 +17,10 @@ const assetInclude = {
       email: true,
       department: true,
       position: true,
-      isActive: true
-    }
-  }
-}
+      isActive: true,
+    },
+  },
+};
 
 const transformEntry = (entry: any) => ({
   ...entry,
@@ -37,156 +40,158 @@ const transformEntry = (entry: any) => ({
   asset: entry.asset
     ? {
         ...entry.asset,
-        noAsset: entry.asset.noAsset
+        noAsset: entry.asset.noAsset,
       }
-    : null
-})
+    : null,
+});
 
 const safeDecode = (value: string) => {
-  if (!value) return ''
+  if (!value) return "";
   try {
-    return decodeURIComponent(value)
+    return decodeURIComponent(value);
   } catch (error) {
-    console.warn('[scan-route] Failed to decode asset number, using raw value.', error)
-    return value
+    console.warn(
+      "[scan-route] Failed to decode asset number, using raw value.",
+      error
+    );
+    return value;
   }
-}
+};
 
 const normalizeAssetNumber = async (number: string) => {
-  if (!number) return null
-  const decoded = safeDecode(number).trim()
+  if (!number) return null;
+  const decoded = safeDecode(number).trim();
 
-  const normalize = (value: string) => value.trim()
+  const normalize = (value: string) => value.trim();
   const attempts = Array.from(
     new Set(
       [
         decoded,
         decoded.toUpperCase(),
         decoded.toLowerCase(),
-        decoded.replace(/\./g, ''),
-        decoded.replace(/-/g, ''),
-        decoded.replace(/\s+/g, '')
+        decoded.replace(/\./g, ""),
+        decoded.replace(/-/g, ""),
+        decoded.replace(/\s+/g, ""),
       ]
         .filter(Boolean)
         .map(normalize)
     )
-  )
+  );
 
   for (const attempt of attempts) {
     const asset = await db.asset.findFirst({
       where: { noAsset: attempt },
-      include: assetInclude
-    })
-    if (asset) return asset
+      include: assetInclude,
+    });
+    if (asset) return asset;
   }
 
   // fallback contains
-  const variations = Array.from(new Set([decoded, decoded.toLowerCase(), decoded.toUpperCase()].filter(Boolean)))
+  const variations = Array.from(
+    new Set(
+      [decoded, decoded.toLowerCase(), decoded.toUpperCase()].filter(Boolean)
+    )
+  );
   if (variations.length > 0) {
     const fallback = await db.asset.findFirst({
       where: {
-        OR: variations.map(value => ({
-          noAsset: { contains: value }
-        }))
+        OR: variations.map((value) => ({
+          noAsset: { contains: value },
+        })),
       },
-      include: assetInclude
-    })
+      include: assetInclude,
+    });
 
-    if (fallback) return fallback
+    if (fallback) return fallback;
   }
 
-  return null
-}
+  return null;
+};
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    const auth = await getServerAuth();
+    if (!auth.isAuthenticated) {
+      console.log("[DEBUG API] Scan endpoint - User not authenticated");
       return NextResponse.json(
-        { error: 'Authentication required' },
+        { error: "Authentication required" },
         { status: 401 }
-      )
+      );
     }
 
-    const token = authHeader.substring(7)
-    const user = verifyToken(token)
-
-    if (!user) {
-      return NextResponse.json(
-        { error: 'Invalid or expired token' },
-        { status: 401 }
-      )
-    }
-
+    const user = auth.user;
     if (!canScanInSOSession(user.role)) {
       return NextResponse.json(
-        { error: 'Insufficient permissions to scan assets' },
+        { error: "Insufficient permissions to scan assets" },
         { status: 403 }
-      )
+      );
     }
 
-    const { id: sessionId } = await params
-    const body = await request.json()
-    const { assetNumber, assetId, source = 'camera', isCrucial = false, crucialNotes = null } = body
+    const { id: sessionId } = await params;
+    const body = await request.json();
+    const {
+      assetNumber,
+      assetId,
+      source = "camera",
+      isCrucial = false,
+      crucialNotes = null,
+    } = body;
 
     if (!assetNumber && !assetId) {
       return NextResponse.json(
-        { error: 'Asset number or ID is required' },
+        { error: "Asset number or ID is required" },
         { status: 400 }
-      )
+      );
     }
 
     const session = await db.sOSession.findUnique({
-      where: { id: sessionId }
-    })
+      where: { id: sessionId },
+    });
 
     if (!session) {
       return NextResponse.json(
-        { error: 'SO Session not found' },
+        { error: "SO Session not found" },
         { status: 404 }
-      )
+      );
     }
 
-    if (session.status !== 'Active') {
+    if (session.status !== "Active") {
       return NextResponse.json(
-        { error: 'SO Session is not active' },
+        { error: "SO Session is not active" },
         { status: 400 }
-      )
+      );
     }
 
-    let asset
+    let asset;
     if (assetId) {
       asset = await db.asset.findUnique({
         where: { id: assetId },
-        include: assetInclude
-      })
+        include: assetInclude,
+      });
     } else {
-      asset = await normalizeAssetNumber(String(assetNumber))
+      asset = await normalizeAssetNumber(String(assetNumber));
     }
 
     if (!asset) {
-      return NextResponse.json(
-        { error: 'Asset not found' },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: "Asset not found" }, { status: 404 });
     }
 
     const existingEntry = await db.sOAssetEntry.findFirst({
       where: { soSessionId: sessionId, assetId: asset.id },
-      include: { asset: { include: assetInclude } }
-    })
+      include: { asset: { include: assetInclude } },
+    });
 
     if (existingEntry) {
       return NextResponse.json({
         success: true,
         alreadyScanned: true,
-        message: 'Asset already scanned in this session',
+        message: "Asset already scanned in this session",
         entry: transformEntry(existingEntry),
-        asset: existingEntry.asset
-      })
+        asset: existingEntry.asset,
+      });
     }
 
     const newEntry = await db.sOAssetEntry.create({
@@ -200,37 +205,41 @@ export async function POST(
         tempBrand: asset.brand,
         tempModel: asset.model,
         tempCost: asset.cost,
-        status: 'Scanned',
+        status: "Scanned",
         isIdentified: false,
         isCrucial: Boolean(isCrucial),
-        crucialNotes: isCrucial ? (typeof crucialNotes === 'string' ? crucialNotes.trim() || null : null) : null
+        crucialNotes: isCrucial
+          ? typeof crucialNotes === "string"
+            ? crucialNotes.trim() || null
+            : null
+          : null,
       },
       include: {
-        asset: { include: assetInclude }
-      }
-    })
+        asset: { include: assetInclude },
+      },
+    });
 
     await db.sOSession.update({
       where: { id: sessionId },
       data: {
         scannedAssets: { increment: 1 },
-        startedAt: session.startedAt ?? new Date()
-      }
-    })
+        startedAt: session.startedAt ?? new Date(),
+      },
+    });
 
     return NextResponse.json({
       success: true,
       alreadyScanned: false,
-      message: 'Asset scanned successfully',
+      message: "Asset scanned successfully",
       entry: transformEntry(newEntry),
       asset: newEntry.asset,
-      source
-    })
+      source,
+    });
   } catch (error) {
-    console.error('Scan asset error:', error)
+    console.error("Scan asset error:", error);
     return NextResponse.json(
-      { error: 'Failed to process scan' },
+      { error: "Failed to process scan" },
       { status: 500 }
-    )
+    );
   }
 }

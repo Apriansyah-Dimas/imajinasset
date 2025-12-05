@@ -226,7 +226,6 @@ export default function Navbar() {
           {/* Header with toggle button */}
           <div className="flex items-center justify-between px-1">
             <Link
-              prefetch={false}
               href="/dashboard/"
               className="flex items-center gap-3"
               onClick={() => {
@@ -305,8 +304,7 @@ export default function Navbar() {
                               if (child.href) {
                                 return (
                                   <Link
-                                    prefetch={false}
-                                    key={child.name}
+                                      key={child.name}
                                     href={child.href}
                                     className={commonClasses}
                                     onClick={() => {
@@ -363,8 +361,7 @@ export default function Navbar() {
                   const active = isActive(item.href);
                   return (
                     <Link
-                      prefetch={false}
-                      key={item.name}
+                            key={item.name}
                       href={item.href}
                       className={cn(
                         navItemBaseClasses,
@@ -427,8 +424,7 @@ export default function Navbar() {
               <div className="rounded-2xl border border-dashed border-border px-4 py-5 text-center">
                 <p className="text-sm text-text-muted">Belum masuk</p>
                 <Link
-                  prefetch={false}
-                  href="/login"
+                    href="/login"
                   className="mt-3 inline-flex w-full items-center justify-center gap-2 sneat-btn sneat-btn-primary"
                 >
                   <User className="size-4" />

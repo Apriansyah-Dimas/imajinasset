@@ -30,7 +30,7 @@ const TABLES_TO_EXPORT = [
 type TableDump = Record<string, unknown[]>
 
 type AssetImageManifestEntry = {
-  assetId: string
+  assetId: string | 'orphaned-file'
   imageUrl: string
   relativePath: string
   fileName: string
@@ -46,6 +46,7 @@ type CollectedAssetImages = {
     uniqueFiles: number
     missing: number
     skipped: number
+    orphaned: number
   }
 }
 
@@ -127,6 +128,7 @@ async function collectAssetImages(
   const manifest: AssetImageManifestEntry[] = []
   const files: { relativePath: string; absolutePath: string }[] = []
 
+  // First collect referenced images from assets
   for (const asset of assets) {
     const imageUrl = stringOptional(asset, 'imageUrl', 'image_url')
     if (!imageUrl) continue
@@ -158,11 +160,46 @@ async function collectAssetImages(
       const stats = await fs.stat(absolutePath)
       entry.fileSize = stats.size
       files.push({ relativePath, absolutePath })
-    } catch (error) {
+    } catch (error: unknown) {
       console.warn(`Image file not found for asset ${assetId}: ${absolutePath}`)
     }
 
     manifest.push(entry)
+  }
+
+  // Then collect ALL files in uploads directory (including orphaned files)
+  try {
+    const allUploadFiles = await fs.readdir(uploadsDir)
+
+    for (const fileName of allUploadFiles) {
+      const filePath = path.join(uploadsDir, fileName)
+      const stats = await fs.stat(filePath)
+
+      if (stats.isFile()) {
+        const relativePath = `uploads/${fileName}`
+        const absolutePath = filePath
+
+        // Only add if not already processed from assets
+        const existingFile = files.find(f => f.relativePath === relativePath)
+        if (!existingFile) {
+          files.push({ relativePath, absolutePath })
+          console.log(`Including orphaned upload file: ${fileName}`)
+
+          // Add to manifest without asset reference
+          manifest.push({
+            assetId: 'orphaned-file',
+            imageUrl: relativePath,
+            relativePath,
+            fileName,
+            fileSize: stats.size
+          })
+
+          uniqueImageUrls.add(relativePath)
+        }
+      }
+    }
+  } catch (error: unknown) {
+    console.warn(`Could not read uploads directory: ${error}`)
   }
 
   const summary = {
@@ -173,7 +210,8 @@ async function collectAssetImages(
     skipped: assets.filter(a => {
       const url = stringOptional(a, 'imageUrl', 'image_url')
       return url && (url.startsWith('http://') || url.startsWith('https://'))
-    }).length
+    }).length,
+    orphaned: manifest.filter(e => e.assetId === 'orphaned-file').length
   }
 
   return { manifest, files, summary }

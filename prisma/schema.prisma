@@ -142,6 +142,7 @@ model SOAssetEntry {
   tempPurchaseDate DateTime? @map("temp_purchase_date")
   tempName     String?   @map("temp_name")
   tempStatus   String?   @map("temp_status")
+  tempNoAsset   String?   @map("temp_noasset")
   tempSerialNo String?   @map("temp_serial_no")
   tempPic      String?   @map("temp_pic")
   tempNotes    String?   @map("temp_notes")
