@@ -24,7 +24,6 @@ model Asset {
   pic            String?
   imageUrl       String?            @map("image_url")
   notes          String?
-  dateCreated    DateTime           @default(now()) @map("date_created")
   createdAt      DateTime           @default(now()) @map("createdat")
   updatedAt      DateTime           @updatedAt @map("updatedat")
   checkouts      AssetCheckout[]
@@ -39,7 +38,6 @@ model Asset {
   @@index([siteId])
   @@index([categoryId])
   @@index([departmentId])
-  @@index([picId])
   @@map("assets")
 }
 
@@ -47,13 +45,6 @@ model Site {
   id         String   @id @default(cuid())
   name       String   @unique
   sortOrder  Int      @default(0) @map("sort_order")
-  address    String?
-  city       String?
-  province   String?
-  postalCode String?  @map("postal_code")
-  country    String?  @default("Indonesia")
-  phone      String?
-  email      String?
   createdAt  DateTime @default(now()) @map("createdat")
   updatedAt  DateTime @updatedAt @map("updatedat")
   assets     Asset[]
@@ -63,13 +54,12 @@ model Site {
 }
 
 model Category {
-  id          String   @id @default(cuid())
-  name        String   @unique
-  sortOrder   Int      @default(0) @map("sort_order")
-  description String?
-  createdAt   DateTime @default(now()) @map("createdat")
-  updatedAt   DateTime @updatedAt @map("updatedat")
-  assets      Asset[]
+  id        String   @id @default(cuid())
+  name      String   @unique
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("createdat")
+  updatedAt DateTime @updatedAt @map("updatedat")
+  assets    Asset[]
   tempEntries SOAssetEntry[] @relation("TempCategoryOnEntry")
 
   @@map("categories")
@@ -91,13 +81,7 @@ model Department {
 
 model Employee {
   id                String          @id @default(cuid())
-  employeeId        String          @unique @map("employee_id")
   name              String
-  email             String?         @unique
-  department        String?
-  position          String?
-  joinDate          DateTime?       @map("join_date")
-  isActive          Boolean         @default(true) @map("isactive")
   createdAt         DateTime        @default(now()) @map("createdat")
   updatedAt         DateTime        @updatedAt @map("updatedat")
   receivedCheckouts AssetCheckout[] @relation("EmployeeCheckoutReceivedBy")
@@ -138,7 +122,7 @@ model SOAssetEntry {
   status       String    @default("Scanned")
   isIdentified Boolean   @default(false) @map("isidentified")
   isCrucial    Boolean   @default(false) @map("is_crucial")
-  crucialNotes String?   @map("crucial_notes")
+  pendingNotes String?   @map("pending_notes")
   tempPurchaseDate DateTime? @map("temp_purchase_date")
   tempName     String?   @map("temp_name")
   tempStatus   String?   @map("temp_status")

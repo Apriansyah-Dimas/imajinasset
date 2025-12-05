@@ -12,12 +12,7 @@ const assetInclude = {
   employee: {
     select: {
       id: true,
-      employeeId: true,
       name: true,
-      email: true,
-      department: true,
-      position: true,
-      isActive: true,
     },
   },
 };
@@ -29,7 +24,7 @@ const transformEntry = (entry: any) => ({
   scannedAt: entry.scannedAt,
   isIdentified: entry.isIdentified,
   isCrucial: entry.isCrucial ?? false,
-  crucialNotes: entry.crucialNotes ?? null,
+  pendingNotes: entry.pendingNotes ?? null,
   tempName: entry.tempName,
   tempStatus: entry.tempStatus,
   tempSerialNo: entry.tempSerialNo,

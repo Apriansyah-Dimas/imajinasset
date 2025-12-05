@@ -31,7 +31,6 @@ export interface Category {
   id: string;
   name: string;
   sortOrder: number;
-  description?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -49,26 +48,13 @@ export interface Site {
   id: string;
   name: string;
   sortOrder: number;
-  address?: string;
-  city?: string;
-  province?: string;
-  postalCode?: string;
-  country?: string;
-  phone?: string;
-  email?: string;
   createdAt: Date;
   updatedAt: Date;
 }
 
 export interface Employee {
   id: string;
-  employeeId: string;
   name: string;
-  email?: string;
-  department?: string;
-  position?: string;
-  joinDate?: Date;
-  isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -109,7 +95,7 @@ export interface SOAssetEntry {
   status: string;
   isIdentified: boolean;
   isCrucial: boolean;
-  crucialNotes?: string;
+  pendingNotes?: string;
   tempPurchaseDate?: Date;
   tempName?: string;
   tempStatus?: string;
