@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect } from "react";
-import { useSidebar } from "@/contexts/SidebarContext";
-import { useMotionPreference } from "@/hooks/useMotionPreference";
+import { useSidebar } from "@/contexts/sidebar-context";
+import { useMotionPreference } from "@/hooks/use-motion-preference";
 
 type SidebarMarginOptions = {
   disabled?: boolean;

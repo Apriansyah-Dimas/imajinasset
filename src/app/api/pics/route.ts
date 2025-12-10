@@ -5,9 +5,9 @@ import type { Employee } from '@prisma/client'
 const formatPicResponse = (employee: Employee) => ({
   id: employee.id,
   name: employee.name,
-  email: employee.email,
-  department: employee.department ?? null,
-  position: employee.position ?? null,
+  email: null,
+  department: null,
+  position: null,
   type: 'employee',
 })
 
@@ -19,31 +19,13 @@ const generateEmployeeIdentifier = (name: string) => {
 }
 
 const ensureUniqueEmployeeId = async (candidate: string) => {
-  let normalized = candidate.replace(/\s+/g, '').toUpperCase()
-  if (!normalized) {
-    normalized = generateEmployeeIdentifier('PIC')
-  }
-
-  let attempt = normalized
-  let suffix = 1
-
-   
-  while (true) {
-    const exists = await db.employee.findUnique({
-      where: { employeeId: attempt }
-    })
-
-    if (!exists) return attempt
-
-    attempt = `${normalized}-${suffix}`
-    suffix += 1
-  }
+  // This function is no longer needed since we removed employeeId field
+  return candidate
 }
 
 export async function GET() {
   try {
     const employees = await db.employee.findMany({
-      where: { isActive: true },
       orderBy: { name: 'asc' }
     })
 
@@ -78,13 +60,7 @@ export async function POST(request: NextRequest) {
 
     const employee = await db.employee.create({
       data: {
-        employeeId: uniqueEmployeeId,
         name,
-        email: null,
-        department: null,
-        position: null,
-        joinDate: null,
-        isActive: true,
       }
     })
 

@@ -303,13 +303,7 @@ const transformDepartment = (row: Record<string, unknown>) =>
 const transformEmployee = (row: Record<string, unknown>) =>
   finalizeRecord({
     id: stringRequired('employees', row, 'id'),
-    employeeId: stringRequired('employees', row, 'employeeId', 'employee_id'),
     name: stringRequired('employees', row, 'name'),
-    email: stringOptional(row, 'email'),
-    department: stringOptional(row, 'department'),
-    position: stringOptional(row, 'position'),
-    joinDate: dateOptional(row, 'joinDate', 'join_date'),
-    isActive: booleanOptional(row, 'isActive', 'is_active', 'isactive') ?? true,
     createdAt: dateRequired('employees', row, 'createdAt', 'created_at'),
     updatedAt: dateRequired('employees', row, 'updatedAt', 'updated_at')
   })
@@ -345,7 +339,6 @@ const transformAsset = (row: Record<string, unknown>) =>
     pic: stringOptional(row, 'pic'),
     imageUrl: stringOptional(row, 'imageUrl', 'image_url'),
     notes: stringOptional(row, 'notes'),
-    dateCreated: dateOptional(row, 'dateCreated', 'date_created') || new Date(),
     createdAt: dateRequired('assets', row, 'createdAt', 'created_at'),
     updatedAt: dateRequired('assets', row, 'updatedAt', 'updated_at')
   })
@@ -515,7 +508,7 @@ const transformSOAssetEntry = (row: Record<string, unknown>) =>
     status: stringRequired('so_asset_entries', row, 'status'),
     isIdentified: booleanRequired('so_asset_entries', row, 'isIdentified', 'is_identified'),
     isCrucial: booleanOptional(row, 'isCrucial', 'is_crucial') ?? false,
-    crucialNotes: stringOptional(row, 'crucialNotes', 'crucial_notes'),
+    pendingNotes: stringOptional(row, 'pendingNotes', 'pending_notes'),
     tempPurchaseDate: dateOptional(row, 'tempPurchaseDate', 'temp_purchase_date'),
     tempName: stringOptional(row, 'tempName', 'temp_name'),
     tempStatus: stringOptional(row, 'tempStatus', 'temp_status'),
@@ -526,6 +519,7 @@ const transformSOAssetEntry = (row: Record<string, unknown>) =>
     tempModel: stringOptional(row, 'tempModel', 'temp_model'),
     tempCost: numberOptional(row, 'tempCost', 'temp_cost'),
     tempImageUrl: stringOptional(row, 'tempImageUrl', 'temp_image_url'),
+    tempNoAsset: stringOptional(row, 'tempNoAsset', 'temp_noasset'),
     tempSiteId: stringOptional(row, 'tempSiteId', 'temp_site_id'),
     tempCategoryId: stringOptional(row, 'tempCategoryId', 'temp_category_id'),
     tempDepartmentId: stringOptional(row, 'tempDepartmentId', 'temp_department_id'),

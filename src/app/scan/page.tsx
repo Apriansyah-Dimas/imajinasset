@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Rocket, Clock, Camera, QrCode, Wrench, ArrowLeft } from "lucide-react";
 import Link from "next/link";
-import ProtectedRoute from "@/components/ProtectedRoute";
+import ProtectedRoute from "@/components/protected-route";
 
 function ScanPageContent() {
   return (

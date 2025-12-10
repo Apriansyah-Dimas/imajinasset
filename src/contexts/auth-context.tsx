@@ -29,19 +29,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshUser = async () => {
     try {
-      console.log("Refreshing user...");
-
       // Check if we have a token in storage/cookie
       const token = getClientAuthToken();
 
       if (!token) {
-        console.log("No token found in storage");
         setUser(null);
         setLoading(false);
         return;
       }
-
-      console.log("Found token, getting user data...");
 
       // Get user data from our API
       const response = await fetch(`/api/auth/me`, {
@@ -56,14 +51,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const data = await response.json();
         if (data.success && data.user) {
           setUser(data.user);
-          console.log("User refreshed successfully:", data.user);
         } else {
           // Clear invalid token
           clearClientAuthToken();
           setUser(null);
         }
       } else {
-        console.log("Failed to get user data, clearing token and user");
         clearClientAuthToken();
         setUser(null);
       }
@@ -81,8 +74,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     password: string
   ): Promise<{ success: boolean; message?: string }> => {
     try {
-      console.log("Attempting login with:", email);
-
       // Login to our API
       const checkResponse = await fetch('/api/auth/login', {
         method: 'POST',
@@ -91,9 +82,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         },
         body: JSON.stringify({ email, password }),
       });
-
-      console.log("Login response status:", checkResponse.status);
-      console.log("Login response ok:", checkResponse.ok);
 
       if (!checkResponse.ok) {
         let errorMessage = "Invalid credentials";
@@ -111,23 +99,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (checkResponse.status >= 500) {
           console.error("Login failed with status:", checkResponse.status, errorMessage);
-        } else {
-          console.warn("Login failed:", errorMessage);
         }
         return { success: false, message: errorMessage };
       }
 
       const loginData = await checkResponse.json();
-      console.log("Login response data:", loginData);
 
       if (loginData.success && loginData.user && loginData.token) {
         // Store token for subsequent requests
         setClientAuthToken(loginData.token);
         setUser(loginData.user);
-        console.log("Login successful:", loginData.user);
         return { success: true };
       } else {
-        console.error("Invalid login response format:", loginData);
         return {
           success: false,
           message: "Unexpected response from server. Please try again."
@@ -144,12 +127,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = async () => {
     try {
-      console.log("Logging out...");
-
       // Clear token and user
       clearClientAuthToken();
       setUser(null);
-      console.log("Logout successful");
     } catch (error) {
       console.error("Logout error:", error);
     }

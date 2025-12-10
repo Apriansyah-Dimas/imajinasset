@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useEffect, useState, useCallback, useRef, type ComponentProps } from 'react'
 import dynamic from 'next/dynamic'
@@ -17,9 +17,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
-import ProtectedRoute from '@/components/ProtectedRoute'
-import RoleBasedAccess from '@/components/RoleBasedAccess'
-import { useAuth } from '@/contexts/AuthContext'
+import ProtectedRoute from '@/components/protected-route'
+import RoleBasedAccess from '@/components/role-based-access'
+import { useAuth } from '@/contexts/auth-context'
 import AssetImagePlaceholder from '@/components/asset-image-placeholder'
 import AssetDetailModalComponent from '@/components/asset-detail-modal'
 import AddAssetModalComponent from '@/components/add-asset-modal'
@@ -72,7 +72,7 @@ type EditDropdownsModalProps = ComponentProps<EditDropdownsModalComponent>
 const AssetDetailModal = dynamic<AssetDetailModalProps>(
   () => import('@/components/asset-detail-modal'),
   {
-    loading: () => <LazyModalFallback label="Memuat detail aset..." />,
+    loading: () => <LazyModalFallback label="Loading asset details..." />,
     ssr: false
   }
 )
@@ -80,7 +80,7 @@ const AssetDetailModal = dynamic<AssetDetailModalProps>(
 const AddAssetModal = dynamic<AddAssetModalProps>(
   () => import('@/components/add-asset-modal'),
   {
-    loading: () => <LazyModalFallback label="Menyiapkan formulir tambah aset..." />,
+    loading: () => <LazyModalFallback label="Preparing add-asset form..." />,
     ssr: false
   }
 )
@@ -88,7 +88,7 @@ const AddAssetModal = dynamic<AddAssetModalProps>(
 const ImportAssetsModal = dynamic<ImportAssetsModalProps>(
   () => import('@/components/import-assets-modal'),
   {
-    loading: () => <LazyModalFallback label="Memuat modul impor aset..." />,
+    loading: () => <LazyModalFallback label="Loading import module..." />,
     ssr: false
   }
 )
@@ -96,7 +96,7 @@ const ImportAssetsModal = dynamic<ImportAssetsModalProps>(
 const EditDropdownsModal = dynamic<EditDropdownsModalProps>(
   () => import('@/components/edit-dropdowns-modal'),
   {
-    loading: () => <LazyModalFallback label="Memuat konfigurasi dropdown..." />,
+    loading: () => <LazyModalFallback label="Loading dropdown configuration..." />,
     ssr: false
   }
 )
@@ -752,8 +752,8 @@ function AssetsPageContent() {
           </div>
           <span className="sneat-chip bg-primary/10 text-primary">
             {loading && assets.length === 0
-              ? 'Memuat data...'
-              : `Menampilkan ${assets.length}${typeof totalResults === 'number' ? ` dari ${totalResults}` : ''} aset`}
+              ? 'Loading data...'
+              : `Showing ${assets.length}${typeof totalResults === 'number' ? ` of ${totalResults}` : ''} assets`}
           </span>
         </div>
 
@@ -1000,18 +1000,18 @@ function AssetsPageContent() {
 
                   <div className="mt-4 flex flex-col gap-2 pt-2">
                     <button
-                      onClick={() => {
-                        setSelectedAsset(asset)
-                        setShowDetailModal(true)
-                      }}
-                      className="w-full sneat-btn sneat-btn-outlined justify-center text-xs font-semibold uppercase tracking-[0.3em]"
-                    >
-                      <Eye className="h-4 w-4" />
-                      Lihat Detail
-                    </button>
-                  </div>
+                    onClick={() => {
+                      setSelectedAsset(asset)
+                      setShowDetailModal(true)
+                    }}
+                    className="w-full sneat-btn sneat-btn-outlined justify-center text-xs font-semibold uppercase tracking-[0.3em]"
+                  >
+                    <Eye className="h-4 w-4" />
+                    View Details
+                  </button>
                 </div>
-              ))}
+              </div>
+            ))}
             </div>
           </>
         ) : null}
@@ -1024,7 +1024,7 @@ function AssetsPageContent() {
               disabled={loadingMore || loading}
               className="sneat-btn sneat-btn-primary inline-flex items-center gap-2 px-6 py-2 text-sm font-semibold disabled:opacity-50"
             >
-              {loadingMore ? 'Memuat data...' : `Muat ${PAGE_SIZE} item lagi`}
+              {loadingMore ? 'Loading data...' : `Load ${PAGE_SIZE} more items`}
             </button>
           </div>
         )}

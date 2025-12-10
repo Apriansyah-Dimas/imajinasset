@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import ProtectedRoute from "@/components/ProtectedRoute";
+import ProtectedRoute from "@/components/protected-route";
 import AssetDetailModal from "@/components/asset-detail-modal";
 import { Button } from "@/components/ui/button";
 import {
@@ -39,7 +39,7 @@ interface ScannedEntry {
   status: string;
   isIdentified: boolean;
   isCrucial?: boolean;
-  crucialNotes?: string | null;
+  pendingNotes?: string | null;
   asset: Asset;
 }
 

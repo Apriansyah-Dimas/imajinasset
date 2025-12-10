@@ -2,9 +2,9 @@ import type { Metadata, Viewport } from "next";
 import { Public_Sans, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
-import { AuthProvider } from "@/contexts/AuthContext";
-import { SidebarProvider } from "@/contexts/SidebarContext";
-import { LayoutShell } from "@/components/LayoutShell";
+import { AuthProvider } from "@/contexts/auth-context";
+import { SidebarProvider } from "@/contexts/sidebar-context";
+import { LayoutShell } from "@/components/layout-shell";
 
 const publicSans = Public_Sans({
   variable: "--font-public-sans",

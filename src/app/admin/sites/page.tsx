@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Plus, Search, Edit, Trash2, Eye, MapPin, Building, Calendar, Users } from 'lucide-react'
 import { toast } from 'sonner'
-import ProtectedRoute from '@/components/ProtectedRoute'
+import ProtectedRoute from '@/components/protected-route'
 
 interface Site {
   id: string

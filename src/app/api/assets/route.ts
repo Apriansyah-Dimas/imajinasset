@@ -125,13 +125,7 @@ export async function GET(request: NextRequest) {
         {
           employee: {
             is: {
-              OR: [
-                { name: { contains: search } },
-                { employeeId: { contains: search } },
-                { email: { contains: search } },
-                { department: { contains: search } },
-                { position: { contains: search } }
-              ]
+              name: { contains: search }
             }
           }
         }
@@ -174,7 +168,7 @@ export async function GET(request: NextRequest) {
           site: { select: { id: true, name: true } },
           category: { select: { id: true, name: true } },
           department: { select: { id: true, name: true } },
-          employee: { select: { id: true, employeeId: true, name: true } }
+          employee: { select: { id: true, name: true } }
         }
       })
     )
@@ -226,7 +220,7 @@ export async function POST(request: NextRequest) {
         site: { select: { id: true, name: true } },
         category: { select: { id: true, name: true } },
         department: { select: { id: true, name: true } },
-        employee: { select: { id: true, employeeId: true, name: true } }
+        employee: { select: { id: true, name: true } }
       }
     })
 

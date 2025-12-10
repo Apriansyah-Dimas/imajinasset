@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
-import ProtectedRoute from "@/components/ProtectedRoute";
+import ProtectedRoute from "@/components/protected-route";
 import AssetDetailModal from "@/components/asset-detail-modal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,7 +28,7 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { getClientAuthToken } from "@/lib/client-auth";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/contexts/auth-context";
 import {
   AlertCircle,
   ArrowLeft,
@@ -78,7 +78,7 @@ interface ScannedEntry {
   status: string;
   isIdentified: boolean;
   isCrucial?: boolean;
-  crucialNotes?: string | null;
+  pendingNotes?: string | null;
   tempName?: string | null;
   tempStatus?: string | null;
   tempNoAsset?: string | null;
@@ -315,7 +315,7 @@ function ScanPageContent() {
     | "asset-number-desc"
   >("name-asc");
   const [activeList, setActiveList] = useState<
-    "scanned" | "remaining" | "crucial"
+    "scanned" | "remaining" | "pending"
   >("scanned");
 
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
@@ -717,7 +717,7 @@ function ScanPageContent() {
       scannedEntries.map((entry) => ({
         ...entry,
         isCrucial: Boolean(entry.isCrucial),
-        crucialNotes: entry.crucialNotes ?? null,
+        pendingNotes: entry.pendingNotes ?? null,
         asset: getEntryDisplayAsset(entry),
       })),
     [scannedEntries]
@@ -731,6 +731,7 @@ function ScanPageContent() {
     const rows = normalizedScannedEntries.filter(
       (entry) =>
         !entry.isCrucial &&
+        !entry.pendingNotes &&
         entry.asset &&
         matchesFilters(entry.asset) &&
         matchesSearch(entry.asset, searchQuery)
@@ -738,10 +739,10 @@ function ScanPageContent() {
     return sortRows(rows);
   }, [normalizedScannedEntries, filters, searchQuery, sortOption]);
 
-  const filteredCrucialEntries = useMemo(() => {
+  const filteredPendingEntries = useMemo(() => {
     const rows = normalizedScannedEntries.filter(
       (entry) =>
-        entry.isCrucial &&
+        (entry.isCrucial || Boolean(entry.pendingNotes)) &&
         entry.asset &&
         matchesFilters(entry.asset) &&
         matchesSearch(entry.asset, searchQuery)
@@ -1198,7 +1199,7 @@ function ScanPageContent() {
                 <Tabs
                   value={activeList}
                   onValueChange={(value) =>
-                    setActiveList(value as "scanned" | "remaining" | "crucial")
+                    setActiveList(value as "scanned" | "remaining" | "pending")
                   }
                 >
                   <TabsList className="mb-5 mt-2 flex w-full flex-wrap gap-x-3 gap-y-3 rounded-2xl bg-surface p-2 sm:mb-2 sm:mt-1 sm:grid sm:grid-cols-3 sm:gap-0 sm:p-1">
@@ -1209,10 +1210,10 @@ function ScanPageContent() {
                       Scanned ({filteredScannedEntries.length})
                     </TabsTrigger>
                     <TabsTrigger
-                      value="crucial"
+                      value="pending"
                       className="flex-1 min-w-[calc(50%-0.5rem)] justify-center rounded-2xl px-4 py-3 text-sm font-semibold shadow-sm sm:min-w-0 sm:rounded-xl sm:px-3 sm:py-2 sm:text-sm sm:font-medium sm:shadow-none"
                     >
-                      Pending ({filteredCrucialEntries.length})
+                      Pending ({filteredPendingEntries.length})
                     </TabsTrigger>
                     <TabsTrigger
                       value="remaining"
@@ -1293,11 +1294,11 @@ function ScanPageContent() {
                         </div>
                       ))
                     )
-                  ) : activeList === "crucial" ? (
-                    filteredCrucialEntries.length === 0 ? (
+                  ) : activeList === "pending" ? (
+                    filteredPendingEntries.length === 0 ? (
                       emptyState
                     ) : (
-                      filteredCrucialEntries.map((entry) => (
+                      filteredPendingEntries.map((entry) => (
                         <div
                           key={entry.id}
                           className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4 shadow-sm"
@@ -1346,9 +1347,9 @@ function ScanPageContent() {
                               </Button>
                             </div>
                           </div>
-                          {entry.crucialNotes ? (
+                          {entry.pendingNotes ? (
                             <p className="mt-2 text-xs text-amber-900/80">
-                              Keterangan: {entry.crucialNotes}
+                              Keterangan: {entry.pendingNotes}
                             </p>
                           ) : null}
                         </div>
@@ -1563,7 +1564,7 @@ function ScanPageContent() {
                 sessionId: selectedEntry.soSessionId,
                 entryId: selectedEntry.id,
                 initialIsCrucial: Boolean(selectedEntry.isCrucial),
-                initialCrucialNotes: selectedEntry.crucialNotes || "",
+                initialCrucialNotes: selectedEntry.pendingNotes || "",
               }
             : undefined
         }

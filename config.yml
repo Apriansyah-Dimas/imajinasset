@@ -3,9 +3,9 @@ credentials-file: C:/Users/Apriansyah Dimas/.cloudflared/f8217f1d-3921-4f0c-985f
 
 ingress:
   - hostname: imajinasset.biz.id
-    service: http://localhost:3001
+    service: http://localhost:3000
   - hostname: app.imajinasset.biz.id
-    service: http://localhost:3001
+    service: http://localhost:3000
   - hostname: admin.imajinasset.biz.id
-    service: http://localhost:3001
+    service: http://localhost:3000
   - service: http_status:404

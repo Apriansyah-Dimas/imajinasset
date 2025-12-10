@@ -41,13 +41,11 @@ export async function GET(request: NextRequest) {
             select: {
               id: true,
               name: true,
-              employeeId: true,
-              email: true,
             },
           },
           department: { select: { id: true, name: true } },
           receivedBy: {
-            select: { id: true, name: true, employeeId: true, email: true },
+            select: { id: true, name: true },
           },
           asset: { select: { id: true, name: true, noAsset: true } },
         },
@@ -93,14 +91,13 @@ export async function GET(request: NextRequest) {
           select: {
             id: true,
             name: true,
-            employeeId: true,
           },
         },
         department: {
           select: { id: true, name: true },
         },
         receivedBy: {
-          select: { id: true, name: true, employeeId: true },
+          select: { id: true, name: true },
         },
         asset: { select: { id: true, name: true, noAsset: true } },
       },
@@ -214,7 +211,6 @@ export async function POST(request: NextRequest) {
           select: {
             id: true,
             name: true,
-            employeeId: true,
           },
         },
         department: {
@@ -235,7 +231,6 @@ export async function POST(request: NextRequest) {
           assignTo: {
             id: checkout.assignTo?.id ?? assignToId,
             name: checkout.assignTo?.name ?? assignTo?.name ?? null,
-            employeeId: checkout.assignTo?.employeeId ?? assignTo?.employeeId ?? null,
           },
           department: checkout.department
             ? { id: checkout.department.id, name: checkout.department.name }

@@ -3,8 +3,8 @@
 import { ReactNode, useMemo } from "react";
 import { usePathname } from "next/navigation";
 import Navbar from "@/components/navbar";
-import { useSidebarMargin } from "@/hooks/useSidebarMargin";
-import { useMotionPreference } from "@/hooks/useMotionPreference";
+import { useSidebarMargin } from "@/hooks/use-sidebar-margin";
+import { useMotionPreference } from "@/hooks/use-motion-preference";
 import { cn } from "@/lib/utils";
 
 const IMMERSIVE_ROUTES = ["/login", "/register", "/logout", "/unauthorized"];

@@ -36,9 +36,9 @@ import {
   CheckCheck
 } from 'lucide-react'
 import Link from 'next/link'
-import ProtectedRoute from '@/components/ProtectedRoute'
-import RoleBasedAccess from '@/components/RoleBasedAccess'
-import { useAuth } from '@/contexts/AuthContext'
+import ProtectedRoute from '@/components/protected-route'
+import RoleBasedAccess from '@/components/role-based-access'
+import { useAuth } from '@/contexts/auth-context'
 
 interface SOAssetEntry {
   id: string

@@ -90,12 +90,7 @@ export async function GET(
             employee: {
               select: {
                 id: true,
-                employeeId: true,
                 name: true,
-                email: true,
-                department: true,
-                position: true,
-                isActive: true
               }
             }
           }
@@ -106,12 +101,7 @@ export async function GET(
         tempPicEmployee: {
           select: {
             id: true,
-            employeeId: true,
             name: true,
-            email: true,
-            department: true,
-            position: true,
-            isActive: true
           }
         }
       }

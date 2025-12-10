@@ -7,16 +7,22 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 type CleanResult = Record<string, number>
-const DEFAULT_ADMIN_EMAIL = 'admin@assetso.com'
-const DEFAULT_ADMIN_NAME = 'Administrator'
-const DEFAULT_ADMIN_PASSWORD = 'admin123'
+const DEFAULT_ADMIN_EMAIL = process.env.DEFAULT_ADMIN_EMAIL
+const DEFAULT_ADMIN_NAME = process.env.DEFAULT_ADMIN_NAME
 
 async function ensureDefaultAdminPg(client: PoolClient) {
   try {
+    const defaultPassword = process.env.DEFAULT_ADMIN_PASSWORD;
+
+    if (!DEFAULT_ADMIN_EMAIL || !DEFAULT_ADMIN_NAME || !defaultPassword) {
+      console.warn('[CLEAN] Default admin credentials not configured, skipping admin creation');
+      return;
+    }
+
     console.log('[CLEAN] Creating default admin user...')
-    const hashedPassword = await bcrypt.hash(DEFAULT_ADMIN_PASSWORD, 10)
+    const hashedPassword = await bcrypt.hash(defaultPassword, 10)
     console.log('[CLEAN] Admin password hashed')
-    
+
     const result = await client.query(
       `
         INSERT INTO users (id, email, name, password, role, isactive, updatedat)
@@ -39,7 +45,7 @@ async function ensureDefaultAdminPg(client: PoolClient) {
       `,
       [DEFAULT_ADMIN_EMAIL, DEFAULT_ADMIN_NAME, hashedPassword]
     )
-    
+
     console.log('[CLEAN] Default admin user created/updated successfully')
     return result
   } catch (error) {
@@ -297,8 +303,15 @@ async function cleanWithPrisma(): Promise<CleanResult> {
     throw new Error(`Database connection failed: ${error instanceof Error ? error.message : String(error)}`)
   }
   
+  const defaultPassword = process.env.DEFAULT_ADMIN_PASSWORD;
+
+  if (!DEFAULT_ADMIN_EMAIL || !DEFAULT_ADMIN_NAME || !defaultPassword) {
+    console.warn('[CLEAN] Default admin credentials not configured, skipping Prisma clean');
+    return {};
+  }
+
   console.log('[CLEAN] Hashing default admin password...')
-  const hashedPassword = await bcrypt.hash(DEFAULT_ADMIN_PASSWORD, 10)
+  const hashedPassword = await bcrypt.hash(defaultPassword, 10)
   console.log('[CLEAN] Admin password hashed successfully')
 
   return db.$transaction(async (tx) => {

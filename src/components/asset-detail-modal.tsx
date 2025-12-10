@@ -114,7 +114,7 @@ type SessionEntry = {
   status?: string;
   isIdentified?: boolean;
   isCrucial?: boolean | null;
-  crucialNotes?: string | null;
+  pendingNotes?: string | null;
   tempPurchaseDate?: string | null;
   tempName?: string | null;
   tempStatus?: string | null;
@@ -457,7 +457,7 @@ export default function AssetDetailModal({
             if (entryData) {
               assetData = mapSessionEntryToAsset(entryData);
               setEntryCrucial(Boolean(entryData.isCrucial));
-              setEntryCrucialNotes(entryData.crucialNotes || "");
+              setEntryCrucialNotes(entryData.pendingNotes || "");
             }
           } else {
             console.warn(
@@ -716,7 +716,7 @@ export default function AssetDetailModal({
           tempImageUrl: payload.imageUrl ?? null,
           isIdentified: true,
           isCrucial: entryCrucial,
-          crucialNotes: entryCrucial ? entryCrucialNotes.trim() : null,
+          pendingNotes: entryCrucial ? entryCrucialNotes.trim() : null,
         };
 
         const response = await fetch(
@@ -825,6 +825,8 @@ export default function AssetDetailModal({
     if (isSessionContext) {
       setEntryCrucial(Boolean(sessionContext?.initialIsCrucial));
       setEntryCrucialNotes(sessionContext?.initialCrucialNotes || "");
+      // On the SO scan flow, cancel should close the modal immediately
+      onOpenChange(false);
     }
   };
 

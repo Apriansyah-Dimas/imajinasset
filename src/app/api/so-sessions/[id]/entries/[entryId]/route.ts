@@ -77,12 +77,7 @@ export async function GET(
             employee: {
               select: {
                 id: true,
-                employeeId: true,
                 name: true,
-                email: true,
-                department: true,
-                position: true,
-                isActive: true,
               },
             },
           },
@@ -93,12 +88,7 @@ export async function GET(
         tempPicEmployee: {
           select: {
             id: true,
-            employeeId: true,
             name: true,
-            email: true,
-            department: true,
-            position: true,
-            isActive: true,
           },
         },
       },
@@ -123,7 +113,7 @@ export async function GET(
       scannedAt: entry.scannedAt,
       isIdentified: entry.isIdentified,
       isCrucial: entry.isCrucial,
-      crucialNotes: entry.crucialNotes,
+      pendingNotes: (entry as any).pendingNotes,
       tempPurchaseDate: entry.tempPurchaseDate,
       tempName: entry.tempName,
       tempStatus: entry.tempStatus,
@@ -236,12 +226,7 @@ export async function PUT(
             employee: {
               select: {
                 id: true,
-                employeeId: true,
                 name: true,
-                email: true,
-                department: true,
-                position: true,
-                isActive: true,
               },
             },
           },
@@ -252,12 +237,7 @@ export async function PUT(
         tempPicEmployee: {
           select: {
             id: true,
-            employeeId: true,
             name: true,
-            email: true,
-            department: true,
-            position: true,
-            isActive: true,
           },
         },
       },
@@ -317,14 +297,14 @@ export async function PUT(
     if (body.isCrucial !== undefined) {
       updateData.isCrucial = Boolean(body.isCrucial);
       if (!updateData.isCrucial) {
-        updateData.crucialNotes = null;
+        updateData.pendingNotes = null;
       }
     }
 
-    if (body.crucialNotes !== undefined) {
+    if (body.pendingNotes !== undefined) {
       const note =
-        typeof body.crucialNotes === "string" ? body.crucialNotes.trim() : "";
-      updateData.crucialNotes = note || null;
+        typeof body.pendingNotes === "string" ? body.pendingNotes.trim() : "";
+      updateData.pendingNotes = note || null;
     }
 
     console.log("DEBUG: Update data prepared:", updateData);
@@ -341,12 +321,7 @@ export async function PUT(
             employee: {
               select: {
                 id: true,
-                employeeId: true,
                 name: true,
-                email: true,
-                department: true,
-                position: true,
-                isActive: true,
               },
             },
           },
@@ -378,12 +353,7 @@ export async function PUT(
           where: { id: updatedEntry.tempPicId },
           select: {
             id: true,
-            employeeId: true,
             name: true,
-            email: true,
-            department: true,
-            position: true,
-            isActive: true,
           },
         })
       : null;
@@ -420,7 +390,7 @@ export async function PUT(
       scannedAt: updatedEntry.scannedAt,
       isIdentified: updatedEntry.isIdentified,
       isCrucial: updatedEntry.isCrucial,
-      crucialNotes: updatedEntry.crucialNotes,
+      pendingNotes: (updatedEntry as any).pendingNotes,
       tempName: updatedEntry.tempName,
       tempStatus: updatedEntry.tempStatus,
       tempSerialNo: updatedEntry.tempSerialNo,

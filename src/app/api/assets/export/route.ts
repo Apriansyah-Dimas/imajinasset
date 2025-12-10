@@ -10,7 +10,7 @@ export async function GET(
     // Get all assets with their relations and custom values
     const assets = await db.asset.findMany({
       orderBy: {
-        dateCreated: 'desc'
+        createdAt: 'desc'
       },
       include: {
         site: true,
@@ -19,12 +19,7 @@ export async function GET(
         employee: {
           select: {
             id: true,
-            employeeId: true,
             name: true,
-            email: true,
-            department: true,
-            position: true,
-            isActive: true
           }
         },
         customValues: {
@@ -39,7 +34,6 @@ export async function GET(
 
     // Get all active custom fields for headers
     const customFields = await db.assetCustomField.findMany({
-      where: { isActive: true },
       orderBy: { createdAt: 'asc' }
     })
 

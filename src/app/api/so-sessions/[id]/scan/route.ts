@@ -132,7 +132,7 @@ export async function POST(
       assetId,
       source = "camera",
       isCrucial = false,
-      crucialNotes = null,
+      pendingNotes = null,
     } = body;
 
     if (!assetNumber && !assetId) {
@@ -203,9 +203,9 @@ export async function POST(
         status: "Scanned",
         isIdentified: false,
         isCrucial: Boolean(isCrucial),
-        crucialNotes: isCrucial
-          ? typeof crucialNotes === "string"
-            ? crucialNotes.trim() || null
+        pendingNotes: isCrucial
+          ? typeof pendingNotes === "string"
+            ? pendingNotes.trim() || null
             : null
           : null,
       },

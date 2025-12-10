@@ -18,9 +18,9 @@ import {
   Users,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useAuth } from "@/contexts/AuthContext";
-import { useSidebar } from "@/contexts/SidebarContext";
-import { useMotionPreference } from "@/hooks/useMotionPreference";
+import { useAuth } from "@/contexts/auth-context";
+import { useSidebar } from "@/contexts/sidebar-context";
+import { useMotionPreference } from "@/hooks/use-motion-preference";
 import type { LucideIcon } from "lucide-react";
 
 type NavigationChild = {

@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import ProtectedRoute from "@/components/ProtectedRoute";
-import RoleBasedAccess from "@/components/RoleBasedAccess";
+import ProtectedRoute from "@/components/protected-route";
+import RoleBasedAccess from "@/components/role-based-access";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -315,40 +315,44 @@ export default function UserManagementPage() {
     <>
       <ProtectedRoute>
         <RoleBasedAccess allowedRoles={["ADMIN"]}>
-          <div className="p-8 sm:p-12 bg-gray-50 min-h-screen w-full overflow-x-hidden">
+          <div className="min-h-screen w-full overflow-x-hidden bg-background px-4 py-6 lg:px-10">
             {/* Header */}
-            <div className="mb-4 sm:mb-6">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-600 rounded-lg flex items-center justify-center">
-                    <Users className="h-4 w-4 sm:h-6 sm:w-6 text-white" />
+            <div className="surface-card relative mb-6 overflow-hidden rounded-[var(--radius)]">
+              <div className="absolute inset-0 pointer-events-none bg-gradient-to-br from-primary/10 via-transparent to-secondary/20" />
+              <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg">
+                    <Users className="h-5 w-5" />
                   </div>
                   <div>
-                    <h1 className="text-lg sm:text-2xl font-bold text-gray-900">
-                      USER MANAGEMENT
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-text-muted">
+                      Administration
+                    </p>
+                    <h1 className="text-xl font-bold text-foreground sm:text-2xl">
+                      User Management
                     </h1>
-                    <p className="text-xs sm:text-sm text-gray-600">
-                      Manage system users and permissions
+                    <p className="text-sm text-text-muted">
+                      Manage roles, access, and account status in one place.
                     </p>
                   </div>
                 </div>
                 <Button
                   onClick={() => setShowCreateDialog(true)}
-                  className="bg-blue-600 hover:bg-blue-700"
+                  className="rounded-full bg-primary px-5 shadow-[0_20px_50px_rgba(99,101,185,0.25)] hover:bg-primary/90"
                 >
-                  <Plus className="h-4 w-4 mr-2" />
+                  <Plus className="mr-2 h-4 w-4" />
                   Add User
                 </Button>
               </div>
             </div>
 
             {/* Filters */}
-            <Card className="mb-4 sm:mb-6">
-              <CardContent className="p-3 sm:p-4">
-                <div className="flex flex-col sm:flex-row gap-3">
+            <Card className="mb-5 border border-surface-border bg-surface shadow-lg rounded-[var(--radius)]">
+              <CardContent className="p-4 sm:p-5">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                   <div className="flex-1">
                     <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
                       <Input
                         placeholder="Search users..."
                         value={searchQuery}
@@ -357,7 +361,7 @@ export default function UserManagementPage() {
                       />
                     </div>
                   </div>
-                  <div className="sm:w-48">
+                  <div className="w-full sm:w-52">
                     <Select value={roleFilter} onValueChange={setRoleFilter}>
                       <SelectTrigger>
                         <SelectValue placeholder="Filter by role" />
@@ -381,7 +385,7 @@ export default function UserManagementPage() {
                       fetchUsers();
                     }}
                   >
-                    <RefreshCw className="h-4 w-4 mr-2" />
+                    <RefreshCw className="mr-2 h-4 w-4" />
                     Reset
                   </Button>
                 </div>
@@ -389,7 +393,7 @@ export default function UserManagementPage() {
             </Card>
 
             {/* Users List */}
-            <Card>
+            <Card className="rounded-[var(--radius)]">
               <CardContent className="p-0">
                 {loading ? (
                   <div className="flex items-center justify-center h-64">

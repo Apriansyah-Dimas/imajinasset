@@ -47,7 +47,7 @@ interface ScannedEntry {
   assetId: string
   isIdentified: boolean
   isCrucial?: boolean
-  crucialNotes?: string | null
+  pendingNotes?: string | null
   scannedAt: string
   asset: Asset
 }

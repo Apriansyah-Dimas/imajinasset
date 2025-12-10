@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect } from "react";
 import {
@@ -42,9 +42,9 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import Link from "next/link";
-import ProtectedRoute from "@/components/ProtectedRoute";
-import RoleBasedAccess from "@/components/RoleBasedAccess";
-import { useAuth } from "@/contexts/AuthContext";
+import ProtectedRoute from "@/components/protected-route";
+import RoleBasedAccess from "@/components/role-based-access";
+import { useAuth } from "@/contexts/auth-context";
 import { getClientAuthToken } from "@/lib/client-auth";
 import { cn } from "@/lib/utils";
 
