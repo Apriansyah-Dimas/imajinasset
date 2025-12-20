@@ -271,13 +271,7 @@ const transformSite = (row: Record<string, unknown>) =>
   finalizeRecord({
     id: stringRequired('sites', row, 'id'),
     name: stringRequired('sites', row, 'name'),
-    address: stringOptional(row, 'address'),
-    city: stringOptional(row, 'city'),
-    province: stringOptional(row, 'province'),
-    postalCode: stringOptional(row, 'postalCode', 'postal_code'),
-    country: stringOptional(row, 'country') ?? 'Indonesia',
-    phone: stringOptional(row, 'phone'),
-    email: stringOptional(row, 'email'),
+    sortOrder: numberOptional(row, 'sortOrder', 'sort_order') ?? 0,
     createdAt: dateRequired('sites', row, 'createdAt', 'created_at'),
     updatedAt: dateRequired('sites', row, 'updatedAt', 'updated_at')
   })
@@ -286,7 +280,7 @@ const transformCategory = (row: Record<string, unknown>) =>
   finalizeRecord({
     id: stringRequired('categories', row, 'id'),
     name: stringRequired('categories', row, 'name'),
-    description: stringOptional(row, 'description'),
+    sortOrder: numberOptional(row, 'sortOrder', 'sort_order') ?? 0,
     createdAt: dateRequired('categories', row, 'createdAt', 'created_at'),
     updatedAt: dateRequired('categories', row, 'updatedAt', 'updated_at')
   })
@@ -295,6 +289,7 @@ const transformDepartment = (row: Record<string, unknown>) =>
   finalizeRecord({
     id: stringRequired('departments', row, 'id'),
     name: stringRequired('departments', row, 'name'),
+    sortOrder: numberOptional(row, 'sortOrder', 'sort_order') ?? 0,
     description: stringOptional(row, 'description'),
     createdAt: dateRequired('departments', row, 'createdAt', 'created_at'),
     updatedAt: dateRequired('departments', row, 'updatedAt', 'updated_at')

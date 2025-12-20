@@ -27,6 +27,7 @@ export function BackupManagerPanel({
   const [importStatus, setImportStatus] = useState('Waiting for backup upload')
   const [importSummary, setImportSummary] = useState<{ total: number; tables: Record<string, number> } | null>(null)
   const [isCleaning, setIsCleaning] = useState(false)
+  const [cleanProgress, setCleanProgress] = useState(0)
   const [cleanStatus, setCleanStatus] = useState('Ready to clean data')
   const [cleanSummary, setCleanSummary] = useState<Record<string, number> | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -43,6 +44,7 @@ export function BackupManagerPanel({
   }, [])
 
   const resetCleanFeedback = useCallback(() => {
+    setCleanProgress(0)
     setCleanStatus('Ready to clean data')
   }, [])
 
@@ -205,18 +207,29 @@ export function BackupManagerPanel({
     if (isCleaning) return
     if (typeof window !== 'undefined') {
       const confirmed = window.confirm(
-        'This action will delete all Assets, Employees, SO Sessions, and non-admin Users.\nMake sure you have created a backup first.\nContinue?'
+        '⚠️ PERINGATAN: Ini akan menghapus SEMUA data:\n\n' +
+        '• Semua Assets\n' +
+        '• Semua Employees\n' +
+        '• Semua SO Sessions\n' +
+        '• Semua non-admin Users\n' +
+        '• Log activities dan backup data\n\n' +
+        'Pastikan Anda sudah membuat backup sebelum melanjutkan!\n\n' +
+        'Lanjutkan penghapusan data?'
       )
       if (!confirmed) return
     }
 
     setIsCleaning(true)
+    setCleanProgress(15)
     setCleanStatus('Cleaning data...')
     setCleanSummary(null)
 
     try {
       const response = await fetch('/api/backup/clean', {
-        method: 'POST'
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
       })
 
       const payload = await response.json().catch(() => ({}))
@@ -228,18 +241,28 @@ export function BackupManagerPanel({
 
       const summary = (payload?.summary ?? {}) as Record<string, number>
       setCleanSummary(summary)
-      setCleanStatus('Clean complete. Data tables cleared for restore testing.')
+
+      setCleanProgress(90)
+      const totalDeleted = Object.values(summary).reduce((sum, count) => sum + count, 0)
+      setCleanProgress(100)
+      setCleanStatus(`✅ Clean complete! ${totalDeleted} records deleted. Ready for restore testing.`)
+
       toast.success('Data cleaned successfully', {
-        description: 'All non-admin data has been removed.'
+        description: `${totalDeleted} records removed. System is ready for backup restore testing.`,
+        duration: 5000
       })
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to clean data.'
       console.error('Data clean failed:', error)
-      setCleanStatus(message)
-      toast.error('Data clean failed', { description: message })
+      setCleanProgress(0)
+      setCleanStatus(`❌ Error: ${message}`)
+      toast.error('Data clean failed', {
+        description: message,
+        duration: 5000
+      })
     } finally {
       setIsCleaning(false)
-      setTimeout(resetCleanFeedback, 6000)
+      setTimeout(resetCleanFeedback, 8000)
     }
   }, [isCleaning, resetCleanFeedback])
 
@@ -380,6 +403,7 @@ export function BackupManagerPanel({
                 {isCleaning ? 'Cleaning...' : 'Clean Data'}
               </Button>
             </div>
+            <Progress value={cleanProgress} />
             <div className="flex items-center gap-2 text-xs sm:text-sm text-red-800">
               {isCleaning ? (
                 <Loader2 className="h-4 w-4 animate-spin text-red-600" />
@@ -393,11 +417,22 @@ export function BackupManagerPanel({
 
             {cleanSummary && (
               <div className="rounded-md border border-red-200 bg-white/90 p-3 text-xs sm:text-sm text-red-800">
-                <div className="font-semibold text-red-900 mb-2">Rows deleted per table:</div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="font-semibold text-red-900">Rows deleted per table:</div>
+                  <div className="text-emerald-700 font-bold">
+                    Total: {Object.values(cleanSummary).reduce((sum, count) => sum + count, 0)}
+                  </div>
+                </div>
                 <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
                   {Object.entries(cleanSummary).map(([table, count]) => (
                     <div key={table} className="flex items-center justify-between uppercase tracking-wide">
-                      <span className="mr-2 text-[11px] sm:text-xs text-red-700">{table.replace(/([A-Z])/g, ' $1').trim()}</span>
+                      <span className="mr-2 text-[11px] sm:text-xs text-red-700">
+                        {table
+                          .replace(/([A-Z])/g, ' $1')
+                          .replace(/so session/g, 'SO Session')
+                          .replace(/so asset entry/g, 'SO Asset Entry')
+                          .trim()}
+                      </span>
                       <span className="font-semibold text-red-900">{count}</span>
                     </div>
                   ))}

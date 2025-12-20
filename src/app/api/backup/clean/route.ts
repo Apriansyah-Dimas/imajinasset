@@ -184,9 +184,6 @@ async function cleanWithPostgres(): Promise<CleanResult> {
     console.log('[CLEAN] Database connection test result:', testResult)
     console.log('[CLEAN] Database connection test passed')
     
-    await client.query('BEGIN')
-    console.log('[CLEAN] Transaction started')
-
     console.log('[CLEAN] Starting PostgreSQL clean process')
     const results: CleanResult = {}
     
@@ -291,23 +288,17 @@ async function cleanWithPostgres(): Promise<CleanResult> {
 
 
 async function cleanWithPrisma(): Promise<CleanResult> {
-  console.log('[CLEAN] Starting Prisma clean process')
-  console.log('[CLEAN] Testing database connection...')
-  
-  try {
-    // Test database connection first
-    await db.$queryRaw`SELECT 1`
-    console.log('[CLEAN] Database connection test passed')
-  } catch (error) {
-    console.error('[CLEAN] Database connection test failed:', error)
-    throw new Error(`Database connection failed: ${error instanceof Error ? error.message : String(error)}`)
-  }
-  
+  console.log('[CLEAN] Starting Prisma clean process for SQLite')
+
   const defaultPassword = process.env.DEFAULT_ADMIN_PASSWORD;
 
   if (!DEFAULT_ADMIN_EMAIL || !DEFAULT_ADMIN_NAME || !defaultPassword) {
-    console.warn('[CLEAN] Default admin credentials not configured, skipping Prisma clean');
-    return {};
+    console.error('[CLEAN] Missing required environment variables:', {
+      DEFAULT_ADMIN_EMAIL: !!DEFAULT_ADMIN_EMAIL,
+      DEFAULT_ADMIN_NAME: !!DEFAULT_ADMIN_NAME,
+      DEFAULT_ADMIN_PASSWORD: !!defaultPassword
+    })
+    throw new Error('Default admin credentials not configured. Please set DEFAULT_ADMIN_EMAIL, DEFAULT_ADMIN_NAME, and DEFAULT_ADMIN_PASSWORD')
   }
 
   console.log('[CLEAN] Hashing default admin password...')
@@ -315,42 +306,47 @@ async function cleanWithPrisma(): Promise<CleanResult> {
   console.log('[CLEAN] Admin password hashed successfully')
 
   return db.$transaction(async (tx) => {
-    console.log('[CLEAN] Starting Prisma clean process')
+    console.log('[CLEAN] Starting database transaction for cleaning')
     const summary: CleanResult = {}
-    
+
     try {
-      console.log('[CLEAN] Deleting asset_events...')
-      summary.assetEvents = (await tx.assetEvent.deleteMany()).count
-      console.log(`[CLEAN] Deleted ${summary.assetEvents} asset_events`)
-      
+      // Delete in proper order to respect foreign key constraints
+
+      // 1. Delete dependent records first
       console.log('[CLEAN] Deleting so_asset_entries...')
       summary.soAssetEntries = (await tx.sOAssetEntry.deleteMany()).count
       console.log(`[CLEAN] Deleted ${summary.soAssetEntries} so_asset_entries`)
-      
-      console.log('[CLEAN] Deleting so_sessions...')
-      summary.soSessions = (await tx.sOSession.deleteMany()).count
-      console.log(`[CLEAN] Deleted ${summary.soSessions} so_sessions`)
-      
-      console.log('[CLEAN] Deleting asset_custom_values...')
-      summary.assetCustomValues = (await tx.assetCustomValue.deleteMany()).count
-      console.log(`[CLEAN] Deleted ${summary.assetCustomValues} asset_custom_values`)
-      
-      console.log('[CLEAN] Deleting asset_custom_fields...')
-      summary.assetCustomFields = (await tx.assetCustomField.deleteMany()).count
-      console.log(`[CLEAN] Deleted ${summary.assetCustomFields} asset_custom_fields`)
-      
+
+      console.log('[CLEAN] Deleting asset_events...')
+      summary.assetEvents = (await tx.assetEvent.deleteMany()).count
+      console.log(`[CLEAN] Deleted ${summary.assetEvents} asset_events`)
+
       console.log('[CLEAN] Deleting asset_checkouts...')
       summary.assetCheckouts = (await tx.assetCheckout.deleteMany()).count
       console.log(`[CLEAN] Deleted ${summary.assetCheckouts} asset_checkouts`)
-      
+
+      console.log('[CLEAN] Deleting asset_custom_values...')
+      summary.assetCustomValues = (await tx.assetCustomValue.deleteMany()).count
+      console.log(`[CLEAN] Deleted ${summary.assetCustomValues} asset_custom_values`)
+
+      console.log('[CLEAN] Deleting asset_custom_fields...')
+      summary.assetCustomFields = (await tx.assetCustomField.deleteMany()).count
+      console.log(`[CLEAN] Deleted ${summary.assetCustomFields} asset_custom_fields`)
+
+      // 2. Delete main records
       console.log('[CLEAN] Deleting assets...')
       summary.assets = (await tx.asset.deleteMany()).count
       console.log(`[CLEAN] Deleted ${summary.assets} assets`)
-      
+
       console.log('[CLEAN] Deleting employees...')
       summary.employees = (await tx.employee.deleteMany()).count
       console.log(`[CLEAN] Deleted ${summary.employees} employees`)
-      
+
+      console.log('[CLEAN] Deleting so_sessions...')
+      summary.soSessions = (await tx.sOSession.deleteMany()).count
+      console.log(`[CLEAN] Deleted ${summary.soSessions} so_sessions`)
+
+      // 3. Delete users except admin
       console.log('[CLEAN] Deleting non-admin users...')
       summary.users = (await tx.user.deleteMany({
         where: {
@@ -358,8 +354,11 @@ async function cleanWithPrisma(): Promise<CleanResult> {
         }
       })).count
       console.log(`[CLEAN] Deleted ${summary.users} non-admin users`)
-      
-      console.log('[CLEAN] Deleting logs...')
+
+      // 4. Clean up other tables that might exist
+      console.log('[CLEAN] Cleaning additional tables...')
+
+      // Try to delete from logs table if it exists
       try {
         const logsResult = await tx.$queryRaw`DELETE FROM logs`
         summary.logs = Array.isArray(logsResult) ? logsResult.length : 0
@@ -368,8 +367,8 @@ async function cleanWithPrisma(): Promise<CleanResult> {
         console.warn('[CLEAN] Failed to delete logs, table might not exist:', error)
         summary.logs = 0
       }
-      
-      console.log('[CLEAN] Deleting backups...')
+
+      // Try to delete from backups table if it exists
       try {
         const backupsResult = await tx.$queryRaw`DELETE FROM backups`
         summary.backups = Array.isArray(backupsResult) ? backupsResult.length : 0
@@ -379,14 +378,16 @@ async function cleanWithPrisma(): Promise<CleanResult> {
         summary.backups = 0
       }
 
-      console.log('[CLEAN] Creating default admin user...')
+      // 5. Ensure default admin exists
+      console.log('[CLEAN] Ensuring default admin user exists...')
       await tx.user.upsert({
         where: { email: DEFAULT_ADMIN_EMAIL },
         update: {
           name: DEFAULT_ADMIN_NAME,
           password: hashedPassword,
           role: 'ADMIN',
-          isActive: true
+          isActive: true,
+          updatedAt: new Date()
         },
         create: {
           email: DEFAULT_ADMIN_EMAIL,
@@ -396,7 +397,16 @@ async function cleanWithPrisma(): Promise<CleanResult> {
           isActive: true
         }
       })
-      console.log('[CLEAN] Default admin user created/updated')
+      console.log('[CLEAN] Default admin user ensured')
+
+      // 6. Reset auto-increment counters for SQLite
+      try {
+        console.log('[CLEAN] Resetting auto-increment counters...')
+        await tx.$executeRaw`DELETE FROM sqlite_sequence WHERE name IN ('assets', 'employees', 'users', 'so_sessions', 'asset_events', 'asset_checkouts', 'so_asset_entries', 'asset_custom_fields', 'asset_custom_values')`
+        console.log('[CLEAN] Auto-increment counters reset')
+      } catch (error) {
+        console.warn('[CLEAN] Failed to reset auto-increment counters:', error)
+      }
 
       console.log('[CLEAN] Prisma clean completed successfully:', summary)
       return summary
@@ -413,32 +423,10 @@ async function cleanWithPrisma(): Promise<CleanResult> {
 
 export async function POST() {
   console.log('[CLEAN] Clean data request received')
-  
-  try {
-    if (canUsePostgres()) {
-      console.log('[CLEAN] Using PostgreSQL clean method')
-      try {
-        const summary = await cleanWithPostgres()
-        console.log('[CLEAN] PostgreSQL clean completed successfully')
-        return NextResponse.json({
-          success: true,
-          cleanedAt: new Date().toISOString(),
-          summary,
-          engine: 'pg'
-        })
-      } catch (pgError) {
-        console.error('[CLEAN] PostgreSQL clean failed, attempting fallback:', pgError)
-        console.error('[CLEAN] PostgreSQL error details:', {
-          message: pgError instanceof Error ? pgError.message : String(pgError),
-          stack: pgError instanceof Error ? pgError.stack : undefined,
-          code: (pgError as any)?.code,
-          detail: (pgError as any)?.detail,
-          hint: (pgError as any)?.hint
-        })
-      }
-    }
 
-    console.log('[CLEAN] Using Prisma clean method')
+  try {
+    // Direct to Prisma for SQLite since that's what we're using
+    console.log('[CLEAN] Using Prisma clean method for SQLite')
     const summary = await cleanWithPrisma()
     console.log('[CLEAN] Prisma clean completed successfully')
     return NextResponse.json({
@@ -457,14 +445,14 @@ export async function POST() {
       detail: (error as any)?.detail,
       hint: (error as any)?.hint
     })
-    
+
     const message =
       error instanceof Error
         ? error.message
         : typeof error === 'string'
           ? error
           : 'Unknown error occurred.'
-    
+
     console.error('[CLEAN] Returning error response:', message)
     return NextResponse.json(
       { error: `Failed to clean data: ${message}` },

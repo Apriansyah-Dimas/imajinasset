@@ -86,6 +86,8 @@ const nextConfig: NextConfig = {
   // Set base path for custom domain
   basePath: "",
   assetPrefix: "",
+  // Disable static generation to avoid Html import issues
+  output: "standalone",
   // Disable the Next.js dev indicator/watermark
   devIndicators: {
     position: "bottom-right",

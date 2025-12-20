@@ -41,7 +41,7 @@ export default function ProtectedRoute({
       router.push('/unauthorized')
       return
     }
-  }, [user, loading, router, requiredRole, fallbackPath])
+  }, [user, loading, router, requiredRole, allowedRoles, fallbackPath])
 
   // Show loading spinner while checking auth
   if (loading) {

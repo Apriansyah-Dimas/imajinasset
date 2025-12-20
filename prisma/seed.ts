@@ -29,13 +29,7 @@ async function main() {
     update: {},
     create: {
       name: "Head Office",
-      address: "Jl. Sudirman No. 1",
-      city: "Jakarta",
-      province: "DKI Jakarta",
-      postalCode: "12345",
-      country: "Indonesia",
-      phone: "+62-21-1234567",
-      email: "info@company.com",
+      sortOrder: 1,
     },
   });
 
@@ -44,13 +38,7 @@ async function main() {
     update: {},
     create: {
       name: "Branch Office",
-      address: "Jl. Gatot Subroto No. 10",
-      city: "Surabaya",
-      province: "Jawa Timur",
-      postalCode: "60245",
-      country: "Indonesia",
-      phone: "+62-31-7654321",
-      email: "branch@company.com",
+      sortOrder: 2,
     },
   });
 
@@ -60,7 +48,7 @@ async function main() {
     update: {},
     create: {
       name: "Laptop",
-      description: "Laptop computers and notebooks",
+      sortOrder: 1,
     },
   });
 
@@ -69,7 +57,7 @@ async function main() {
     update: {},
     create: {
       name: "Monitor",
-      description: "Computer monitors and displays",
+      sortOrder: 2,
     },
   });
 
@@ -80,6 +68,7 @@ async function main() {
     create: {
       name: "IT Department",
       description: "Information Technology Department",
+      sortOrder: 1,
     },
   });
 
@@ -89,35 +78,26 @@ async function main() {
     create: {
       name: "Finance Department",
       description: "Finance and Accounting Department",
+      sortOrder: 2,
     },
   });
 
   // Create sample employees
   const emp1 = await prisma.employee.upsert({
-    where: { employeeId: "EMP001" },
+    where: { id: "emp1" },
     update: {},
     create: {
-      employeeId: "EMP001",
+      id: "emp1",
       name: "John Doe",
-      email: "john.doe@company.com",
-      department: "IT Department",
-      position: "IT Manager",
-      joinDate: new Date("2020-01-15"),
-      isActive: true,
     },
   });
 
   const emp2 = await prisma.employee.upsert({
-    where: { employeeId: "EMP002" },
+    where: { id: "emp2" },
     update: {},
     create: {
-      employeeId: "EMP002",
+      id: "emp2",
       name: "Jane Smith",
-      email: "jane.smith@company.com",
-      department: "Finance Department",
-      position: "Finance Manager",
-      joinDate: new Date("2019-03-20"),
-      isActive: true,
     },
   });
 
