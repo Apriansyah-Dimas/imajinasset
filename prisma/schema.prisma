@@ -185,10 +185,32 @@ model User {
   createdBy    String?  @map("createdby")
   backups      Backup[] @relation("UserBackups")
   logs         Log[]    @relation("UserLogs")
+  loginHistories LoginHistory[]
   creator      User?    @relation("UserCreator", fields: [createdBy], references: [id])
   createdUsers User[]   @relation("UserCreator")
 
   @@map("users")
+}
+
+model LoginHistory {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+  loginTime   DateTime @default(now()) @map("login_time")
+  ipAddress   String?  @map("ip_address")
+  userAgent   String?  @map("user_agent")
+  browser     String?
+  os          String?
+  device      String?
+  isSuccess   Boolean  @default(true) @map("is_success")
+  failureReason String? @map("failure_reason")
+  createdAt   DateTime @default(now()) @map("createdat")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, loginTime])
+  @@index([loginTime])
+  @@index([isSuccess])
+  @@map("login_histories")
 }
 
 model AssetCustomField {

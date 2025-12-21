@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { db } from '@/lib/db';
 import { validateEmail, validatePassword, sanitizeTextInput } from '@/lib/validation';
+import { parseUserAgent } from '@/lib/user-agent';
 
 const jwtSecret = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
@@ -11,6 +12,38 @@ if (!process.env.JWT_SECRET) {
 }
 const DEFAULT_ADMIN_EMAIL = process.env.DEFAULT_ADMIN_EMAIL;
 const DEFAULT_ADMIN_NAME = process.env.DEFAULT_ADMIN_NAME;
+
+async function recordLoginHistory(
+  userId: string,
+  isSuccess: boolean,
+  failureReason?: string,
+  request?: NextRequest
+) {
+  try {
+    const userAgent = request?.headers.get('user-agent') || '';
+    const ipAddress = request?.headers.get('x-forwarded-for') ||
+                      request?.headers.get('x-real-ip') ||
+                      '127.0.0.1';
+
+    const parsedUA = parseUserAgent(userAgent);
+
+    await db.loginHistory.create({
+      data: {
+        userId,
+        ipAddress,
+        userAgent,
+        browser: parsedUA.browser,
+        os: parsedUA.os,
+        device: parsedUA.device,
+        isSuccess,
+        failureReason,
+      }
+    });
+  } catch (error) {
+    console.error('Failed to record login history:', error);
+    // Don't fail the login if history recording fails
+  }
+}
 
 async function ensureDefaultAdmin() {
   // Only proceed if default admin credentials are properly configured
@@ -118,6 +151,8 @@ export async function POST(request: NextRequest) {
     });
 
     if (!user) {
+      // Record failed login attempt (user not found)
+      // We don't have userId here, so we skip recording for now
       return NextResponse.json(
         { error: "Invalid credentials" },
         { status: 401 }
@@ -126,6 +161,8 @@ export async function POST(request: NextRequest) {
 
     // Check if user is active (handle undefined case)
     if (!user.isActive) {
+      // Record failed login attempt (inactive account)
+      await recordLoginHistory(user.id, false, 'Account is inactive', request);
       return NextResponse.json(
         { error: "Account is inactive" },
         { status: 403 }
@@ -136,11 +173,16 @@ export async function POST(request: NextRequest) {
     const isValidPassword = await bcrypt.compare(sanitizedPassword, user.password);
 
     if (!isValidPassword) {
+      // Record failed login attempt (wrong password)
+      await recordLoginHistory(user.id, false, 'Invalid credentials', request);
       return NextResponse.json(
         { error: "Invalid credentials" },
         { status: 401 }
       );
     }
+
+    // Record successful login
+    await recordLoginHistory(user.id, true, undefined, request);
 
     // Generate JWT token
     const token = jwt.sign(

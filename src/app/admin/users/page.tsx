@@ -40,6 +40,11 @@ import {
   Shield,
   User,
   Archive,
+  History,
+  Clock,
+  Globe,
+  Monitor,
+  Smartphone,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -71,6 +76,38 @@ export default function UserManagementPage() {
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  // Login history states
+  const [showHistoryDialog, setShowHistoryDialog] = useState(false);
+  const [loginHistory, setLoginHistory] = useState<any[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyTotalPages, setHistoryTotalPages] = useState(1);
+  const [showFailedLogins, setShowFailedLogins] = useState(false);
+
+  // Function to fetch login history
+  const fetchLoginHistory = async (userId: string, page: number = 1, showFailed: boolean = false) => {
+    try {
+      setHistoryLoading(true);
+      const response = await fetch(
+        `/api/admin/users/${userId}/login-history?page=${page}&limit=20&showFailed=${showFailed}`
+      );
+      const data = await response.json();
+
+      if (response.ok) {
+        setLoginHistory(data.history);
+        setHistoryTotalPages(data.pagination.totalPages);
+        setHistoryPage(page);
+      } else {
+        toast.error("Failed to fetch login history");
+      }
+    } catch (error) {
+      console.error("Error fetching login history:", error);
+      toast.error("Failed to fetch login history");
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
 
   // Form states
   const [createForm, setCreateForm] = useState({
@@ -286,6 +323,14 @@ export default function UserManagementPage() {
     setShowDeleteDialog(true);
   };
 
+  const handleViewLoginHistory = async (user: User) => {
+    setSelectedUser(user);
+    setShowHistoryDialog(true);
+    setHistoryPage(1);
+    setLoginHistory([]);
+    await fetchLoginHistory(user.id, 1, showFailedLogins);
+  };
+
   const getRoleBadgeColor = (role: string) => {
     const colors = {
       ADMIN: "bg-red-100 text-red-800",
@@ -470,6 +515,14 @@ export default function UserManagementPage() {
                                   <Button
                                     variant="outline"
                                     size="sm"
+                                    onClick={() => handleViewLoginHistory(user)}
+                                    title="View Login History"
+                                  >
+                                    <History className="h-3 w-3" />
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
                                     onClick={() => openEditDialog(user)}
                                   >
                                     <Edit className="h-3 w-3" />
@@ -541,6 +594,14 @@ export default function UserManagementPage() {
                             </div>
 
                             <div className="flex flex-wrap gap-2">
+                              <Button
+                                variant="outline"
+                                onClick={() => handleViewLoginHistory(user)}
+                                className="flex-1 min-w-[110px] justify-center"
+                              >
+                                <History className="h-4 w-4 mr-2" />
+                                History
+                              </Button>
                               <Button
                                 variant="outline"
                                 onClick={() => openEditDialog(user)}
@@ -919,6 +980,153 @@ export default function UserManagementPage() {
                     )}
                     Delete User
                   </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            {/* Login History Dialog */}
+            <Dialog open={showHistoryDialog} onOpenChange={setShowHistoryDialog}>
+              <DialogContent className="max-w-4xl max-h-[80vh]">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <History className="h-5 w-5" />
+                    Login History - {selectedUser?.name}
+                  </DialogTitle>
+                  <DialogDescription>
+                    View login activity for {selectedUser?.email}
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-4">
+                  {/* Filter Toggle */}
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="showFailed"
+                      checked={showFailedLogins}
+                      onChange={(e) => {
+                        setShowFailedLogins(e.target.checked);
+                        if (selectedUser) {
+                          fetchLoginHistory(selectedUser.id, 1, e.target.checked);
+                        }
+                      }}
+                      className="rounded"
+                    />
+                    <label htmlFor="showFailed" className="text-sm">
+                      Show failed login attempts
+                    </label>
+                  </div>
+
+                  {/* History List */}
+                  <div className="border rounded-lg max-h-[60vh] overflow-y-auto">
+                    {historyLoading ? (
+                      <div className="p-8 text-center">
+                        <RefreshCw className="h-8 w-8 animate-spin mx-auto text-gray-400" />
+                        <p className="mt-2 text-gray-500">Loading history...</p>
+                      </div>
+                    ) : loginHistory.length === 0 ? (
+                      <div className="p-8 text-center text-gray-500">
+                        No login history found
+                      </div>
+                    ) : (
+                      <div className="divide-y">
+                        {loginHistory.map((entry) => (
+                          <div
+                            key={entry.id}
+                            className={`p-4 ${!entry.isSuccess ? 'bg-red-50' : ''}`}
+                          >
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-2">
+                                  {entry.isSuccess ? (
+                                    <div className="w-2 h-2 bg-green-500 rounded-full" />
+                                  ) : (
+                                    <div className="w-2 h-2 bg-red-500 rounded-full" />
+                                  )}
+                                  <span className="font-medium text-sm">
+                                    {entry.isSuccess ? 'Successful Login' : 'Failed Login'}
+                                  </span>
+                                  <span className="text-xs text-gray-500">
+                                    {new Date(entry.loginTime).toLocaleString()}
+                                  </span>
+                                </div>
+
+                                {!entry.isSuccess && entry.failureReason && (
+                                  <p className="text-sm text-red-600 mb-2">
+                                    Reason: {entry.failureReason}
+                                  </p>
+                                )}
+
+                                <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
+                                  {entry.ipAddress && (
+                                    <div className="flex items-center gap-1">
+                                      <Globe className="h-3 w-3" />
+                                      <span>IP: {entry.ipAddress}</span>
+                                    </div>
+                                  )}
+                                  {entry.browser && (
+                                    <div className="flex items-center gap-1">
+                                      <Monitor className="h-3 w-3" />
+                                      <span>{entry.browser}</span>
+                                    </div>
+                                  )}
+                                  {entry.os && (
+                                    <div className="flex items-center gap-1">
+                                      <Smartphone className="h-3 w-3" />
+                                      <span>{entry.os}</span>
+                                    </div>
+                                  )}
+                                  {entry.device && (
+                                    <div className="flex items-center gap-1">
+                                      <Monitor className="h-3 w-3" />
+                                      <span>{entry.device}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Pagination */}
+                  {historyTotalPages > 1 && (
+                    <div className="flex justify-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const newPage = Math.max(1, historyPage - 1);
+                          setHistoryPage(newPage);
+                          if (selectedUser) {
+                            fetchLoginHistory(selectedUser.id, newPage, showFailedLogins);
+                          }
+                        }}
+                        disabled={historyPage === 1}
+                      >
+                        Previous
+                      </Button>
+                      <span className="flex items-center px-3 py-1 text-sm">
+                        Page {historyPage} of {historyTotalPages}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const newPage = Math.min(historyTotalPages, historyPage + 1);
+                          setHistoryPage(newPage);
+                          if (selectedUser) {
+                            fetchLoginHistory(selectedUser.id, newPage, showFailedLogins);
+                          }
+                        }}
+                        disabled={historyPage === historyTotalPages}
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </DialogContent>
             </Dialog>
