@@ -100,7 +100,7 @@ export async function POST(
 
     // Update main assets with data from SO session & record history only upon completion
     for (const entry of soAssetEntries) {
-      if (entry.isIdentified && entry.asset) {
+      if (entry.asset) {
         const updates = {
           name: entry.tempName ?? entry.asset.name,
           status: entry.tempStatus ?? entry.asset.status,

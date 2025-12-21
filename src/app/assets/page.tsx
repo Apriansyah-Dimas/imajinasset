@@ -20,10 +20,10 @@ import {
 import ProtectedRoute from '@/components/protected-route'
 import RoleBasedAccess from '@/components/role-based-access'
 import { useAuth } from '@/contexts/auth-context'
-import AssetImagePlaceholder from '@/components/asset-image-placeholder'
-import AssetDetailModalComponent from '@/components/asset-detail-modal'
-import AddAssetModalComponent from '@/components/add-asset-modal'
-import ImportAssetsModalComponent from '@/components/import-assets-modal'
+import AssetImagePlaceholder from '@/components/features/assets/asset-image-placeholder'
+import AssetDetailModalComponent from '@/components/features/assets/asset-detail-modal'
+import AddAssetModalComponent from '@/components/features/assets/add-asset-modal'
+import ImportAssetsModalComponent from '@/components/features/assets/import-assets-modal'
 import EditDropdownsModalComponent from '@/components/edit-dropdowns-modal'
 
 const PAGE_SIZE = 50
@@ -70,7 +70,7 @@ type ImportAssetsModalProps = ComponentProps<ImportAssetsModalComponent>
 type EditDropdownsModalProps = ComponentProps<EditDropdownsModalComponent>
 
 const AssetDetailModal = dynamic<AssetDetailModalProps>(
-  () => import('@/components/asset-detail-modal'),
+  () => import('@/components/features/assets/asset-detail-modal'),
   {
     loading: () => <LazyModalFallback label="Loading asset details..." />,
     ssr: false
@@ -78,7 +78,7 @@ const AssetDetailModal = dynamic<AssetDetailModalProps>(
 )
 
 const AddAssetModal = dynamic<AddAssetModalProps>(
-  () => import('@/components/add-asset-modal'),
+  () => import('@/components/features/assets/add-asset-modal'),
   {
     loading: () => <LazyModalFallback label="Preparing add-asset form..." />,
     ssr: false
@@ -86,7 +86,7 @@ const AddAssetModal = dynamic<AddAssetModalProps>(
 )
 
 const ImportAssetsModal = dynamic<ImportAssetsModalProps>(
-  () => import('@/components/import-assets-modal'),
+  () => import('@/components/features/assets/import-assets-modal'),
   {
     loading: () => <LazyModalFallback label="Loading import module..." />,
     ssr: false
@@ -608,7 +608,7 @@ function AssetsPageContent() {
               </button>
             </div>
           </form>
-          <DropdownMenu>
+          <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
@@ -622,8 +622,8 @@ function AssetsPageContent() {
                 ) : null}
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-80 max-h-[80vh] p-0">
-              <div className="space-y-4 p-3 overflow-y-auto max-h-[80vh]">
+            <DropdownMenuContent align="end" className="w-80 max-h-[80vh] p-0 overflow-hidden">
+              <div className="space-y-4 p-3 overflow-y-auto max-h-[70vh]">
                 <div className="flex items-center justify-between">
                   <DropdownMenuLabel className="p-0 text-[0.6rem] uppercase tracking-[0.3em] text-text-muted">
                     Filter & Sort
@@ -837,7 +837,7 @@ function AssetsPageContent() {
                                     if (fallback) fallback.classList.remove('hidden')
                                     e.currentTarget.parentElement?.classList.add('hidden')
                                   }}
-                                  unoptimized
+                                  unoptimized={String(true)}
                                 />
                               </div>
                             ) : null}
@@ -918,7 +918,7 @@ function AssetsPageContent() {
                               if (fallback) fallback.classList.remove('hidden')
                               e.currentTarget.parentElement?.classList.add('hidden')
                             }}
-                            unoptimized
+                            unoptimized={String(true)}
                           />
                         </div>
                       ) : null}

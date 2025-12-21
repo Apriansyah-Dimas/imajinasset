@@ -98,9 +98,9 @@ export async function GET(
         orderBy: { checkoutDate: 'desc' },
         take: limit * 2,
         include: {
-          assignTo: { select: { id: true, name: true, employeeId: true } },
+          assignTo: { select: { id: true, name: true } },
           department: { select: { id: true, name: true } },
-          receivedBy: { select: { id: true, name: true, employeeId: true } },
+          receivedBy: { select: { id: true, name: true } },
         },
       }),
     ])

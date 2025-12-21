@@ -3,7 +3,7 @@
 import { Database, Shield } from 'lucide-react'
 
 import ProtectedRoute from '@/components/protected-route'
-import BackupManagerPanel from '@/components/backup-manager-panel'
+import BackupManagerPanel from '@/components/features/admin/backup-manager-panel'
 
 export default function AdminBackupPage() {
   return (

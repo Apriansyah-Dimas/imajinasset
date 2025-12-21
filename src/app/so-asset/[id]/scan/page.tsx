@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import ProtectedRoute from "@/components/protected-route";
-import AssetDetailModal from "@/components/asset-detail-modal";
+import AssetDetailModal from "@/components/features/assets/asset-detail-modal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -40,7 +40,7 @@ import {
   Trash2,
   XCircle,
 } from "lucide-react";
-import { AssetScanPanel } from "@/components/asset-scan-panel";
+import { AssetScanPanel } from "@/components/features/stock-opname/asset-scan-panel";
 import { Textarea } from "@/components/ui/textarea";
 
 interface Asset {
@@ -48,12 +48,13 @@ interface Asset {
   name: string;
   noAsset: string;
   status: string;
-  serialNo?: string | null;
-  brand?: string | null;
-  model?: string | null;
-  cost?: number | null;
-  site?: { id: string; name: string } | null;
-  category?: { id: string; name: string } | null;
+  serialNo?: string;
+  purchaseDate?: string;
+  cost?: number;
+  brand?: string;
+  model?: string;
+  site?: { id: string; name: string };
+  category?: { id: string; name: string };
   department?: { id: string; name: string } | null;
   pic?: string | null;
   picId?: string | null;
@@ -1030,7 +1031,7 @@ function ScanPageContent() {
                       className="sneat-input h-12 w-full pl-12 text-sm"
                     />
                   </div>
-                  <DropdownMenu>
+                  <DropdownMenu modal={false}>
                     <DropdownMenuTrigger asChild>
                       <button
                         type="button"
@@ -1046,9 +1047,9 @@ function ScanPageContent() {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent
                       align="end"
-                      className="w-80 max-h-[70vh] overflow-y-auto p-0"
+                      className="w-80 max-h-[70vh] overflow-hidden p-0"
                     >
-                      <div className="space-y-4 p-3">
+                      <div className="space-y-4 p-3 overflow-y-auto max-h-[60vh]">
                         <div className="flex items-center justify-between">
                           <DropdownMenuLabel className="p-0 text-[0.6rem] uppercase tracking-[0.3em] text-text-muted">
                             Filter & Sort

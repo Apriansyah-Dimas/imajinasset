@@ -201,7 +201,7 @@ export async function POST(
         tempModel: asset.model,
         tempCost: asset.cost,
         status: "Scanned",
-        isIdentified: false,
+        isIdentified: true,
         isCrucial: Boolean(isCrucial),
         pendingNotes: isCrucial
           ? typeof pendingNotes === "string"

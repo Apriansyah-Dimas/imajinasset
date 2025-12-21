@@ -1,6 +1,6 @@
 'use client'
 
-import Dashboard from '@/components/dashboard'
+import Dashboard from '@/components/features/dashboard/dashboard'
 import ProtectedRoute from '@/components/protected-route'
 
 export default function DashboardPage() {

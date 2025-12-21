@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/protected-route";
-import AssetDetailModal from "@/components/asset-detail-modal";
+import AssetDetailModal from "@/components/features/assets/asset-detail-modal";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -22,13 +22,17 @@ interface Asset {
   name: string;
   noAsset: string;
   status: string;
-  serialNo?: string | null;
-  brand?: string | null;
-  model?: string | null;
-  cost?: number | null;
-  site?: { id: string; name: string } | null;
-  category?: { id: string; name: string } | null;
+  serialNo?: string;
+  purchaseDate?: string;
+  cost?: number;
+  brand?: string;
+  model?: string;
+  site?: { id: string; name: string };
+  category?: { id: string; name: string };
   department?: { id: string; name: string } | null;
+  pic?: string | null;
+  picId?: string | null;
+  imageUrl?: string | null;
 }
 
 interface ScannedEntry {

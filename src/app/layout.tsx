@@ -4,7 +4,7 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from "@/contexts/auth-context";
 import { SidebarProvider } from "@/contexts/sidebar-context";
-import { LayoutShell } from "@/components/layout-shell";
+import { LayoutShell } from "@/components/layout/layout-shell";
 
 const publicSans = Public_Sans({
   variable: "--font-public-sans",
