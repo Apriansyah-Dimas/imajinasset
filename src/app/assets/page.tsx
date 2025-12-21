@@ -49,13 +49,13 @@ const SORT_CONFIG: Record<
 }
 
 type FilterKey = 'status' | 'category' | 'site' | 'department'
-type FilterState = Record<FilterKey, string>
+type FilterState = Record<FilterKey, string[]>
 
 const INITIAL_FILTERS: FilterState = {
-  status: 'all',
-  category: 'all',
-  site: 'all',
-  department: 'all'
+  status: [],
+  category: [],
+  site: [],
+  department: []
 }
 
 const LazyModalFallback = ({ label }: { label: string }) => (
@@ -184,10 +184,10 @@ function AssetsPageContent() {
       })
 
       if (searchTerm) params.set('search', searchTerm)
-      if (filters.status !== 'all') params.set('status', filters.status)
-      if (filters.category !== 'all') params.set('category', filters.category)
-      if (filters.site !== 'all') params.set('site', filters.site)
-      if (filters.department !== 'all') params.set('department', filters.department)
+      if (filters.status.length > 0) params.set('status', filters.status.join(','))
+      if (filters.category.length > 0) params.set('category', filters.category.join(','))
+      if (filters.site.length > 0) params.set('site', filters.site.join(','))
+      if (filters.department.length > 0) params.set('department', filters.department.join(','))
 
       const sortConfig = SORT_CONFIG[sortOption]
       params.set('sort', sortConfig.sort)
@@ -364,18 +364,32 @@ function AssetsPageContent() {
 
 
   const hasActiveFilters =
-    filters.status !== 'all' ||
-    filters.category !== 'all' ||
-    filters.site !== 'all' ||
-    filters.department !== 'all'
+    filters.status.length > 0 ||
+    filters.category.length > 0 ||
+    filters.site.length > 0 ||
+    filters.department.length > 0
   const showActiveFilterDot = hasActiveFilters || sortOption !== 'name-asc'
   const showInitialSkeleton = loading && assets.length === 0 && !fetchError
 
   const handleFilterChange = (type: FilterKey, value: string) => {
-    setFilters(prev => ({
-      ...prev,
-      [type]: value
-    }))
+    setFilters(prev => {
+      const currentValues = prev[type]
+      const isSelected = currentValues.includes(value)
+
+      if (isSelected) {
+        // Remove value if already selected
+        return {
+          ...prev,
+          [type]: currentValues.filter(v => v !== value)
+        }
+      } else {
+        // Add value if not selected
+        return {
+          ...prev,
+          [type]: [...currentValues, value]
+        }
+      }
+    })
   }
 
   const resetFilters = () => {
@@ -651,14 +665,14 @@ function AssetsPageContent() {
                     Filter status
                   </p>
                   <div className="mt-2 flex flex-wrap gap-2">
-                    {['all', ...statusOptions].map(status => (
+                    {statusOptions.map(status => (
                       <button
-                        key={status || 'all-status'}
+                        key={status || 'no-status'}
                         type="button"
-                        onClick={() => handleFilterChange('status', status || 'all')}
-                        className={filterChipClass(filters.status === (status || 'all'))}
+                        onClick={() => handleFilterChange('status', status || '')}
+                        className={filterChipClass(filters.status.includes(status || ''))}
                       >
-                        {status === 'all' ? 'Semua status' : status}
+                        {status || 'Tanpa status'}
                       </button>
                     ))}
                   </div>
@@ -670,14 +684,14 @@ function AssetsPageContent() {
                       Filter kategori
                     </p>
                     <div className="mt-2 flex flex-wrap gap-2">
-                      {['all', ...categoryOptions].map(category => (
+                      {categoryOptions.map(category => (
                         <button
-                          key={category || 'all-category'}
+                          key={category || 'no-category'}
                           type="button"
-                          onClick={() => handleFilterChange('category', category || 'all')}
-                          className={filterChipClass(filters.category === (category || 'all'))}
+                          onClick={() => handleFilterChange('category', category || '')}
+                          className={filterChipClass(filters.category.includes(category || ''))}
                         >
-                          {category === 'all' ? 'Semua kategori' : category}
+                          {category || 'Tanpa kategori'}
                         </button>
                       ))}
                     </div>
@@ -690,14 +704,14 @@ function AssetsPageContent() {
                       Filter lokasi
                     </p>
                     <div className="mt-2 flex flex-wrap gap-2">
-                      {['all', ...siteOptions].map(site => (
+                      {siteOptions.map(site => (
                         <button
-                          key={site || 'all-site'}
+                          key={site || 'no-site'}
                           type="button"
-                          onClick={() => handleFilterChange('site', site || 'all')}
-                          className={filterChipClass(filters.site === (site || 'all'))}
+                          onClick={() => handleFilterChange('site', site || '')}
+                          className={filterChipClass(filters.site.includes(site || ''))}
                         >
-                          {site === 'all' ? 'Semua lokasi' : site}
+                          {site || 'Tanpa lokasi'}
                         </button>
                       ))}
                     </div>
@@ -710,14 +724,14 @@ function AssetsPageContent() {
                       Filter department
                     </p>
                     <div className="mt-2 flex flex-wrap gap-2">
-                      {['all', ...departmentOptions].map(dept => (
+                      {departmentOptions.map(dept => (
                         <button
-                          key={dept || 'all-dept'}
+                          key={dept || 'no-dept'}
                           type="button"
-                          onClick={() => handleFilterChange('department', dept || 'all')}
-                          className={filterChipClass(filters.department === (dept || 'all'))}
+                          onClick={() => handleFilterChange('department', dept || '')}
+                          className={filterChipClass(filters.department.includes(dept || ''))}
                         >
-                          {dept === 'all' ? 'Semua department' : dept}
+                          {dept || 'Tanpa department'}
                         </button>
                       ))}
                     </div>

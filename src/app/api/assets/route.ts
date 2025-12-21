@@ -60,31 +60,69 @@ export async function GET(request: NextRequest) {
     if (siteId) where.siteId = siteId
     if (departmentId) where.departmentId = departmentId
     if (status) {
-      where.status = { equals: status }
+      const statuses = status.split(',').filter(s => s.trim())
+      if (statuses.length === 1) {
+        where.status = { equals: statuses[0] }
+      } else {
+        where.status = { in: statuses }
+      }
     }
     if (categoryName) {
-      where.category = {
-        is: {
-          name: {
-            equals: categoryName
+      const categories = categoryName.split(',').filter(c => c.trim())
+      if (categories.length === 1) {
+        where.category = {
+          is: {
+            name: {
+              equals: categories[0]
+            }
+          }
+        }
+      } else {
+        where.category = {
+          is: {
+            name: {
+              in: categories
+            }
           }
         }
       }
     }
     if (siteName) {
-      where.site = {
-        is: {
-          name: {
-            equals: siteName
+      const sites = siteName.split(',').filter(s => s.trim())
+      if (sites.length === 1) {
+        where.site = {
+          is: {
+            name: {
+              equals: sites[0]
+            }
+          }
+        }
+      } else {
+        where.site = {
+          is: {
+            name: {
+              in: sites
+            }
           }
         }
       }
     }
     if (departmentName) {
-      where.department = {
-        is: {
-          name: {
-            equals: departmentName
+      const departments = departmentName.split(',').filter(d => d.trim())
+      if (departments.length === 1) {
+        where.department = {
+          is: {
+            name: {
+              equals: departments[0]
+            }
+          }
+        }
+      } else {
+        where.department = {
+          is: {
+            name: {
+              in: departments
+            }
           }
         }
       }
