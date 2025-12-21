@@ -392,6 +392,37 @@ function AssetsPageContent() {
     })
   }
 
+  const handleRemoveFilter = (type: FilterKey, value: string) => {
+    setFilters(prev => ({
+      ...prev,
+      [type]: prev[type].filter(v => v !== value)
+    }))
+  }
+
+  const getFilterLabel = (type: FilterKey): string => {
+    switch (type) {
+      case 'status': return 'Status'
+      case 'category': return 'Kategori'
+      case 'site': return 'Lokasi'
+      case 'department': return 'Department'
+      default: return type
+    }
+  }
+
+  const getAllSelectedFilters = (): { type: FilterKey; value: string }[] => {
+    const selected: { type: FilterKey; value: string }[] = []
+
+    Object.entries(filters).forEach(([type, values]) => {
+      values.forEach(value => {
+        if (value) {
+          selected.push({ type: type as FilterKey, value })
+        }
+      })
+    })
+
+    return selected
+  }
+
   const resetFilters = () => {
     setFilters(INITIAL_FILTERS)
   }
@@ -795,6 +826,38 @@ function AssetsPageContent() {
             </div>
           </div>
         ) : null}
+
+        {/* Selected Filters */}
+        {hasActiveFilters && (
+          <div className="border-b border-surface-border bg-surface-muted/20 px-4 py-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-medium text-text-muted">Active Filters:</span>
+              {getAllSelectedFilters().map((filter, index) => (
+                <div
+                  key={`${filter.type}-${filter.value}-${index}`}
+                  className="group inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/5 px-3 py-1 text-xs font-medium text-primary transition-all hover:border-primary/50 hover:bg-primary/10"
+                >
+                  <span>{getFilterLabel(filter.type)}: {filter.value}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveFilter(filter.type, filter.value)}
+                    className="rounded-full p-0.5 text-primary/70 transition-colors hover:bg-primary/20 hover:text-primary"
+                    aria-label={`Remove ${filter.value} filter`}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={resetFilters}
+                className="text-xs font-medium text-text-muted hover:text-primary transition-colors"
+              >
+                Clear all
+              </button>
+            </div>
+          </div>
+        )}
 
         {showInitialSkeleton ? (
           <div className="p-4 sm:p-6">
