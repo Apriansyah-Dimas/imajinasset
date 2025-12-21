@@ -188,10 +188,15 @@ export async function GET(request: NextRequest) {
         break
       case 'purchasedate':
       case 'purchase_date':
+        orderBy = [
+          { purchaseDate: sortOrder },
+          { createdAt: 'desc' }
+        ]
+        break
       default:
         orderBy = [
           { purchaseDate: sortOrder },
-          { dateCreated: 'desc' }
+          { createdAt: 'desc' }
         ]
         break
     }
