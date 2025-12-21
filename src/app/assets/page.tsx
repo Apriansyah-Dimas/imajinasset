@@ -413,11 +413,14 @@ function AssetsPageContent() {
     const selected: { type: FilterKey; value: string }[] = []
 
     Object.entries(filters).forEach(([type, values]) => {
-      values.forEach(value => {
-        if (value) {
-          selected.push({ type: type as FilterKey, value })
-        }
-      })
+      // Check if values is an array
+      if (Array.isArray(values)) {
+        values.forEach(value => {
+          if (value) {
+            selected.push({ type: type as FilterKey, value })
+          }
+        })
+      }
     })
 
     return selected
