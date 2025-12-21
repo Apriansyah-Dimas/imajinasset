@@ -7,6 +7,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -1675,31 +1676,52 @@ export default function AssetDetailModal({
               </div>
             )}
             {!historyLoading && history.length > 0 && (
-              <div className="space-y-3 max-h-[520px] overflow-y-auto pr-1">
-                {history.map((entry) => (
-                  <div
-                    key={entry.id}
-                    className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm"
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <Badge
-                          variant={getHistoryBadgeVariant(entry.type)}
-                          className="uppercase tracking-wide"
+              <div className="max-h-[520px] overflow-y-auto pr-1">
+                {history.map((entry, index) => {
+                  const prevEntry = index > 0 ? history[index - 1] : null;
+                  const showPeriodDivider = prevEntry &&
+                    prevEntry.type === 'CHECK_OUT' && entry.type === 'CHECK_IN';
+
+                  return (
+                    <div key={entry.id}>
+                      {/* Period divider between CHECK_OUT and CHECK_IN */}
+                      {showPeriodDivider && (
+                        <div className="my-4 flex items-center gap-3 px-2">
+                          <Separator className="flex-1" />
+                          <span className="text-xs font-medium text-gray-500 uppercase tracking-wide whitespace-nowrap">
+                            Periode Checkout
+                          </span>
+                          <Separator className="flex-1" />
+                        </div>
+                      )}
+
+                      {/* History entry */}
+                      <div className={showPeriodDivider ? "mt-4" : "mb-3"}>
+                        <div
+                          className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm"
                         >
-                          {formatHistoryType(entry.type)}
-                        </Badge>
-                        <span className="text-sm font-semibold text-gray-900">
-                          {entry.summary}
-                        </span>
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <Badge
+                                variant={getHistoryBadgeVariant(entry.type)}
+                                className="uppercase tracking-wide"
+                              >
+                                {formatHistoryType(entry.type)}
+                              </Badge>
+                              <span className="text-sm font-semibold text-gray-900">
+                                {entry.summary}
+                              </span>
+                            </div>
+                            <span className="text-xs text-gray-500">
+                              {new Date(entry.timestamp).toLocaleString()}
+                            </span>
+                          </div>
+                          {renderHistoryDetails(entry)}
+                        </div>
                       </div>
-                      <span className="text-xs text-gray-500">
-                        {new Date(entry.timestamp).toLocaleString()}
-                      </span>
                     </div>
-                    {renderHistoryDetails(entry)}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
