@@ -837,7 +837,7 @@ function AssetsPageContent() {
                                     if (fallback) fallback.classList.remove('hidden')
                                     e.currentTarget.parentElement?.classList.add('hidden')
                                   }}
-                                  unoptimized={String(true)}
+                                  unoptimized
                                 />
                               </div>
                             ) : null}

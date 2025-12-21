@@ -888,7 +888,7 @@ export default function AssetDetailModal({
                               "hidden"
                             );
                           }}
-                          unoptimized={String(true)}
+                          unoptimized
                         />
                       </div>
                     </div>
