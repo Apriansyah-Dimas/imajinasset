@@ -424,10 +424,17 @@ function AssetsPageContent() {
   const handleExport = async () => {
     setIsExporting(true)
     try {
-      const response = await fetch('/api/assets/export')
+      const response = await fetch('/api/assets/export', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
 
       if (!response.ok) {
-        throw new Error('Export failed')
+        const errorText = await response.text()
+        console.error('Export API error:', response.status, errorText)
+        throw new Error(`Export failed: ${response.status} ${errorText}`)
       }
 
       const blob = await response.blob()
