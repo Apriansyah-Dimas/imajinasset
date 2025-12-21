@@ -691,6 +691,33 @@ function AssetsPageContent() {
                   ) : null}
                 </div>
 
+                {/* Selected Filters in Dropdown */}
+                {hasActiveFilters && (
+                  <div className="border-t border-surface-border pt-3">
+                    <p className="text-[0.65rem] uppercase text-text-muted mb-2">
+                      Active Filters
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {getAllSelectedFilters().map((filter, index) => (
+                        <div
+                          key={`${filter.type}-${filter.value}-${index}`}
+                          className="group inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/5 px-2 py-1 text-[0.7rem] font-medium text-primary transition-all hover:border-primary/50 hover:bg-primary/10"
+                        >
+                          <span>{getFilterLabel(filter.type)}: {filter.value}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveFilter(filter.type, filter.value)}
+                            className="rounded-full p-0.5 text-primary/70 transition-colors hover:bg-primary/20 hover:text-primary"
+                            aria-label={`Remove ${filter.value} filter`}
+                          >
+                            <X className="h-2.5 w-2.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div>
                   <p className="text-[0.65rem] uppercase text-text-muted">
                     Filter status
@@ -826,38 +853,6 @@ function AssetsPageContent() {
             </div>
           </div>
         ) : null}
-
-        {/* Selected Filters */}
-        {hasActiveFilters && (
-          <div className="border-b border-surface-border bg-surface-muted/20 px-4 py-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-medium text-text-muted">Active Filters:</span>
-              {getAllSelectedFilters().map((filter, index) => (
-                <div
-                  key={`${filter.type}-${filter.value}-${index}`}
-                  className="group inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/5 px-3 py-1 text-xs font-medium text-primary transition-all hover:border-primary/50 hover:bg-primary/10"
-                >
-                  <span>{getFilterLabel(filter.type)}: {filter.value}</span>
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveFilter(filter.type, filter.value)}
-                    className="rounded-full p-0.5 text-primary/70 transition-colors hover:bg-primary/20 hover:text-primary"
-                    aria-label={`Remove ${filter.value} filter`}
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </div>
-              ))}
-              <button
-                type="button"
-                onClick={resetFilters}
-                className="text-xs font-medium text-text-muted hover:text-primary transition-colors"
-              >
-                Clear all
-              </button>
-            </div>
-          </div>
-        )}
 
         {showInitialSkeleton ? (
           <div className="p-4 sm:p-6">
