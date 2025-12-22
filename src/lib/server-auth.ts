@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken'
 
 const jwtSecret = process.env.JWT_SECRET || 'your-secret-key-change-in-production'
 
-type UserRole = 'ADMIN' | 'SO_ASSET_USER' | 'VIEWER'
+type UserRole = 'ADMIN' | 'SO_ASSET_USER' | 'VIEWER' | 'USER'
 
 type AuthResult =
   | { isAuthenticated: false }

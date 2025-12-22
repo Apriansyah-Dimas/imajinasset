@@ -10,7 +10,7 @@ const JWT_EXPIRES_IN = "7d";
 export interface JWTPayload {
   userId: string;
   email: string;
-  role: "ADMIN" | "SO_ASSET_USER" | "VIEWER";
+  role: "ADMIN" | "SO_ASSET_USER" | "VIEWER" | "USER";
   name: string;
 }
 
@@ -147,6 +147,7 @@ export const hasPermission = (
     ADMIN: 3,
     SO_ASSET_USER: 2,
     VIEWER: 1,
+    USER: 1,
   };
 
   return (
@@ -196,6 +197,19 @@ export const canCreateAssets = (userRole: string): boolean => {
 };
 
 export const canEditAssets = (userRole: string): boolean => {
+  return userRole === "ADMIN" || userRole === "SO_ASSET_USER";
+};
+
+export const canViewCheckInOut = (userRole: string): boolean => {
+  return (
+    userRole === "ADMIN" ||
+    userRole === "SO_ASSET_USER" ||
+    userRole === "VIEWER" ||
+    userRole === "USER"
+  );
+};
+
+export const canManageCheckInOut = (userRole: string): boolean => {
   return userRole === "ADMIN" || userRole === "SO_ASSET_USER";
 };
 

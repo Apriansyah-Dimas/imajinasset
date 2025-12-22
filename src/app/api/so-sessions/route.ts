@@ -34,29 +34,41 @@ export async function GET(request: NextRequest) {
 
     const [sessions, globalAssetCount] = await Promise.all([
       db.sOSession.findMany({
-        orderBy: { createdAt: 'desc' }
+        orderBy: { createdAt: 'desc' },
+        include: {
+          _count: {
+            select: { soAssetEntries: true }
+          }
+        }
       }),
       db.asset.count()
     ])
 
     // Convert field names to camelCase for frontend compatibility
-    const camelCaseSessions = sessions.map(session => ({
-      id: session.id,
-      name: session.name,
-      year: session.year,
-      description: session.description,
-      planStart: session.planStart,
-      planEnd: session.planEnd,
-      notes: session.notes,
-      status: session.status,
-      totalAssets: globalAssetCount,
-      scannedAssets: session.scannedAssets,
-      startedAt: session.startedAt,
-      completedAt: session.completedAt,
-      createdAt: session.createdAt,
-      updatedAt: session.updatedAt,
-      completionNotes: session.completionNotes
-    }))
+    const camelCaseSessions = sessions.map(session => {
+      // Always align target with the current asset list to avoid stale stored totals
+      const derivedTotal = globalAssetCount
+      const derivedScanned =
+        session._count?.soAssetEntries ?? session.scannedAssets ?? 0
+
+      return {
+        id: session.id,
+        name: session.name,
+        year: session.year,
+        description: session.description,
+        planStart: session.planStart,
+        planEnd: session.planEnd,
+        notes: session.notes,
+        status: session.status,
+        totalAssets: derivedTotal,
+        scannedAssets: derivedScanned,
+        startedAt: session.startedAt,
+        completedAt: session.completedAt,
+        createdAt: session.createdAt,
+        updatedAt: session.updatedAt,
+        completionNotes: session.completionNotes
+      }
+    })
 
     return NextResponse.json(camelCaseSessions)
   } catch (error) {

@@ -53,9 +53,11 @@ export default function Navbar() {
 
     const role = user?.role;
 
-    if (role === "ADMIN" || role === "SO_ASSET_USER") {
+    if (role === "ADMIN" || role === "SO_ASSET_USER" || role === "USER") {
       baseNav.push({ name: "Check Out", href: "/check-out/", icon: LogOut });
       baseNav.push({ name: "Check In", href: "/check-in/", icon: LogIn });
+    } else if (role === "VIEWER") {
+      baseNav.push({ name: "Check Out", href: "/check-out/", icon: LogOut });
     }
 
     if (role === "ADMIN" || role === "SO_ASSET_USER" || role === "VIEWER") {

@@ -148,7 +148,7 @@ export function BackupManagerPanel({
         const formData = new FormData()
         formData.append('file', selectedFile)
 
-        const response = await fetch('/api/backup/import', {
+        const response = await fetch('/api/backup/import/', {
           method: 'POST',
           body: formData
         })

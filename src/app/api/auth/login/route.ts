@@ -20,14 +20,17 @@ async function recordLoginHistory(
   request?: NextRequest
 ) {
   try {
+    console.log('DEBUG: Recording login history for userId:', userId, 'isSuccess:', isSuccess);
+
     const userAgent = request?.headers.get('user-agent') || '';
     const ipAddress = request?.headers.get('x-forwarded-for') ||
                       request?.headers.get('x-real-ip') ||
                       '127.0.0.1';
 
     const parsedUA = parseUserAgent(userAgent);
+    console.log('DEBUG: Parsed UA:', parsedUA);
 
-    await db.loginHistory.create({
+    const result = await db.loginHistory.create({
       data: {
         userId,
         ipAddress,
@@ -39,6 +42,7 @@ async function recordLoginHistory(
         failureReason,
       }
     });
+    console.log('DEBUG: Login history recorded successfully with ID:', result.id);
   } catch (error) {
     console.error('Failed to record login history:', error);
     // Don't fail the login if history recording fails

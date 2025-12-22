@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { recordAssetEvent } from "@/lib/asset-events";
+import { authenticate, canManageCheckInOut, canViewCheckInOut } from "@/lib/auth";
 
 const successResponse = (data: unknown) =>
   NextResponse.json(data, { status: 200 });
@@ -8,6 +9,14 @@ const successResponse = (data: unknown) =>
 export async function GET(request: NextRequest) {
   try {
     console.log("Check-outs GET request received");
+
+    const auth = await authenticate(request);
+    if (!auth.success || !auth.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    if (!canViewCheckInOut(auth.user.role)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
 
     // Test database connection
     try {
@@ -58,6 +67,10 @@ export async function GET(request: NextRequest) {
         );
       }
 
+      if (auth.user.role === "VIEWER" && checkout.status !== "OUT") {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+
       return successResponse({ checkout });
     }
 
@@ -82,9 +95,20 @@ export async function GET(request: NextRequest) {
       where
     );
 
+    const orderBy =
+      status === "RETURNED" ? { returnedAt: "desc" } : { checkoutDate: "desc" };
+
+    if (auth.user.role === "VIEWER") {
+      // Viewer can only see assets that are still out
+      if (status && status !== "OUT") {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+      where.status = "OUT";
+    }
+
     const history = await db.assetCheckout.findMany({
       where,
-      orderBy: { checkoutDate: "desc" },
+      orderBy,
       take: limit,
       include: {
         assignTo: {
@@ -125,6 +149,17 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const auth = await authenticate(request);
+    if (!auth.success || !auth.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    if (!canManageCheckInOut(auth.user.role)) {
+      return NextResponse.json(
+        { error: "You do not have permission to create check-out records" },
+        { status: 403 }
+      );
+    }
+
     const body = await request.json();
 
     const assetId = typeof body.assetId === "string" ? body.assetId.trim() : "";

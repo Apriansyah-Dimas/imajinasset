@@ -6,8 +6,8 @@ import { useAuth } from '@/contexts/auth-context'
 
 interface ProtectedRouteProps {
   children: React.ReactNode
-  requiredRole?: 'ADMIN' | 'SO_ASSET_USER' | 'VIEWER'
-  allowedRoles?: ('ADMIN' | 'SO_ASSET_USER' | 'VIEWER')[]
+  requiredRole?: 'ADMIN' | 'SO_ASSET_USER' | 'VIEWER' | 'USER'
+  allowedRoles?: ('ADMIN' | 'SO_ASSET_USER' | 'VIEWER' | 'USER')[]
   fallbackPath?: string
 }
 

@@ -5,6 +5,8 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   reactStrictMode: false,
+  // Allow cross-origin requests from Cloudflare tunnel in development
+  allowedDevOrigins: ["imajinasset.biz.id"],
   webpack: (config, { isServer }) => {
     if (!isServer) {
       config.resolve.fallback = {

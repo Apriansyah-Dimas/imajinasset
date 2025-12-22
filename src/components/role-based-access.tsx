@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/auth-context'
 
 interface RoleBasedAccessProps {
   children: React.ReactNode
-  allowedRoles: ('ADMIN' | 'SO_ASSET_USER' | 'VIEWER')[]
+  allowedRoles: ('ADMIN' | 'SO_ASSET_USER' | 'VIEWER' | 'USER')[]
   fallback?: React.ReactNode
 }
 

@@ -10,6 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2, RefreshCcw, Search } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/auth-context";
+import { getClientAuthToken } from "@/lib/client-auth";
 
 interface AssetRecord {
   id: string;
@@ -34,6 +36,9 @@ interface CheckoutEntry {
   notes?: string | null;
   asset?: { id: string; name: string; noAsset: string };
   status?: string;
+  returnedAt?: string | null;
+  returnNotes?: string | null;
+  receivedBy?: { id: string; name: string } | null;
 }
 
 interface CheckInFormState {
@@ -86,9 +91,11 @@ function AssetInfo({
 function OutstandingCard({
   entry,
   onSelect,
+  isReadOnly = false,
 }: {
   entry: CheckoutEntry;
   onSelect: (entry: CheckoutEntry) => void;
+  isReadOnly?: boolean;
 }) {
   return (
     <div className="rounded-xl border bg-background p-4 text-sm shadow-sm">
@@ -101,8 +108,13 @@ function OutstandingCard({
             {entry.asset?.name ?? "Asset"}
           </p>
         </div>
-        <Button variant="secondary" size="sm" onClick={() => onSelect(entry)}>
-          Check In
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => onSelect(entry)}
+          disabled={isReadOnly}
+        >
+          {isReadOnly ? "Read Only" : "Check In"}
         </Button>
       </div>
       <p className="mt-2 text-xs text-muted-foreground">
@@ -119,7 +131,47 @@ function OutstandingCard({
   );
 }
 
+function ReturnedCard({ entry }: { entry: CheckoutEntry }) {
+  return (
+    <div className="rounded-xl border bg-background p-4 text-sm shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="text-xs uppercase text-muted-foreground">
+            {entry.asset?.noAsset ?? "-"}
+          </p>
+          <p className="text-base font-semibold text-foreground">
+            {entry.asset?.name ?? "Asset"}
+          </p>
+        </div>
+        <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200">
+          Returned
+        </span>
+      </div>
+      <p className="mt-2 text-xs text-muted-foreground">
+        Dipinjam oleh{" "}
+        <span className="font-semibold text-foreground">
+          {entry.assignTo.name}
+        </span>
+      </p>
+      <p className="text-xs text-muted-foreground">
+        Dikembalikan{" "}
+        {formatDisplayDateTime(entry.returnedAt ?? entry.checkoutDate)}
+        {entry.receivedBy ? ` \u00b7 Diterima oleh ${entry.receivedBy.name}` : ""}
+      </p>
+      {entry.returnNotes && (
+        <p className="mt-1 text-xs text-muted-foreground">
+          Notes: {entry.returnNotes}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function CheckInContent() {
+  const { user } = useAuth();
+  const canManageCheckInOut =
+    user?.role === "ADMIN" || user?.role === "SO_ASSET_USER";
+  const isReadOnly = !canManageCheckInOut;
   const [assetNumber, setAssetNumber] = useState("");
   const [assetError, setAssetError] = useState<string | null>(null);
   const [lookupLoading, setLookupLoading] = useState(false);
@@ -139,16 +191,23 @@ function CheckInContent() {
   const [pendingCheckouts, setPendingCheckouts] = useState<CheckoutEntry[]>([]);
   const [pendingLoading, setPendingLoading] = useState(false);
   const [pendingError, setPendingError] = useState<string | null>(null);
+  const [returnedCheckouts, setReturnedCheckouts] = useState<CheckoutEntry[]>(
+    []
+  );
+  const [returnedLoading, setReturnedLoading] = useState(false);
+  const [returnedError, setReturnedError] = useState<string | null>(null);
+
+  const getAuthHeaders = useCallback(() => {
+    const token = getClientAuthToken();
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  }, [getAuthHeaders]);
 
   const fetchPics = useCallback(async () => {
     setPicsLoading(true);
     try {
-      // Get auth token
-      const token = localStorage.getItem('auth_token');
-
       const response = await fetch("/api/pics", {
         headers: {
-          "Authorization": token ? `Bearer ${token}` : '',
+          ...getAuthHeaders(),
         },
       });
       if (!response.ok) {
@@ -169,12 +228,9 @@ function CheckInContent() {
     setPendingLoading(true);
     setPendingError(null);
     try {
-      // Get auth token
-      const token = localStorage.getItem('auth_token');
-
       const response = await fetch("/api/check-in-out?status=OUT&limit=50", {
         headers: {
-          "Authorization": token ? `Bearer ${token}` : '',
+          ...getAuthHeaders(),
         },
       });
       if (!response.ok) {
@@ -196,12 +252,44 @@ function CheckInContent() {
     } finally {
       setPendingLoading(false);
     }
-  }, []);
+  }, [getAuthHeaders]);
+
+  const loadReturnedCheckouts = useCallback(async () => {
+    setReturnedLoading(true);
+    setReturnedError(null);
+    try {
+      const response = await fetch(
+        "/api/check-in-out?status=RETURNED&limit=50",
+        { headers: { ...getAuthHeaders() } },
+      );
+      if (!response.ok) {
+        const data = (await response.json().catch(() => null)) as
+          | { error?: string }
+          | null;
+        setReturnedError(
+          data?.error ?? "Gagal memuat daftar pengembalian."
+        );
+        setReturnedCheckouts([]);
+        return;
+      }
+      const payload = (await response.json()) as {
+        history?: CheckoutEntry[];
+      };
+      setReturnedCheckouts(payload.history ?? []);
+    } catch (error) {
+      console.error("Returned checkouts fetch error:", error);
+      setReturnedError("Tidak dapat memuat daftar pengembalian.");
+      setReturnedCheckouts([]);
+    } finally {
+      setReturnedLoading(false);
+    }
+  }, [getAuthHeaders]);
 
   useEffect(() => {
     fetchPics();
     loadPendingCheckouts();
-  }, [fetchPics, loadPendingCheckouts]);
+    loadReturnedCheckouts();
+  }, [fetchPics, loadPendingCheckouts, loadReturnedCheckouts]);
 
   const resetFlow = () => {
     setSelectedAsset(null);
@@ -217,14 +305,11 @@ function CheckInContent() {
 
   const fetchActiveCheckout = useCallback(async (assetId: string) => {
     try {
-      // Get auth token
-      const token = localStorage.getItem('auth_token');
-
       const response = await fetch(
         `/api/check-in-out?assetId=${assetId}&limit=1`,
         {
           headers: {
-            "Authorization": token ? `Bearer ${token}` : '',
+            ...getAuthHeaders(),
           },
         },
       );
@@ -252,7 +337,7 @@ function CheckInContent() {
       console.error("Active checkout fetch error:", error);
       setActiveCheckout(null);
     }
-  }, []);
+  }, [getAuthHeaders]);
 
   const verifyAsset = useCallback(
     async (number: string) => {
@@ -264,13 +349,10 @@ function CheckInContent() {
       setAssetError(null);
       setLookupLoading(true);
       try {
-        // Get auth token
-        const token = localStorage.getItem('auth_token');
-
         const query = encodeURIComponent(trimmed);
         const response = await fetch(`/api/assets/by-number?number=${query}`, {
           headers: {
-            "Authorization": token ? `Bearer ${token}` : '',
+            ...getAuthHeaders(),
           },
         });
         if (!response.ok) {
@@ -299,7 +381,7 @@ function CheckInContent() {
         setLookupLoading(false);
       }
     },
-    [fetchActiveCheckout],
+    [fetchActiveCheckout, getAuthHeaders],
   );
 
   const handleVerifyAsset = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -313,18 +395,19 @@ function CheckInContent() {
       toast.error("PIC penerima wajib dipilih.");
       return;
     }
+    if (isReadOnly) {
+      toast.error("Anda tidak memiliki akses untuk melakukan check-in.");
+      return;
+    }
     setSubmitting(true);
     try {
-      // Get auth token
-      const token = localStorage.getItem('auth_token');
-
       const response = await fetch(
         `/api/check-in-out/${activeCheckout.id}`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "Authorization": token ? `Bearer ${token}` : '',
+            ...getAuthHeaders(),
           },
           body: JSON.stringify({
             returnedAt: formData.returnDate,
@@ -381,9 +464,19 @@ function CheckInContent() {
     <div className="min-h-screen bg-background px-4 py-6 sm:px-6 lg:px-10">
       <div className="mx-auto w-full max-w-7xl space-y-6">
         <div className="flex flex-col gap-2">
-          <h1 className="text-3xl font-semibold text-foreground">Check In</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl font-semibold text-foreground">Check In</h1>
+            {isReadOnly && (
+              <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+                Read Only
+              </span>
+            )}
+          </div>
           <p className="text-sm text-muted-foreground">
-            Masukkan Asset No untuk memproses pengembalian asset.
+            {isReadOnly
+              ? "View only access. You cannot perform check-in operations."
+              : "Masukkan Asset No untuk memproses pengembalian asset."
+            }
           </p>
         </div>
 
@@ -409,16 +502,22 @@ function CheckInContent() {
                   onChange={(event) => setAssetNumber(event.target.value)}
                   required
                   className="flex-1"
+                  disabled={isReadOnly}
                 />
                 <Button
                   type="submit"
                   className="w-full sm:w-40"
-                  disabled={lookupLoading}
+                  disabled={lookupLoading || isReadOnly}
                 >
                   {lookupLoading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       Mencari
+                    </>
+                  ) : isReadOnly ? (
+                    <>
+                      <Search className="mr-2 h-4 w-4" />
+                      View Only
                     </>
                   ) : (
                     <>
@@ -476,6 +575,7 @@ function CheckInContent() {
                               returnDate: event.target.value,
                             }))
                           }
+                          disabled={isReadOnly}
                         />
                       </div>
                       <div className="space-y-2">
@@ -488,7 +588,7 @@ function CheckInContent() {
                               receivedBy: value,
                             }))
                           }
-                          disabled={picsLoading || pics.length === 0}
+                          disabled={picsLoading || pics.length === 0 || isReadOnly}
                         >
                           <SelectTrigger>
                             <SelectValue placeholder="Pilih PIC penerima" />
@@ -521,6 +621,7 @@ function CheckInContent() {
                           }))
                         }
                         placeholder="Catatan kondisi asset saat kembali."
+                        disabled={isReadOnly}
                       />
                     </div>
 
@@ -534,6 +635,7 @@ function CheckInContent() {
                             signature,
                           }))
                         }
+                        disabled={isReadOnly}
                       />
                     </div>
 
@@ -549,13 +651,15 @@ function CheckInContent() {
                       <Button
                         type="button"
                         onClick={handleSubmit}
-                        disabled={submitting || !formData.receivedBy}
+                        disabled={submitting || !formData.receivedBy || isReadOnly}
                       >
                         {submitting ? (
                           <>
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                             Memproses
                           </>
+                        ) : isReadOnly ? (
+                          "Read Only"
                         ) : (
                           "Check In"
                         )}
@@ -620,6 +724,7 @@ function CheckInContent() {
                 <OutstandingCard
                   key={entry.id}
                   entry={entry}
+                  isReadOnly={isReadOnly}
                   onSelect={(item) => {
                     if (item.asset?.noAsset) {
                       setAssetNumber(item.asset.noAsset);
@@ -631,6 +736,58 @@ function CheckInContent() {
             </div>
           )}
         </section>
+
+        <section className="rounded-2xl border bg-card p-6 shadow-sm">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold text-foreground">
+                History Pengembalian
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Daftar asset yang sudah dikembalikan (urut terbaru).
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={loadReturnedCheckouts}
+              disabled={returnedLoading}
+            >
+              <RefreshCcw className="mr-2 h-4 w-4" />
+              Refresh
+            </Button>
+          </div>
+
+          {returnedError && (
+            <p className="mt-4 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {returnedError}
+            </p>
+          )}
+
+          {!returnedError &&
+            returnedCheckouts.length === 0 &&
+            !returnedLoading && (
+              <p className="mt-4 text-sm text-muted-foreground">
+                Belum ada asset yang dikembalikan.
+              </p>
+            )}
+
+          {returnedLoading && (
+            <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Memuat history pengembalian...
+            </div>
+          )}
+
+          {!returnedError && returnedCheckouts.length > 0 && (
+            <div className="mt-4 space-y-3">
+              {returnedCheckouts.map((entry) => (
+                <ReturnedCard key={entry.id} entry={entry} />
+              ))}
+            </div>
+          )}
+        </section>
       </div>
     </div>
   );
@@ -638,7 +795,7 @@ function CheckInContent() {
 
 export default function CheckInPage() {
   return (
-    <ProtectedRoute allowedRoles={["ADMIN", "SO_ASSET_USER", "VIEWER"]}>
+    <ProtectedRoute allowedRoles={["ADMIN", "SO_ASSET_USER", "USER"]}>
       <CheckInContent />
     </ProtectedRoute>
   );

@@ -284,7 +284,11 @@ function ScanPageContent() {
   const params = useParams();
   const router = useRouter();
   const { user } = useAuth();
-  const canManageSession = user?.role === "ADMIN";
+  const role = user?.role;
+  const isViewer = role === "VIEWER";
+  const canScanAssets = role === "ADMIN" || role === "SO_ASSET_USER";
+  const canManageSession = role === "ADMIN";
+  const canEditEntries = canScanAssets;
   const sessionId = params.id as string;
 
   const [session, setSession] = useState<SessionOverview | null>(null);
@@ -362,22 +366,20 @@ function ScanPageContent() {
     ],
     [scannedEntries, remainingAssets]
   );
-  const derivedScannedCount = scannedEntries.length;
-  const derivedTotalAssets = derivedScannedCount + remainingAssets.length;
-  const displayScannedCount = loadingData
-    ? session?.scannedAssets ?? derivedScannedCount
-    : derivedScannedCount;
-  const displayTotalAssets = loadingData
-    ? session?.totalAssets ?? derivedTotalAssets
-    : derivedTotalAssets;
-  const remainingCount = Math.max(displayTotalAssets - displayScannedCount, 0);
-  const progressPercent =
-    displayTotalAssets > 0
-      ? Math.min(
-          100,
-          Math.round((displayScannedCount / displayTotalAssets) * 100)
-        )
-      : 0;
+  // Note: We no longer use derived counts for display - session data is authoritative for consistency
+
+  // Use actual scanned entries count for accuracy - this matches the real scanned data
+  // This ensures we display the true number of scanned assets (550), not stored session count (554)
+  const displayScannedCount = scannedEntries.length;
+  const targetTotalAssets = session?.totalAssets ?? scannedEntries.length + remainingAssets.length;
+
+  // Calculate remaining count based on session data only
+  const remainingCount = Math.max(targetTotalAssets - displayScannedCount, 0);
+
+  // Calculate progress percentage based on session data only
+  const progressPercent = targetTotalAssets > 0
+    ? Math.min(100, Math.max(0, Math.round((displayScannedCount / targetTotalAssets) * 100)))
+    : 0;
 
   const statusOptions = useMemo(
     () =>
@@ -587,6 +589,42 @@ function ScanPageContent() {
     }
   }, [pendingSessionAction]);
 
+  // Auto-refresh data when window gets focus (ensures data stays synchronized)
+  useEffect(() => {
+    const handleFocus = () => {
+      console.log("[DEBUG] Window focused, refreshing session data");
+      fetchSessionData();
+    };
+
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        console.log("[DEBUG] Page became visible, refreshing session data");
+        fetchSessionData();
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [fetchSessionData]);
+
+  // Periodic refresh to ensure data synchronization during active scanning
+  useEffect(() => {
+    // Only set up interval if session exists and is in progress
+    if (!session || session.status !== 'IN_PROGRESS') return;
+
+    const interval = setInterval(() => {
+      console.log("[DEBUG] Periodic refresh of session data");
+      fetchSessionData();
+    }, 10000); // Refresh every 10 seconds
+
+    return () => clearInterval(interval);
+  }, [session?.status, fetchSessionData]);
+
   const handleFilterChange = (type: keyof FilterState, value: string) => {
     setFilters((prev) => ({ ...prev, [type]: value }));
   };
@@ -602,6 +640,10 @@ function ScanPageContent() {
   };
 
   const handleNotesSave = useCallback(async () => {
+    if (isViewer) {
+      toast.error("Viewer hanya bisa melihat catatan.");
+      return;
+    }
     if (!sessionId) return;
     setNotesSaving(true);
     setNotesError(null);
@@ -642,7 +684,7 @@ function ScanPageContent() {
     } finally {
       setNotesSaving(false);
     }
-  }, [sessionId, notesDraft]);
+  }, [sessionId, notesDraft, isViewer]);
 
   const matchesSearch = (asset: Asset, query: string) => {
     if (!query.trim()) return true;
@@ -765,6 +807,12 @@ function ScanPageContent() {
       value: string,
       source: "camera" | "manual"
     ): Promise<{ success: boolean; message?: string }> => {
+      if (!canScanAssets) {
+        return {
+          success: false,
+          message: "Mode viewer: scanning tidak diizinkan",
+        } as const;
+      }
       const trimmed = value.trim();
       if (!trimmed) {
         return { success: false, message: "Asset number is empty" } as const;
@@ -822,7 +870,7 @@ function ScanPageContent() {
         return { success: false, message };
       }
     },
-    [sessionId, fetchSessionData]
+    [sessionId, fetchSessionData, canScanAssets]
   );
 
   const handleSessionAction = async () => {
@@ -899,7 +947,7 @@ function ScanPageContent() {
     }
   };
   const openAssetModal = (asset: Asset | null, options?: ModalOptions) => {
-    const readOnly = !!options?.readOnly;
+    const readOnly = isViewer || !!options?.readOnly;
     const startEdit = !!options?.startEdit && !readOnly;
     const entry = options?.entry ?? null;
     const derivedAsset = entry ? getEntryDisplayAsset(entry) : asset;
@@ -994,8 +1042,8 @@ function ScanPageContent() {
                 <span>Progress</span>
                 <span className="font-semibold text-foreground">
                   {progressPercent}%{" "}
-                  {displayTotalAssets
-                    ? `(${displayScannedCount}/${displayTotalAssets})`
+                  {targetTotalAssets
+                    ? `(${displayScannedCount}/${targetTotalAssets})`
                     : ""}
                 </span>
               </div>
@@ -1010,13 +1058,31 @@ function ScanPageContent() {
         </div>
 
         <div className="grid gap-6 lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
-          <AssetScanPanel
-            onDetected={handleAssetSelection}
-            title="Scan aset"
-            description="Scan barcode atau ketik nomor aset."
-            manualPlaceholder="Nomor aset"
-            manualHelperText="Tekan X untuk fokus ke input manual."
-          />
+          <div
+            className={cn(
+              "relative",
+              isViewer ? "pointer-events-none opacity-70" : ""
+            )}
+          >
+            <AssetScanPanel
+              onDetected={handleAssetSelection}
+              title="Scan aset"
+              description="Scan barcode atau ketik nomor aset."
+              manualPlaceholder="Nomor aset"
+              manualHelperText={
+                isViewer
+                  ? "Mode viewer: scanning dinonaktifkan"
+                  : "Tekan X untuk fokus ke input manual."
+              }
+            />
+            {isViewer && (
+              <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                <div className="rounded-full bg-white/90 px-4 py-2 text-sm font-semibold text-muted-foreground shadow">
+                  Viewer mode - monitoring only
+                </div>
+              </div>
+            )}
+          </div>
           <div className="space-y-4">
             <Card className="rounded-3xl border border-surface-border/70 bg-white/80 shadow-sm">
               <CardContent className="space-y-4 pt-4">
@@ -1281,14 +1347,14 @@ function ScanPageContent() {
                                 size="sm"
                                 onClick={() =>
                                   openAssetModal(entry.asset, {
-                                    startEdit: true,
+                                    startEdit: canEditEntries,
                                     entry,
                                   })
                                 }
                                 className="justify-center"
                               >
                                 <Eye className="mr-2 h-3.5 w-3.5" />
-                                Edit
+                                {canEditEntries ? "Edit" : "View"}
                               </Button>
                             </div>
                           </div>
@@ -1337,14 +1403,14 @@ function ScanPageContent() {
                                 size="sm"
                                 onClick={() =>
                                   openAssetModal(entry.asset, {
-                                    startEdit: true,
+                                    startEdit: canEditEntries,
                                     entry,
                                   })
                                 }
                                 className="justify-center"
                               >
                                 <Eye className="mr-2 h-3.5 w-3.5" />
-                                Review
+                                {canEditEntries ? "Review" : "View"}
                               </Button>
                             </div>
                           </div>
@@ -1412,6 +1478,7 @@ function ScanPageContent() {
                     rows={4}
                     placeholder="Catatan singkat untuk tim."
                     className="min-h-[100px] resize-y border border-surface-border bg-surface"
+                    disabled={isViewer}
                   />
                   {notesError ? (
                     <p className="text-sm text-destructive">{notesError}</p>
@@ -1425,7 +1492,7 @@ function ScanPageContent() {
                       type="button"
                       variant="ghost"
                       size="sm"
-                      disabled={!hasNotesChanged || notesSaving}
+                      disabled={!hasNotesChanged || notesSaving || isViewer}
                       onClick={() => {
                         setNotesDraft(sessionNotes);
                         setNotesError(null);
@@ -1437,7 +1504,7 @@ function ScanPageContent() {
                       type="button"
                       size="sm"
                       className="bg-primary text-white hover:bg-primary/90"
-                      disabled={!hasNotesChanged || notesSaving}
+                      disabled={!hasNotesChanged || notesSaving || isViewer}
                       onClick={handleNotesSave}
                     >
                       {notesSaving ? "Saving..." : "Simpan"}
@@ -1576,7 +1643,7 @@ function ScanPageContent() {
 
 export default function ScanPage() {
   return (
-    <ProtectedRoute allowedRoles={["ADMIN", "SO_ASSET_USER"]}>
+    <ProtectedRoute allowedRoles={["ADMIN", "SO_ASSET_USER", "VIEWER"]}>
       <ScanPageContent />
     </ProtectedRoute>
   );

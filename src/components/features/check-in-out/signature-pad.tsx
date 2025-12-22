@@ -7,9 +7,10 @@ import { Lock, Unlock } from "lucide-react"
 interface SignaturePadProps {
   value: string | null
   onChange: (value: string | null) => void
+  disabled?: boolean
 }
 
-export default function SignaturePad({ value, onChange }: SignaturePadProps) {
+export default function SignaturePad({ value, onChange, disabled = false }: SignaturePadProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const wrapperRef = useRef<HTMLDivElement | null>(null)
   const [isDrawing, setIsDrawing] = useState(false)
@@ -101,6 +102,7 @@ export default function SignaturePad({ value, onChange }: SignaturePadProps) {
   }
 
   const handlePointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    if (disabled) return
     event.preventDefault()
     const canvas = canvasRef.current
     const ctx = canvas?.getContext("2d")
@@ -134,6 +136,7 @@ export default function SignaturePad({ value, onChange }: SignaturePadProps) {
   }
 
   const handleClear = () => {
+    if (disabled) return
     clearCanvas()
     setHasDrawing(false)
     setIsDirty(false)
@@ -142,6 +145,7 @@ export default function SignaturePad({ value, onChange }: SignaturePadProps) {
   }
 
   const handleConfirm = () => {
+    if (disabled) return
     const canvas = canvasRef.current
     if (!canvas || !hasDrawing || !isDirty) return
     const signatureData = canvas.toDataURL("image/png")
@@ -151,6 +155,7 @@ export default function SignaturePad({ value, onChange }: SignaturePadProps) {
   }
 
   const helperText = (() => {
+    if (disabled) return "Read-only mode: signature cannot be modified."
     if (isLocked) return "Lock aktif: scroll dinonaktifkan untuk memudahkan tanda tangan."
     if (isConfirmed) return "Signature confirmed."
     if (hasDrawing && isDirty) return "Click Confirm to save the signature."
@@ -162,7 +167,7 @@ export default function SignaturePad({ value, onChange }: SignaturePadProps) {
       <div className="overflow-hidden rounded-lg border border-dashed border-muted-foreground/60 bg-background">
         <canvas
           ref={canvasRef}
-          className="h-44 w-full rounded-t-lg bg-background"
+          className={`h-44 w-full rounded-t-lg bg-background ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
           style={{ touchAction: isLocked ? "none" : "auto" }}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
@@ -179,6 +184,7 @@ export default function SignaturePad({ value, onChange }: SignaturePadProps) {
               variant="ghost"
               size="sm"
               onClick={() => setIsLocked((prev) => !prev)}
+              disabled={disabled}
             >
               {isLocked ? (
                 <>
@@ -197,7 +203,7 @@ export default function SignaturePad({ value, onChange }: SignaturePadProps) {
               variant="outline"
               size="sm"
               onClick={handleClear}
-              disabled={!hasDrawing && !value}
+              disabled={!hasDrawing && !value || disabled}
             >
               Clear
             </Button>
@@ -205,7 +211,7 @@ export default function SignaturePad({ value, onChange }: SignaturePadProps) {
               type="button"
               size="sm"
               onClick={handleConfirm}
-              disabled={!hasDrawing || !isDirty}
+              disabled={!hasDrawing || !isDirty || disabled}
             >
               Confirm
             </Button>

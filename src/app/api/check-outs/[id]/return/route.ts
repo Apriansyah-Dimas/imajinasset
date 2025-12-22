@@ -1,17 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { recordAssetEvent } from "@/lib/asset-events";
-import { authenticate } from "@/lib/auth";
+import { authenticate, canManageCheckInOut } from "@/lib/auth";
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Authenticate user
     const authResult = await authenticate(request);
-    if (!authResult.success) {
+    if (!authResult.success || !authResult.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    if (!canManageCheckInOut(authResult.user.role)) {
+      return NextResponse.json(
+        { error: "You do not have permission to complete check-in" },
+        { status: 403 }
+      );
     }
 
     // Await params as required by Next.js 15

@@ -173,6 +173,8 @@ export async function GET(
     }
 
     console.log("[DEBUG API] Scanned entries found:", scannedEntries.length);
+    console.log("[DEBUG API] Session stored scannedAssets:", session.scannedAssets);
+    console.log("[DEBUG API] Actual scanned entries count:", scannedEntries.length);
 
     // Get scanned asset IDs
     const scannedAssetIds = scannedEntries.map((entry) => entry.assetId);
@@ -187,6 +189,34 @@ export async function GET(
     // Get statistics
     const totalAssets = allAssets.length;
     const scannedAssets = scannedEntries.length;
+
+    // Sync session data with actual counts to fix inconsistencies
+    try {
+      const sessionNeedsUpdate =
+        session.totalAssets !== totalAssets ||
+        session.scannedAssets !== scannedAssets;
+
+      if (sessionNeedsUpdate) {
+        console.log("[DEBUG API] Session data inconsistent, updating...");
+        console.log("[DEBUG API] Old totals:", session.totalAssets, "-> New:", totalAssets);
+        console.log("[DEBUG API] Old scanned:", session.scannedAssets, "-> New:", scannedAssets);
+
+        await retryOnBusy(() =>
+          db.sOSession.update({
+            where: { id },
+            data: {
+              totalAssets,
+              scannedAssets,
+              updatedAt: new Date()
+            }
+          })
+        );
+        console.log("[DEBUG API] Session data updated successfully");
+      }
+    } catch (updateError) {
+      console.error("[DEBUG API] Failed to update session data:", updateError);
+      // Continue anyway - we'll still return correct data even if update fails
+    }
     const missingCount = missingAssets.length;
     const identifiedCount = scannedEntries.filter(
       (entry) => entry.isIdentified
@@ -232,8 +262,8 @@ export async function GET(
         notes: session.notes,
         completionNotes: session.completionNotes,
         status: session.status,
-        totalAssets: session.totalAssets,
-        scannedAssets: session.scannedAssets,
+        totalAssets: totalAssets, // Use actual count from database
+        scannedAssets: scannedAssets, // Use actual count from scanned entries
         planStart: session.planStart,
         planEnd: session.planEnd,
       },

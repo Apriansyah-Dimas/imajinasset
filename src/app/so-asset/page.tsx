@@ -285,8 +285,10 @@ function SOAssetPageContent() {
   };
 
   const getProgressPercentage = (scanned: number, total: number) => {
-    if (!scanned || !total || total === 0) return 0;
-    return Math.round((scanned / total) * 100);
+    if (!total || total <= 0) return 0;
+    const percentage = ((Number(scanned) || 0) / total) * 100;
+    if (!Number.isFinite(percentage)) return 0;
+    return Math.min(100, Math.max(0, Math.round(percentage)));
   };
 
   const statusCounts = {

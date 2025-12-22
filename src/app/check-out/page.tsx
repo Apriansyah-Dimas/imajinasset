@@ -38,6 +38,8 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import Image from "next/image";
+import { useAuth } from "@/contexts/auth-context";
+import { getClientAuthToken } from "@/lib/client-auth";
 
 interface AssetRecord {
   id: string;
@@ -379,6 +381,10 @@ function HistoryEntryCard({
 }
 
 function CheckOutContent() {
+  const { user } = useAuth();
+  const canManageCheckInOut =
+    user?.role === "ADMIN" || user?.role === "SO_ASSET_USER";
+  const isReadOnly = !canManageCheckInOut;
   const [assetNumber, setAssetNumber] = useState("");
   const [assetError, setAssetError] = useState<string | null>(null);
   const [assetLookupLoading, setAssetLookupLoading] = useState(false);
@@ -405,6 +411,11 @@ function CheckOutContent() {
     useState<CheckoutHistoryEntry | null>(null);
   const autoLoadAttemptedRef = useRef(false);
 
+  const getAuthHeaders = useCallback(() => {
+    const token = getClientAuthToken();
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  }, []);
+
   const loadHistory = useCallback(
     async (options?: { startDate?: string; endDate?: string }) => {
       setHistoryLoading(true);
@@ -421,6 +432,11 @@ function CheckOutContent() {
         const query = params.toString();
         const response = await fetch(
           `/api/check-in-out${query ? `?${query}` : ""}`,
+          {
+            headers: {
+              ...getAuthHeaders(),
+            },
+          }
         );
         if (!response.ok) {
           const data = (await response.json().catch(() => null)) as
@@ -445,7 +461,7 @@ function CheckOutContent() {
         setHistoryLoading(false);
       }
     },
-    [],
+    [getAuthHeaders],
   );
 
   const persistAssetState = useCallback((state: StoredAssetState | null) => {
@@ -473,7 +489,8 @@ function CheckOutContent() {
   const checkOutstandingCheckout = useCallback(async (assetId: string) => {
     try {
       const response = await fetch(
-        `/api/check-in-out?assetId=${assetId}&limit=1`
+        `/api/check-in-out?assetId=${assetId}&limit=1`,
+        { headers: { ...getAuthHeaders() } }
       );
       if (!response.ok) {
         setPendingCheckout(null);
@@ -494,7 +511,7 @@ function CheckOutContent() {
       setPendingCheckout(null);
       return null;
     }
-  }, []);
+  }, [getAuthHeaders]);
 
   const fetchAssetDetails = useCallback(
     async (
@@ -567,7 +584,9 @@ function CheckOutContent() {
 
   const fetchHistoryDetail = useCallback(async (id: string) => {
     try {
-      const response = await fetch(`/api/check-in-out?id=${id}`);
+      const response = await fetch(`/api/check-in-out?id=${id}`, {
+        headers: { ...getAuthHeaders() },
+      });
       if (!response.ok) {
         const data = (await response.json().catch(() => null)) as {
           error?: string;
@@ -587,7 +606,7 @@ function CheckOutContent() {
       );
       return null;
     }
-  }, []);
+  }, [getAuthHeaders]);
 
   useEffect(() => {
     const fetchMasterData = async () => {
@@ -735,6 +754,10 @@ function CheckOutContent() {
       toast.error("Assign To wajib dipilih.");
       return;
     }
+    if (isReadOnly) {
+      toast.error("Anda tidak memiliki akses untuk melakukan check-out.");
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -742,6 +765,7 @@ function CheckOutContent() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          ...getAuthHeaders(),
         },
         body: JSON.stringify({
           assetId: selectedAsset.id,
@@ -799,6 +823,7 @@ function CheckOutContent() {
                 }))
               }
               className="pr-10"
+              disabled={isReadOnly}
             />
             <Calendar className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           </div>
@@ -812,7 +837,7 @@ function CheckOutContent() {
             onValueChange={(value) =>
               setFormData((prev) => ({ ...prev, assignTo: value }))
             }
-            disabled={picsLoading || pics.length === 0}
+            disabled={picsLoading || pics.length === 0 || isReadOnly}
           >
             <SelectTrigger>
               <SelectValue placeholder="Select Person" />
@@ -847,6 +872,7 @@ function CheckOutContent() {
                 }))
               }
               className="pr-10"
+              disabled={isReadOnly}
             />
             <Calendar className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           </div>
@@ -860,7 +886,7 @@ function CheckOutContent() {
             onValueChange={(value) =>
               setFormData((prev) => ({ ...prev, departmentId: value }))
             }
-            disabled={departmentsLoading || departments.length === 0}
+            disabled={departmentsLoading || departments.length === 0 || isReadOnly}
           >
             <SelectTrigger>
               <SelectValue placeholder="Select Department" />
@@ -891,6 +917,7 @@ function CheckOutContent() {
               setFormData((prev) => ({ ...prev, notes: event.target.value }))
             }
             placeholder="Catatan tambahan mengenai proses check out."
+            disabled={isReadOnly}
           />
         ),
         alignTop: true,
@@ -913,9 +940,19 @@ function CheckOutContent() {
     <div className="min-h-screen bg-background px-4 py-6 sm:px-6 lg:px-10">
       <div className="mx-auto w-full max-w-7xl space-y-6">
         <div className="flex flex-col gap-2">
-          <h1 className="text-3xl font-semibold text-foreground">Check Out</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl font-semibold text-foreground">Check Out</h1>
+            {isReadOnly && (
+              <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+                Read Only
+              </span>
+            )}
+          </div>
           <p className="text-sm text-muted-foreground">
-            Masukkan Asset No / No Asset untuk memulai proses check out.
+            {isReadOnly
+              ? "View only access. You cannot perform check-out operations."
+              : "Masukkan Asset No / No Asset untuk memulai proses check out."
+            }
           </p>
         </div>
 
@@ -943,16 +980,22 @@ function CheckOutContent() {
                       onChange={(event) => setAssetNumber(event.target.value)}
                       required
                       className="flex-1"
+                      disabled={isReadOnly}
                     />
                     <Button
                       type="submit"
                       className="w-full sm:w-40"
-                      disabled={assetLookupLoading}
+                      disabled={assetLookupLoading || isReadOnly}
                     >
                       {assetLookupLoading ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                           Mencari
+                        </>
+                      ) : isReadOnly ? (
+                        <>
+                          <Search className="mr-2 h-4 w-4" />
+                          View Only
                         </>
                       ) : (
                         <>
@@ -1026,8 +1069,9 @@ function CheckOutContent() {
                           type="button"
                           onClick={advanceToCheckoutForm}
                           className="flex-1"
+                          disabled={isReadOnly}
                         >
-                          Next
+                          {isReadOnly ? "Read Only" : "Next"}
                         </Button>
                       </div>
                     )}
@@ -1283,6 +1327,7 @@ function CheckOutContent() {
                 onChange={(signature) =>
                   setFormData((prev) => ({ ...prev, signature }))
                 }
+                disabled={isReadOnly}
               />
             </div>
           </div>
@@ -1301,13 +1346,15 @@ function CheckOutContent() {
               type="button"
               className="sm:w-40"
               onClick={handleCheckoutSubmit}
-              disabled={submitting || !formData.assignTo}
+              disabled={submitting || !formData.assignTo || isReadOnly}
             >
               {submitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Processing
                 </>
+              ) : isReadOnly ? (
+                "Read Only"
               ) : (
                 "Check Out"
               )}
@@ -1321,7 +1368,7 @@ function CheckOutContent() {
 
 export default function CheckOutPage() {
   return (
-    <ProtectedRoute allowedRoles={["ADMIN", "SO_ASSET_USER", "VIEWER"]}>
+    <ProtectedRoute allowedRoles={["ADMIN", "SO_ASSET_USER", "VIEWER", "USER"]}>
       <CheckOutContent />
     </ProtectedRoute>
   );

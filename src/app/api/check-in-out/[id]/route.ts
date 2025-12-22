@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { authenticate } from "@/lib/auth";
+import { authenticate, canManageCheckInOut, canViewCheckInOut } from "@/lib/auth";
 
 // GET - Get checkout detail
 export async function GET(
@@ -8,10 +8,12 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Authenticate user
     const authResult = await authenticate(request);
-    if (!authResult.success) {
+    if (!authResult.success || !authResult.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    if (!canViewCheckInOut(authResult.user.role)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     // Await params as required by Next.js 15
@@ -35,6 +37,10 @@ export async function GET(
       );
     }
 
+    if (authResult.user.role === "VIEWER" && checkout.status !== "OUT") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     return NextResponse.json({ checkout });
   } catch (error) {
     console.error("Error fetching checkout:", error);
@@ -54,10 +60,15 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Authenticate user
     const authResult = await authenticate(request);
-    if (!authResult.success) {
+    if (!authResult.success || !authResult.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    if (!canManageCheckInOut(authResult.user.role)) {
+      return NextResponse.json(
+        { error: "You do not have permission to complete check-in" },
+        { status: 403 }
+      );
     }
 
     // Await params as required by Next.js 15
