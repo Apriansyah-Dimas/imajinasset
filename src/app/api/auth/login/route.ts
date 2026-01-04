@@ -4,6 +4,13 @@ import bcrypt from 'bcryptjs';
 import { db } from '@/lib/db';
 import { validateEmail, validatePassword, sanitizeTextInput } from '@/lib/validation';
 import { parseUserAgent } from '@/lib/user-agent';
+import {
+  applyIpRateLimit,
+  checkDbFailLimit,
+  checkFailMemoryLimit,
+  registerFailMemory,
+  retryAfterHeader,
+} from '@/lib/rate-limit';
 
 const jwtSecret = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
@@ -12,6 +19,12 @@ if (!process.env.JWT_SECRET) {
 }
 const DEFAULT_ADMIN_EMAIL = process.env.DEFAULT_ADMIN_EMAIL;
 const DEFAULT_ADMIN_NAME = process.env.DEFAULT_ADMIN_NAME;
+
+const getClientIp = (request?: NextRequest) => {
+  const forwarded = request?.headers.get('x-forwarded-for');
+  const headerIp = forwarded?.split(',')[0].trim() || request?.headers.get('x-real-ip');
+  return headerIp || request?.ip || '127.0.0.1';
+};
 
 async function recordLoginHistory(
   userId: string,
@@ -23,9 +36,7 @@ async function recordLoginHistory(
     console.log('DEBUG: Recording login history for userId:', userId, 'isSuccess:', isSuccess);
 
     const userAgent = request?.headers.get('user-agent') || '';
-    const ipAddress = request?.headers.get('x-forwarded-for') ||
-                      request?.headers.get('x-real-ip') ||
-                      '127.0.0.1';
+    const ipAddress = getClientIp(request);
 
     const parsedUA = parseUserAgent(userAgent);
     console.log('DEBUG: Parsed UA:', parsedUA);
@@ -125,6 +136,7 @@ async function ensureDefaultAdmin() {
 export async function POST(request: NextRequest) {
   try {
     const { email, password } = await request.json();
+    const clientIp = getClientIp(request);
 
     // Validate email
     const emailValidation = validateEmail(email);
@@ -147,6 +159,25 @@ export async function POST(request: NextRequest) {
     // Sanitize inputs
     const sanitizedEmail = sanitizeTextInput(email);
     const sanitizedPassword = password; // Don't sanitize password for comparison
+    const identifierKey = (sanitizedEmail || '').toLowerCase();
+
+    // Rate limit by IP first to absorb bursts early
+    const ipRateLimit = applyIpRateLimit(clientIp);
+    if (!ipRateLimit.allowed) {
+      return NextResponse.json(
+        { error: "Too many login attempts. Please try again later." },
+        { status: 429, headers: retryAfterHeader(ipRateLimit) }
+      );
+    }
+
+    // Check memory-based per-identifier fail window before hitting DB
+    const failMemoryLimit = checkFailMemoryLimit(clientIp, identifierKey);
+    if (!failMemoryLimit.allowed) {
+      return NextResponse.json(
+        { error: "Too many login attempts. Please try again later." },
+        { status: 429, headers: retryAfterHeader(failMemoryLimit) }
+      );
+    }
 
     await ensureDefaultAdmin();
 
@@ -156,20 +187,31 @@ export async function POST(request: NextRequest) {
 
     if (!user) {
       // Record failed login attempt (user not found)
-      // We don't have userId here, so we skip recording for now
+      const failResult = registerFailMemory(clientIp, identifierKey);
       return NextResponse.json(
-        { error: "Invalid credentials" },
-        { status: 401 }
+        { error: failResult.allowed ? "Invalid credentials" : "Too many login attempts. Please try again later." },
+        { status: failResult.allowed ? 401 : 429, headers: failResult.allowed ? undefined : retryAfterHeader(failResult) }
       );
     }
 
     // Check if user is active (handle undefined case)
     if (!user.isActive) {
       // Record failed login attempt (inactive account)
+      const failResult = registerFailMemory(clientIp, identifierKey);
       await recordLoginHistory(user.id, false, 'Account is inactive', request);
       return NextResponse.json(
-        { error: "Account is inactive" },
-        { status: 403 }
+        { error: failResult.allowed ? "Account is inactive" : "Too many login attempts. Please try again later." },
+        { status: failResult.allowed ? 403 : 429, headers: failResult.allowed ? undefined : retryAfterHeader(failResult) }
+      );
+    }
+
+    // Cross-instance fail limit using persisted login history
+    const dbFailLimit = await checkDbFailLimit(user.id);
+    if (!dbFailLimit.allowed) {
+      await recordLoginHistory(user.id, false, 'rate_limited', request);
+      return NextResponse.json(
+        { error: "Too many login attempts. Please try again later." },
+        { status: 429, headers: retryAfterHeader(dbFailLimit) }
       );
     }
 
@@ -178,10 +220,11 @@ export async function POST(request: NextRequest) {
 
     if (!isValidPassword) {
       // Record failed login attempt (wrong password)
+      const failResult = registerFailMemory(clientIp, identifierKey);
       await recordLoginHistory(user.id, false, 'Invalid credentials', request);
       return NextResponse.json(
-        { error: "Invalid credentials" },
-        { status: 401 }
+        { error: failResult.allowed ? "Invalid credentials" : "Too many login attempts. Please try again later." },
+        { status: failResult.allowed ? 401 : 429, headers: failResult.allowed ? undefined : retryAfterHeader(failResult) }
       );
     }
 

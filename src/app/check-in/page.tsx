@@ -200,7 +200,8 @@ function CheckInContent() {
   const getAuthHeaders = useCallback(() => {
     const token = getClientAuthToken();
     return token ? { Authorization: `Bearer ${token}` } : {};
-  }, [getAuthHeaders]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const fetchPics = useCallback(async () => {
     setPicsLoading(true);
@@ -222,7 +223,7 @@ function CheckInContent() {
     } finally {
       setPicsLoading(false);
     }
-  }, []);
+  }, [getAuthHeaders]);
 
   const loadPendingCheckouts = useCallback(async () => {
     setPendingLoading(true);
